@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
+	"github.com/doordash/oapi-codegen/v2/pkg/util"
 )
 
 const (

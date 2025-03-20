@@ -23,7 +23,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
+	"github.com/doordash/oapi-codegen/v2/pkg/util"
 )
 
 const (
