@@ -1,16 +1,3 @@
-// Copyright 2019 DeepMap, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 package codegen
 
 import (
@@ -19,18 +6,12 @@ import (
 	"os"
 	"strings"
 	"text/template"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/doordash/oapi-codegen/v2/pkg/util"
-)
-
-const (
-	// These allow the case statements to be sorted later:
-	prefixLeastSpecific = "9"
-
-	defaultClientTypeName = "Client"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -43,6 +24,99 @@ var (
 
 	titleCaser = cases.Title(language.English)
 )
+
+const (
+	// These allow the case statements to be sorted later:
+	prefixLeastSpecific = "9"
+)
+
+// TemplateFunctions is passed to the template engine, and we can call each
+// function here by keyName from the template code.
+var TemplateFunctions = template.FuncMap{
+	// previous
+	"genParamArgs":               genParamArgs,
+	"genParamTypes":              genParamTypes,
+	"genParamNames":              genParamNames,
+	"genParamFmtString":          ReplacePathParamsWithStr,
+	"ucFirstWithPkgName":         UppercaseFirstCharacterWithPkgName,
+	"camelCase":                  ToCamelCase,
+	"genResponsePayload":         genResponsePayload,
+	"genResponseTypeName":        genResponseTypeName,
+	"genResponseUnmarshal":       genResponseUnmarshal,
+	"getResponseTypeDefinitions": getResponseTypeDefinitions,
+	"toStringArray":              toStringArray,
+	"title":                      titleCaser.String,
+	"stripNewLines":              stripNewLines,
+	"sanitizeGoIdentity":         SanitizeGoIdentity,
+
+	// new
+	"genTypeName": nameNormalizer,
+	"lcFirst":     lowercaseFirstCharacter,
+	"ucFirst":     uppercaseFirstCharacter,
+	"caps":        strings.ToUpper,
+	"lower":       strings.ToLower,
+	"toGoComment": stringToGoCommentWithPrefix,
+	"ternary":     ternary,
+	"join":        join,
+	"fst":         fst,
+	"hasPrefix":   strings.HasPrefix,
+	"hasSuffix":   strings.HasSuffix,
+	"str":         str,
+}
+
+func stripNewLines(s string) string {
+	r := strings.NewReplacer("\n", "")
+	return r.Replace(s)
+}
+
+// This outputs a string array
+func toStringArray(sarr []string) string {
+	s := strings.Join(sarr, `","`)
+	if len(s) > 0 {
+		s = `"` + s + `"`
+	}
+	return `[]string{` + s + `}`
+}
+
+// buildUnmarshalCase builds an unmarshaling case clause for different content-types:
+func buildUnmarshalCase(typeDefinition ResponseTypeDefinition, caseAction string, contentType string) (caseKey string, caseClause string) {
+	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, contentType, typeDefinition.ResponseName)
+	caseClauseKey := getConditionOfResponseName("rsp.StatusCode", typeDefinition.ResponseName)
+	caseClause = fmt.Sprintf("case strings.Contains(rsp.Header.Get(\"%s\"), \"%s\") && %s:\n%s\n", "Content-Type", contentType, caseClauseKey, caseAction)
+	return caseKey, caseClause
+}
+
+func buildUnmarshalCaseStrict(typeDefinition ResponseTypeDefinition, caseAction string, contentType string) (caseKey string, caseClause string) {
+	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, contentType, typeDefinition.ResponseName)
+	caseClauseKey := getConditionOfResponseName("rsp.StatusCode", typeDefinition.ResponseName)
+	caseClause = fmt.Sprintf("case rsp.Header.Get(\"%s\") == \"%s\" && %s:\n%s\n", "Content-Type", contentType, caseClauseKey, caseAction)
+	return caseKey, caseClause
+}
+
+// genResponseTypeName creates the name of generated response types (given the operationID):
+func genResponseTypeName(operationID string) string {
+	return fmt.Sprintf("%s%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
+}
+
+func getResponseTypeDefinitions(op *OperationDefinition) []ResponseTypeDefinition {
+	td, err := op.GetResponseTypeDefinitions()
+	if err != nil {
+		panic(err)
+	}
+	return td
+}
+
+// Return the statusCode comparison clause from the response name.
+func getConditionOfResponseName(statusCodeVar, responseName string) string {
+	switch responseName {
+	case "default":
+		return "true"
+	case "1XX", "2XX", "3XX", "4XX", "5XX":
+		return fmt.Sprintf("%s / 100 == %s", statusCodeVar, responseName[:1])
+	default:
+		return fmt.Sprintf("%s == %s", statusCodeVar, responseName)
+	}
+}
 
 // genParamArgs takes an array of Parameter definition, and generates a valid
 // Go parameter declaration from them, eg:
@@ -241,79 +315,60 @@ func genResponseUnmarshal(op *OperationDefinition) string {
 	return buffer.String()
 }
 
-// buildUnmarshalCase builds an unmarshaling case clause for different content-types:
-func buildUnmarshalCase(typeDefinition ResponseTypeDefinition, caseAction string, contentType string) (caseKey string, caseClause string) {
-	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, contentType, typeDefinition.ResponseName)
-	caseClauseKey := getConditionOfResponseName("rsp.StatusCode", typeDefinition.ResponseName)
-	caseClause = fmt.Sprintf("case strings.Contains(rsp.Header.Get(\"%s\"), \"%s\") && %s:\n%s\n", "Content-Type", contentType, caseClauseKey, caseAction)
-	return caseKey, caseClause
-}
-
-func buildUnmarshalCaseStrict(typeDefinition ResponseTypeDefinition, caseAction string, contentType string) (caseKey string, caseClause string) {
-	caseKey = fmt.Sprintf("%s.%s.%s", prefixLeastSpecific, contentType, typeDefinition.ResponseName)
-	caseClauseKey := getConditionOfResponseName("rsp.StatusCode", typeDefinition.ResponseName)
-	caseClause = fmt.Sprintf("case rsp.Header.Get(\"%s\") == \"%s\" && %s:\n%s\n", "Content-Type", contentType, caseClauseKey, caseAction)
-	return caseKey, caseClause
-}
-
-// genResponseTypeName creates the name of generated response types (given the operationID):
-func genResponseTypeName(operationID string) string {
-	return fmt.Sprintf("%s%s", UppercaseFirstCharacter(operationID), responseTypeSuffix)
-}
-
-func getResponseTypeDefinitions(op *OperationDefinition) []ResponseTypeDefinition {
-	td, err := op.GetResponseTypeDefinitions()
-	if err != nil {
-		panic(err)
+// uppercaseFirstCharacter Uppercases the first character in a string.
+func uppercaseFirstCharacter(v any) string {
+	str, ok := v.(string)
+	if !ok || str == "" {
+		return ""
 	}
-	return td
+
+	runes := []rune(str)
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
 }
 
-// Return the statusCode comparison clause from the response name.
-func getConditionOfResponseName(statusCodeVar, responseName string) string {
-	switch responseName {
-	case "default":
-		return "true"
-	case "1XX", "2XX", "3XX", "4XX", "5XX":
-		return fmt.Sprintf("%s / 100 == %s", statusCodeVar, responseName[:1])
-	default:
-		return fmt.Sprintf("%s == %s", statusCodeVar, responseName)
+// lowercaseFirstCharacter Lowercases the first character in a string. This assumes UTF-8, so we have
+// to be careful with unicode, don't treat it as a byte array.
+func lowercaseFirstCharacter(str string) string {
+	if str == "" {
+		return ""
 	}
+	runes := []rune(str)
+	runes[0] = unicode.ToLower(runes[0])
+	return string(runes)
 }
 
-// This outputs a string array
-func toStringArray(sarr []string) string {
-	s := strings.Join(sarr, `","`)
-	if len(s) > 0 {
-		s = `"` + s + `"`
+// Ternary function
+func ternary(cond bool, trueVal, falseVal string) string {
+	if cond {
+		return trueVal
 	}
-	return `[]string{` + s + `}`
+	return falseVal
 }
 
-func stripNewLines(s string) string {
-	r := strings.NewReplacer("\n", "")
-	return r.Replace(s)
+func join(sep string, values []string) string {
+	return strings.Join(values, sep)
 }
 
-// TemplateFunctions is passed to the template engine, and we can call each
-// function here by keyName from the template code.
-var TemplateFunctions = template.FuncMap{
-	"genParamArgs":               genParamArgs,
-	"genParamTypes":              genParamTypes,
-	"genParamNames":              genParamNames,
-	"genParamFmtString":          ReplacePathParamsWithStr,
-	"lcFirst":                    LowercaseFirstCharacter,
-	"ucFirst":                    UppercaseFirstCharacter,
-	"ucFirstWithPkgName":         UppercaseFirstCharacterWithPkgName,
-	"camelCase":                  ToCamelCase,
-	"genResponsePayload":         genResponsePayload,
-	"genResponseTypeName":        genResponseTypeName,
-	"genResponseUnmarshal":       genResponseUnmarshal,
-	"getResponseTypeDefinitions": getResponseTypeDefinitions,
-	"toStringArray":              toStringArray,
-	"lower":                      strings.ToLower,
-	"title":                      titleCaser.String,
-	"stripNewLines":              stripNewLines,
-	"sanitizeGoIdentity":         SanitizeGoIdentity,
-	"toGoComment":                StringWithTypeNameToGoComment,
+func fst(v any) string {
+	switch val := v.(type) {
+	case string:
+		if len(val) > 0 {
+			_, size := utf8.DecodeRuneInString(val)
+			return val[:size]
+		}
+	case []string:
+		if len(val) > 0 {
+			return fst(val[0])
+		}
+	case []any:
+		if len(val) > 0 {
+			return fst(val[0])
+		}
+	}
+	return fst(fmt.Sprintf("%v", v))
+}
+
+func str(v any) string {
+	return fmt.Sprintf("%v", v)
 }

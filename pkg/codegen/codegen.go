@@ -29,10 +29,16 @@ import (
 	"golang.org/x/tools/imports"
 )
 
-// Embed the templates directory
-//
-//go:embed templates
-var templates embed.FS
+// ParseContext holds the OpenAPI models.
+type ParseContext struct {
+	Operations               []OperationDefinition
+	TypeDefinitions          map[SpecLocation][]TypeDefinition
+	Enums                    []EnumDefinition
+	UnionTypes               []TypeDefinition
+	AdditionalTypes          []TypeDefinition
+	UnionWithAdditionalTypes []TypeDefinition
+	Imports                  []string
+}
 
 // globalState stores all global state. Please don't put global state anywhere
 // else so that we can easily track it.
@@ -165,7 +171,7 @@ func Generate(spec *openapi3.T, opts Configuration) (string, error) {
 	}
 
 	// remove any byte-order-marks which break Go-Code
-	goCode := SanitizeCode(buf.String())
+	goCode := sanitizeCode(buf.String())
 
 	outBytes, err := imports.Process(opts.PackageName+".go", []byte(goCode), nil)
 	if err != nil {
@@ -438,14 +444,6 @@ func GenerateUnionAndAdditionalProopertiesBoilerplate(t *template.Template, type
 	}
 
 	return GenerateTemplates([]string{"union-and-additional-properties.tmpl"}, t, context)
-}
-
-// SanitizeCode runs sanitizers across the generated Go code to ensure the
-// generated code will be able to compile.
-func SanitizeCode(goCode string) string {
-	// remove any byte-order-marks which break Go-Code
-	// See: https://groups.google.com/forum/#!topic/golang-nuts/OToNIPdfkks
-	return strings.ReplaceAll(goCode, "\uFEFF", "")
 }
 
 // GetUserTemplateText attempts to retrieve the template text from a passed string or file..

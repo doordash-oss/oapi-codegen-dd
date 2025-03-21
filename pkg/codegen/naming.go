@@ -31,7 +31,7 @@ var (
 	pathParamRE    *regexp.Regexp
 	predeclaredSet map[string]struct{}
 	separatorSet   map[rune]struct{}
-	nameNormalizer = ToCamelCase
+	nameNormalizer = ToCamelCaseWithInitialism
 )
 
 var camelCaseMatchParts = regexp.MustCompile(`[\p{Lu}\d]+([\p{Ll}\d]+|$)`)
