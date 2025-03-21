@@ -6,6 +6,7 @@ import (
 )
 
 type Property struct {
+	GoName        string
 	Description   string
 	JsonFieldName string
 	Schema        Schema
@@ -39,6 +40,22 @@ func (p Property) GoTypeDef() string {
 		typeDef = "*" + typeDef
 	}
 	return typeDef
+}
+
+func createPropertyGoFieldName(jsonName string, extensions map[string]any) string {
+	goFieldName := jsonName
+	if extension, ok := extensions[extGoName]; ok {
+		if extGoFieldName, err := extParseGoFieldName(extension); err == nil {
+			goFieldName = extGoFieldName
+		}
+	}
+
+	// convert some special names needed for interfaces
+	if goFieldName == "error" {
+		goFieldName = "ErrorData"
+	}
+
+	return SchemaNameToTypeName(goFieldName)
 }
 
 // GenFieldsFromProperties produce corresponding field names with JSON annotations,

@@ -369,6 +369,7 @@ func GenerateGoSchema(sref *openapi3.SchemaRef, path []string) (Schema, error) {
 					description = p.Value.Description
 				}
 				prop := Property{
+					// GoName: createPropertyGoFieldName(pName, extensions),
 					JsonFieldName: pName,
 					Schema:        pSchema,
 					Required:      required,
