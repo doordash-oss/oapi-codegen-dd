@@ -103,11 +103,3 @@ func extParseEnumVarNames(extPropValue interface{}) ([]string, error) {
 func extParseDeprecationReason(extPropValue interface{}) (string, error) {
 	return extString(extPropValue)
 }
-
-func extParseOapiCodegenOnlyHonourGoName(extPropValue interface{}) (bool, error) {
-	onlyHonourGoName, ok := extPropValue.(bool)
-	if !ok {
-		return false, fmt.Errorf("failed to convert type: %T", extPropValue)
-	}
-	return onlyHonourGoName, nil
-}
