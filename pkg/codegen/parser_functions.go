@@ -204,7 +204,7 @@ func genResponseUnmarshal(op *OperationDefinition) string {
 
 		// We can't do much without a value:
 		if responseRef.Value == nil {
-			fmt.Fprintf(os.Stderr, "Response %s.%s has nil value\n", op.OperationId, typeDefinition.ResponseName)
+			fmt.Fprintf(os.Stderr, "Response %s.%s has nil value\n", op.ID, typeDefinition.ResponseName)
 			continue
 		}
 

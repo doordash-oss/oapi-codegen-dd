@@ -27,52 +27,64 @@ import (
 )
 
 // OperationDefinition describes an Operation
+// ID The operation_id description from Swagger, used to generate function names
+// PathParams Parameters in the path, eg, /path/:param
+// HeaderParams Parameters in HTTP headers
+// QueryParams Parameters in the query, /path?param
+// TypeDefinitions These are all the types we need to define for this operation
+// BodyRequired Whether the body is required for this operation
+// Bodies The list of bodies for which to generate handlers.
+// Responses The list of responses that can be accepted by handlers.
+// Summary string from Swagger, used to generate a comment
+// Method GET, POST, DELETE, etc.
+// Path The Swagger path for the operation, like /resource/{id}
+// Spec The OpenAPI3 Operation object
 type OperationDefinition struct {
-	OperationId string // The operation_id description from Swagger, used to generate function names
+	ID string
 
-	PathParams      []ParameterDefinition // Parameters in the path, eg, /path/:param
-	HeaderParams    []ParameterDefinition // Parameters in HTTP headers
-	QueryParams     []ParameterDefinition // Parameters in the query, /path?param
-	TypeDefinitions []TypeDefinition      // These are all the types we need to define for this operation
+	PathParams      []ParameterDefinition
+	HeaderParams    []ParameterDefinition
+	QueryParams     []ParameterDefinition
+	TypeDefinitions []TypeDefinition
 	BodyRequired    bool
-	Bodies          []RequestBodyDefinition // The list of bodies for which to generate handlers.
-	Responses       []ResponseDefinition    // The list of responses that can be accepted by handlers.
-	Summary         string                  // Summary string from Swagger, used to generate a comment
-	Method          string                  // GET, POST, DELETE, etc.
-	Path            string                  // The Swagger path for the operation, like /resource/{id}
+	Bodies          []RequestBodyDefinition
+	Responses       []ResponseDefinition
+	Summary         string
+	Method          string
+	Path            string
 	Spec            *openapi3.Operation
 }
 
 // Params returns the list of all parameters except Path parameters. Path parameters
 // are handled differently from the rest, since they're mandatory.
-func (o *OperationDefinition) Params() []ParameterDefinition {
+func (o OperationDefinition) Params() []ParameterDefinition {
 	result := append(o.QueryParams, o.HeaderParams...)
 	return result
 }
 
 // AllParams returns all parameters
-func (o *OperationDefinition) AllParams() []ParameterDefinition {
+func (o OperationDefinition) AllParams() []ParameterDefinition {
 	result := append(o.QueryParams, o.HeaderParams...)
 	result = append(result, o.PathParams...)
 	return result
 }
 
-// If we have parameters other than path parameters, they're bundled into an
+// RequiresParamObject indicates If we have parameters other than path parameters, they're bundled into an
 // object. Returns true if we have any of those. This is used from the template
 // engine.
-func (o *OperationDefinition) RequiresParamObject() bool {
+func (o OperationDefinition) RequiresParamObject() bool {
 	return len(o.Params()) > 0
 }
 
 // HasBody is called by the template engine to determine whether to generate body
 // marshaling code on the client. This is true for all body types, whether
 // we generate types for them.
-func (o *OperationDefinition) HasBody() bool {
+func (o OperationDefinition) HasBody() bool {
 	return o.Spec.RequestBody != nil
 }
 
 // SummaryAsComment returns the Operations summary as a multi line comment
-func (o *OperationDefinition) SummaryAsComment() string {
+func (o OperationDefinition) SummaryAsComment() string {
 	if o.Summary == "" {
 		return ""
 	}
@@ -88,7 +100,7 @@ func (o *OperationDefinition) SummaryAsComment() string {
 // types which we know how to parse. These will be turned into fields on a
 // response object for automatic deserialization of responses in the generated
 // Client code. See "client-with-responses.tmpl".
-func (o *OperationDefinition) GetResponseTypeDefinitions() ([]ResponseTypeDefinition, error) {
+func (o OperationDefinition) GetResponseTypeDefinitions() ([]ResponseTypeDefinition, error) {
 	var tds []ResponseTypeDefinition
 
 	if o.Spec == nil || o.Spec.Responses == nil {
@@ -113,9 +125,9 @@ func (o *OperationDefinition) GetResponseTypeDefinitions() ([]ResponseTypeDefini
 				contentType := responseRef.Value.Content[contentTypeName]
 				// We can only generate a type if we have a schema:
 				if contentType.Schema != nil {
-					responseSchema, err := GenerateGoSchema(contentType.Schema, []string{o.OperationId, responseName})
+					responseSchema, err := GenerateGoSchema(contentType.Schema, []string{o.ID, responseName})
 					if err != nil {
-						return nil, fmt.Errorf("Unable to determine Go type for %s.%s: %w", o.OperationId, contentTypeName, err)
+						return nil, fmt.Errorf("Unable to determine Go type for %s.%s: %w", o.ID, contentTypeName, err)
 					}
 
 					var typeName string
@@ -264,7 +276,7 @@ func OperationDefinitions(swagger *openapi3.T) ([]OperationDefinition, error) {
 				PathParams:   pathParams,
 				HeaderParams: FilterParameterDefinitionByType(allParams, "header"),
 				QueryParams:  FilterParameterDefinitionByType(allParams, "query"),
-				OperationId:  nameNormalizer(op.OperationID),
+				ID:           nameNormalizer(op.OperationID),
 				// Replace newlines in summary.
 				Summary:         op.Summary,
 				Method:          opName,
@@ -292,11 +304,11 @@ func generateDefaultOperationID(opName string, requestPath string) (string, erro
 	var operationId = strings.ToLower(opName)
 
 	if opName == "" {
-		return "", fmt.Errorf("operation name cannot be an empty string")
+		return "", ErrOperationNameEmpty
 	}
 
 	if requestPath == "" {
-		return "", fmt.Errorf("request path cannot be an empty string")
+		return "", ErrRequestPathEmpty
 	}
 
 	for _, part := range strings.Split(requestPath, "/") {
@@ -334,7 +346,7 @@ func GenerateParamsTypes(op OperationDefinition) []TypeDefinition {
 	objectParams := op.QueryParams
 	objectParams = append(objectParams, op.HeaderParams...)
 
-	typeName := op.OperationId + "Params"
+	typeName := op.ID + "Params"
 
 	s := Schema{}
 	for _, param := range objectParams {

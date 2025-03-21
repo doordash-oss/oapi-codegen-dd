@@ -1,4 +1,4 @@
-{{range .}}{{$opid := .OperationId}}
+{{range .}}{{$opid := .ID}}
 {{range .Bodies}}
 {{if .IsSupported -}}
 {{$contentType := .ContentType -}}
