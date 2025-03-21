@@ -589,8 +589,6 @@ func OperationDefinitions(swagger *openapi3.T, initialismOverrides bool) ([]Oper
 				return nil, err
 			}
 
-			ensureExternalRefsInParameterDefinitions(&allParams, pathItem.Ref)
-
 			// Order the path parameters to match the order as specified in
 			// the path, not in the swagger spec, and validate that the parameter
 			// names match, as downstream code depends on that.
@@ -605,14 +603,10 @@ func OperationDefinitions(swagger *openapi3.T, initialismOverrides bool) ([]Oper
 				return nil, fmt.Errorf("error generating body definitions: %w", err)
 			}
 
-			ensureExternalRefsInRequestBodyDefinitions(&bodyDefinitions, pathItem.Ref)
-
 			responseDefinitions, err := GenerateResponseDefinitions(op.OperationID, op.Responses.Map())
 			if err != nil {
 				return nil, fmt.Errorf("error generating response definitions: %w", err)
 			}
-
-			ensureExternalRefsInResponseDefinitions(&responseDefinitions, pathItem.Ref)
 
 			opDef := OperationDefinition{
 				PathParams:   pathParams,
