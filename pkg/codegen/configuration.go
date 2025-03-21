@@ -6,6 +6,11 @@ import (
 	"sort"
 )
 
+const (
+	// TODO: check if needed
+	disableTypeAliasesForArray = true
+)
+
 // Configuration defines code generation customizations.
 // PackageName to generate the code under.
 // SkipPrune indicates whether to skip pruning unused components on the generated code.
@@ -24,8 +29,7 @@ type Configuration struct {
 	Filter        FilterConfig      `yaml:"filter,omitempty"`
 	UserTemplates map[string]string `yaml:"user-templates,omitempty"`
 
-	InitialismOverrides   bool     `yaml:"initialism-overrides,omitempty"`
-	AdditionalInitialisms []string `yaml:"additional-initialisms,omitempty"`
+	InitialismOverrides bool `yaml:"initialism-overrides,omitempty"`
 
 	DisableTypeAliasesForType []string `yaml:"disable-type-aliases-for-type"`
 	NameNormalizer            string   `yaml:"name-normalizer,omitempty"`

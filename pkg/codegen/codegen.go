@@ -29,31 +29,13 @@ import (
 	"golang.org/x/tools/imports"
 )
 
-// globalState stores all global state. Please don't put global state anywhere
-// else so that we can easily track it.
-var globalState struct {
-	options       Configuration
-	spec          *openapi3.T
-	importMapping importMap
-	// initialismsMap stores initialisms as "lower(initialism) -> initialism" map.
-	// List of initialisms was taken from https://staticcheck.io/docs/configuration/options/#initialisms.
-	initialismsMap map[string]string
-}
-
 // Generate uses the Go templating engine to generate all of our server wrappers from
 // the descriptions we've built up above from the schema objects.
 func Generate(spec *openapi3.T, opts Configuration) (string, error) {
-	// This is global state
-	globalState.options = opts
-	globalState.spec = spec
-	globalState.importMapping = newImportMap(opts.ImportMapping)
-
 	spec, err := filterDocument(spec, opts)
 	if err != nil {
 		return "", fmt.Errorf("error filtering document: %w", err)
 	}
-
-	globalState.initialismsMap = makeInitialismsMap(opts.AdditionalInitialisms)
 
 	// This creates the golang templates text package
 	t := template.New("oapi-codegen").Funcs(TemplateFunctions)
@@ -79,7 +61,7 @@ func Generate(spec *openapi3.T, opts Configuration) (string, error) {
 		}
 	}
 
-	ops, err := OperationDefinitions(spec, opts.InitialismOverrides)
+	ops, err := OperationDefinitions(spec)
 	if err != nil {
 		return "", fmt.Errorf("error creating operation definitions: %w", err)
 	}
@@ -116,7 +98,7 @@ func Generate(spec *openapi3.T, opts Configuration) (string, error) {
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
 
-	externalImports := append(globalState.importMapping.GoImports(), importMap(xGoTypeImports).GoImports()...)
+	externalImports := importMap(xGoTypeImports).GoImports()
 	importsOut, err := GenerateImports(
 		t,
 		externalImports,
@@ -346,17 +328,15 @@ func GenerateImports(t *template.Template, externalImports []string, packageName
 	}
 
 	context := struct {
-		ExternalImports   []string
-		PackageName       string
-		ModuleName        string
-		Version           string
-		AdditionalImports []AdditionalImport
+		ExternalImports []string
+		PackageName     string
+		ModuleName      string
+		Version         string
 	}{
-		ExternalImports:   externalImports,
-		PackageName:       packageName,
-		ModuleName:        modulePath,
-		Version:           moduleVersion,
-		AdditionalImports: globalState.options.AdditionalImports,
+		ExternalImports: externalImports,
+		PackageName:     packageName,
+		ModuleName:      modulePath,
+		Version:         moduleVersion,
 	}
 
 	return GenerateTemplates([]string{"imports.tmpl"}, t, context)

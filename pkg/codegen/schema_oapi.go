@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -43,7 +42,7 @@ func oapiSchemaToGoType(schema *openapi3.Schema, path []string) (Schema, error) 
 		outSchema.AdditionalTypes = arrayType.AdditionalTypes
 		outSchema.Properties = arrayType.Properties
 		outSchema.DefineViaAlias = true
-		if slices.Contains(globalState.options.DisableTypeAliasesForType, "array") {
+		if disableTypeAliasesForArray {
 			outSchema.DefineViaAlias = false
 		}
 		return outSchema, nil

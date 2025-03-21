@@ -32,6 +32,7 @@ var (
 	predeclaredSet map[string]struct{}
 	separatorSet   map[rune]struct{}
 	nameNormalizer = ToCamelCaseWithInitialism
+	initialismMap  = makeInitialismsMap(initialismsList)
 )
 
 var camelCaseMatchParts = regexp.MustCompile(`[\p{Lu}\d]+([\p{Ll}\d]+|$)`)
@@ -232,7 +233,7 @@ func ToCamelCaseWithDigits(s string) string {
 func ToCamelCaseWithInitialisms(s string) string {
 	parts := camelCaseMatchParts.FindAllString(ToCamelCaseWithDigits(s), -1)
 	for i := range parts {
-		if v, ok := globalState.initialismsMap[strings.ToLower(parts[i])]; ok {
+		if v, ok := initialismMap[strings.ToLower(parts[i])]; ok {
 			parts[i] = v
 		}
 	}
@@ -374,69 +375,19 @@ func RefPathToObjName(refPath string) string {
 // #/components/schemas/Foo -> Foo
 // #/components/parameters/Bar -> Bar
 // #/components/responses/Baz -> Baz
-// Remote components (document.json#/Foo) are supported if they present in --import-mapping
-// URL components (http://deepmap.com/schemas/document.json#/Foo) are supported if they present in --import-mapping
-// Remote and URL also support standard local paths even though the spec doesn't mention them.
+// Remote components (document.json#/Foo) are not supported
 func RefPathToGoType(refPath string) (string, error) {
-	return refPathToGoType(refPath, true)
-}
-
-// refPathToGoType returns the Go typename for refPath given its
-func refPathToGoType(refPath string, local bool) (string, error) {
-	if refPath[0] == '#' {
-		return refPathToGoTypeSelf(refPath, local)
-	}
-	pathParts := strings.Split(refPath, "#")
-	if len(pathParts) != 2 {
-		return "", fmt.Errorf("unsupported reference: %s", refPath)
-	}
-	remoteComponent, flatComponent := pathParts[0], pathParts[1]
-	goPkg, ok := globalState.importMapping[remoteComponent]
-
-	if !ok {
-		return "", fmt.Errorf("unrecognized external reference '%s'; please provide the known import for this reference using option --import-mapping", remoteComponent)
-	}
-
-	if goPkg.Path == importMappingCurrentPackage {
-		return refPathToGoTypeSelf(fmt.Sprintf("#%s", pathParts[1]), local)
-	}
-
-	return refPathToGoTypeRemote(flatComponent, goPkg)
-
-}
-
-func refPathToGoTypeSelf(refPath string, local bool) (string, error) {
 	pathParts := strings.Split(refPath, "/")
 	depth := len(pathParts)
-	if local {
-		if depth != 4 {
-			return "", fmt.Errorf("unexpected reference depth: %d for ref: %s local: %t", depth, refPath, local)
-		}
-	} else if depth != 4 && depth != 2 {
-		return "", fmt.Errorf("unexpected reference depth: %d for ref: %s local: %t", depth, refPath, local)
+
+	if depth != 4 {
+		return "", fmt.Errorf("unexpected reference depth: %d for ref: %s", depth, refPath)
 	}
 
-	// Schemas may have been renamed locally, so look up the actual name in
-	// the spec.
-	name, err := findSchemaNameByRefPath(refPath, globalState.spec)
-	if err != nil {
-		return "", fmt.Errorf("error finding ref: %s in spec: %v", refPath, err)
-	}
-	if name != "" {
-		return name, nil
-	}
 	// lastPart now stores the final element of the type path. This is what
 	// we use as the base for a type name.
 	lastPart := pathParts[len(pathParts)-1]
 	return SchemaNameToTypeName(lastPart), nil
-}
-
-func refPathToGoTypeRemote(flatComponent string, goPkg goImport) (string, error) {
-	goType, err := refPathToGoType("#"+flatComponent, false)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s.%s", goPkg.Name, goType), nil
 }
 
 // IsGoTypeReference takes a $ref value and checks if it has link to go type.
@@ -786,49 +737,6 @@ func renameRequestBody(requestBodyName string, requestBodyRef *openapi3.RequestB
 		return typeName, nil
 	}
 	return SchemaNameToTypeName(requestBodyName), nil
-}
-
-// findSchemaByRefPath turns a $ref path into a schema. This will return ""
-// if the schema wasn't found, and it'll only work successfully for schemas
-// defined within the spec that we parsed.
-func findSchemaNameByRefPath(refPath string, spec *openapi3.T) (string, error) {
-	if spec.Components == nil {
-		return "", nil
-	}
-	pathElements := strings.Split(refPath, "/")
-	// All local references will have 4 path elements.
-	if len(pathElements) != 4 {
-		return "", nil
-	}
-
-	// We only support local references
-	if pathElements[0] != "#" {
-		return "", nil
-	}
-	// Only components are supported
-	if pathElements[1] != "components" {
-		return "", nil
-	}
-	propertyName := pathElements[3]
-	switch pathElements[2] {
-	case "schemas":
-		if schema, found := spec.Components.Schemas[propertyName]; found {
-			return renameSchema(propertyName, schema)
-		}
-	case "parameters":
-		if parameter, found := spec.Components.Parameters[propertyName]; found {
-			return renameParameter(propertyName, parameter)
-		}
-	case "responses":
-		if response, found := spec.Components.Responses[propertyName]; found {
-			return renameResponse(propertyName, response)
-		}
-	case "requestBodies":
-		if requestBody, found := spec.Components.RequestBodies[propertyName]; found {
-			return renameRequestBody(propertyName, requestBody)
-		}
-	}
-	return "", nil
 }
 
 // isAdditionalPropertiesExplicitFalse determines whether an openapi3.Schema is explicitly defined as `additionalProperties: false`

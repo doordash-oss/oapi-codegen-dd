@@ -29,7 +29,4 @@ import (
 	{{- range .ExternalImports}}
 	{{ . }}
 	{{- end}}
-	{{- range .AdditionalImports}}
-	{{.Alias}} "{{.Package}}"
-	{{- end}}
 )

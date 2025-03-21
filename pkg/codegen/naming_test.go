@@ -232,17 +232,6 @@ components:
 }
 
 func TestRefPathToGoType(t *testing.T) {
-	old := globalState.importMapping
-	globalState.importMapping = newImportMap(
-		map[string]string{
-			"doc.json":                    "externalref0",
-			"http://deepmap.com/doc.json": "externalref1",
-			// using the "current package" mapping
-			"dj-current-package.yml": "-",
-		},
-	)
-	defer func() { globalState.importMapping = old }()
-
 	tests := []struct {
 		name   string
 		path   string
@@ -264,41 +253,8 @@ func TestRefPathToGoType(t *testing.T) {
 			goType: "Wibble",
 		},
 		{
-			name:   "local-mapped-current-package",
-			path:   "dj-current-package.yml#/components/schemas/Foo",
-			goType: "Foo",
-		},
-		{
-			name:   "remote-root",
-			path:   "doc.json#/foo",
-			goType: "externalRef0.Foo",
-		},
-		{
-			name:   "remote-pathed",
-			path:   "doc.json#/components/parameters/foo",
-			goType: "externalRef0.Foo",
-		},
-		{
-			name:   "url-root",
-			path:   "http://deepmap.com/doc.json#/foo_bar",
-			goType: "externalRef1.FooBar",
-		},
-		{
-			name:   "url-pathed",
-			path:   "http://deepmap.com/doc.json#/components/parameters/foo_bar",
-			goType: "externalRef1.FooBar",
-		},
-		{
 			name: "local-too-deep",
 			path: "#/components/parameters/foo/components/bar",
-		},
-		{
-			name: "remote-too-deep",
-			path: "doc.json#/components/parameters/foo/foo_bar",
-		},
-		{
-			name: "url-too-deep",
-			path: "http://deepmap.com/doc.json#/components/parameters/foo/foo_bar",
 		},
 	}
 
