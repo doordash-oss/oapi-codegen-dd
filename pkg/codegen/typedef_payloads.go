@@ -150,8 +150,9 @@ func GenerateBodyDefinitions(operationID string, bodyOrRef *openapi3.RequestBody
 			}
 
 			td := TypeDefinition{
-				TypeName: bodyTypeName,
-				Schema:   bodySchema,
+				TypeName:     bodyTypeName,
+				Schema:       bodySchema,
+				SpecLocation: SpecLocationBody,
 			}
 			typeDefinitions = append(typeDefinitions, td)
 			// The body schema now is a reference to a type

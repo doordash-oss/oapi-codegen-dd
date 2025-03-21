@@ -5,27 +5,28 @@ import (
 	"reflect"
 )
 
+type SpecLocation string
+
+const (
+	SpecLocationPath     SpecLocation = "path"
+	SpecLocationQuery                 = "query"
+	SpecLocationHeader                = "header"
+	SpecLocationBody                  = "body"
+	SpecLocationResponse              = "response"
+	SpecLocationSchema                = "schema"
+	SpecLocationUnion                 = "union"
+)
+
 // TypeDefinition describes a Go type definition in generated code.
-//
-// Let's use this example schema:
-// components:
-//
-//	schemas:
-//	  Person:
-//	    type: object
-//	    properties:
-//	    name:
-//	      type: string
+// TypeName is the name of the type in the schema, eg, type <...> Person.
+// JsonName is the name of the corresponding JSON description, as it will sometimes
+// differ due to invalid characters.
+// Schema is the Schema object used to populate the type description.
 type TypeDefinition struct {
-	// The name of the type, eg, type <...> Person
-	TypeName string
-
-	// The name of the corresponding JSON description, as it will sometimes
-	// differ due to invalid characters.
-	JsonName string
-
-	// This is the Schema wrapper is used to populate the type description
-	Schema Schema
+	TypeName     string
+	JsonName     string
+	Schema       Schema
+	SpecLocation SpecLocation
 }
 
 // ResponseTypeDefinition is an extension of TypeDefinition, specifically for
