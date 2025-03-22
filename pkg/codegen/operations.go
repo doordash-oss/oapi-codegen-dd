@@ -1,17 +1,3 @@
-// Copyright 2019 DeepMap, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package codegen
 
 import (
@@ -26,7 +12,7 @@ import (
 // Path The path for this operation.
 // PathParams Parameters in the path
 // Header HTTP headers.
-// QueryParams Query
+// Query Query
 // TypeDefinitions These are all the types we need to define for this operation.
 // BodyRequired Whether the body is required for this operation.
 type OperationDefinition struct {
@@ -64,6 +50,33 @@ func (o OperationDefinition) SummaryAsComment() string {
 		parts[i] = "// " + p
 	}
 	return strings.Join(parts, "\n")
+}
+
+func (o OperationDefinition) HasSuccessResponse() bool {
+	return o.Response.Success != nil && o.Response.Success.ResponseName != ""
+}
+
+func (o OperationDefinition) GetSuccessResponse() string {
+	return o.Response.Success.ResponseName
+}
+
+func (o OperationDefinition) HasErrorResponse() bool {
+	return o.Response.Error != nil
+}
+
+func (o OperationDefinition) GetErrorResponse() string {
+	return o.Response.Error.ResponseName
+}
+
+func (o OperationDefinition) GetFunctionResponse() string {
+	if !o.HasSuccessResponse() {
+		return "error"
+	}
+	return "(" + "*" + o.Response.Success.ResponseName + ", error)"
+}
+
+func (o OperationDefinition) HasRequestOptions() bool {
+	return o.PathParams != nil || o.Header != nil || o.Query != nil || o.Body != nil
 }
 
 // FilterParameterDefinitionByType returns the subset of the specified parameters which are of the
