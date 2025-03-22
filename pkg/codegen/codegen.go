@@ -132,25 +132,31 @@ func createParseContextFromDocument(doc *openapi3.T, cfg *Configuration) (*Parse
 			pathDefs, pathSchemas := generateParamsTypes(pathParams, operationID+"Path")
 			if len(pathDefs) > 0 {
 				pathParamsDef = &pathDefs[0]
+				typeDefs = append(typeDefs, pathDefs...)
 			}
-			typeDefs = append(typeDefs, pathDefs...)
-			importSchemas = append(importSchemas, pathSchemas...)
+			if len(pathSchemas) > 0 {
+				importSchemas = append(importSchemas, pathSchemas...)
+			}
 
 			queryParams := FilterParameterDefinitionByType(allParams, "query")
 			queryDefs, querySchemas := generateParamsTypes(queryParams, operationID+"Query")
 			if len(queryDefs) > 0 {
 				queryDef = &queryDefs[0]
+				typeDefs = append(typeDefs, queryDefs...)
 			}
-			typeDefs = append(typeDefs, queryDefs...)
-			importSchemas = append(importSchemas, querySchemas...)
+			if len(querySchemas) > 0 {
+				importSchemas = append(importSchemas, querySchemas...)
+			}
 
 			headerParams := FilterParameterDefinitionByType(allParams, "header")
 			headerDefs, headerSchemas := generateParamsTypes(headerParams, operationID+"Headers")
 			if len(headerDefs) > 0 {
 				headerDef = &headerDefs[0]
+				typeDefs = append(typeDefs, headerDefs...)
 			}
-			typeDefs = append(typeDefs, headerDefs...)
-			importSchemas = append(importSchemas, headerSchemas...)
+			if len(headerSchemas) > 0 {
+				importSchemas = append(importSchemas, headerSchemas...)
+			}
 
 			// Process Request Body
 			bodyDefinition, bodyTypeDef, err := createBodyDefinition(operationID, op.RequestBody)
@@ -233,10 +239,6 @@ func createParseContextFromDocument(doc *openapi3.T, cfg *Configuration) (*Parse
 	)
 
 	for _, td := range typeDefs {
-		if _, found := groupedTypeDefs[td.SpecLocation]; !found {
-			groupedTypeDefs[td.SpecLocation] = []TypeDefinition{}
-		}
-
 		collected := false
 		if td.Schema.HasAdditionalProperties {
 			additionalTypes = append(additionalTypes, td)
@@ -257,7 +259,10 @@ func createParseContextFromDocument(doc *openapi3.T, cfg *Configuration) (*Parse
 			collected = true
 		}
 
-		if !collected {
+		if !collected && td.Name != "" && td.SpecLocation != "" {
+			if _, found := groupedTypeDefs[td.SpecLocation]; !found {
+				groupedTypeDefs[td.SpecLocation] = []TypeDefinition{}
+			}
 			groupedTypeDefs[td.SpecLocation] = append(groupedTypeDefs[td.SpecLocation], td)
 		}
 	}
