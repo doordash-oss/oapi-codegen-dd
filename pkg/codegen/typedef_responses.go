@@ -50,7 +50,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses) (*Re
 
 	// we just need success and error responses
 	for statusCode, response := range responses.Codes.FromOldest() {
-		if response == nil || response.Content == nil || response.Content.Len() == 0 {
+		if response == nil {
 			continue
 		}
 		isSuccess := false
@@ -96,11 +96,13 @@ func getOperationResponses(operationID string, responses *v3high.Responses) (*Re
 			content     *v3high.MediaType
 		)
 
-		if pair, ok := response.Content.Get("application/json"); ok {
-			contentType, content = "application/json", pair
-		} else {
-			if v := response.Content.First(); v != nil {
-				contentType, content = v.Key(), v.Value()
+		if response.Content != nil {
+			if pair, ok := response.Content.Get("application/json"); ok {
+				contentType, content = "application/json", pair
+			} else {
+				if v := response.Content.First(); v != nil {
+					contentType, content = v.Key(), v.Value()
+				}
 			}
 		}
 
