@@ -35,7 +35,7 @@ func TestNewConstraints(t *testing.T) {
 			Max:      float64(99),
 			ValidationTags: []string{
 				"required",
-				"ge=10",
+				"gte=10",
 				"lt=99",
 			},
 		}, res)
@@ -63,7 +63,7 @@ func TestNewConstraints(t *testing.T) {
 			Max:      float64(100),
 			Nullable: true,
 			ValidationTags: []string{
-				"ge=10",
+				"gte=10",
 				"lt=100",
 			},
 		}, res)

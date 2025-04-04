@@ -83,7 +83,7 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 
 	minValue := float64(0)
 	if schema.Minimum != nil {
-		minTag := "ge"
+		minTag := "gte"
 		minValue = *schema.Minimum
 		if schema.ExclusiveMinimum != nil {
 			if schema.ExclusiveMinimum.IsA() && schema.ExclusiveMinimum.A {
@@ -102,7 +102,7 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 
 	maxValue := float64(0)
 	if schema.Maximum != nil {
-		maxTag := "le"
+		maxTag := "lte"
 		maxValue = *schema.Maximum
 		if schema.ExclusiveMaximum != nil {
 			if schema.ExclusiveMaximum.IsA() && schema.ExclusiveMaximum.A {
