@@ -5,55 +5,6 @@ import (
 	"strings"
 )
 
-type ConstraintsContext struct {
-	name       string
-	hasNilType bool
-	required   bool
-}
-
-type Constraints struct {
-	Required  bool
-	Nullable  bool
-	ReadOnly  bool
-	WriteOnly bool
-	MinLength int64
-	MaxLength int64
-	Min       float64
-	Max       float64
-	MinItems  int
-}
-
-// ValidateTags returns a map of tags that can be used for validation.
-func (c Constraints) ValidateTags() map[string]string {
-	var tags []string
-
-	if c.Required {
-		tags = append(tags, "required")
-	}
-
-	if c.MinLength > 0 {
-		tags = append(tags, fmt.Sprintf("min=%d", c.MinLength))
-	}
-
-	if c.MaxLength > 0 {
-		tags = append(tags, fmt.Sprintf("max=%d", c.MaxLength))
-	}
-
-	if c.Min > 0 {
-		tags = append(tags, fmt.Sprintf("gt=%f", c.Min))
-	}
-
-	if c.Max > 0 {
-		tags = append(tags, fmt.Sprintf("lt=%f", c.Max))
-	}
-
-	if len(tags) == 0 {
-		return nil
-	}
-
-	return map[string]string{"validate": strings.Join(tags, ",")}
-}
-
 type Property struct {
 	GoName        string
 	Description   string
@@ -68,7 +19,7 @@ type Property struct {
 func (p Property) IsEqual(other Property) bool {
 	return p.JsonFieldName == other.JsonFieldName &&
 		p.Schema.TypeDecl() == other.Schema.TypeDecl() &&
-		p.Constraints == other.Constraints
+		p.Constraints.IsEqual(other.Constraints)
 }
 
 func (p Property) GoTypeDef() string {
@@ -152,10 +103,8 @@ func genFieldsFromProperties(props []Property) []string {
 
 		fieldTags := make(map[string]string)
 
-		if validateTags := p.Constraints.ValidateTags(); validateTags != nil {
-			for k, v := range validateTags {
-				fieldTags[k] = v
-			}
+		if len(p.Constraints.ValidationTags) > 0 {
+			fieldTags["validate"] = strings.Join(c.ValidationTags, ",")
 		}
 
 		if !omitEmpty {

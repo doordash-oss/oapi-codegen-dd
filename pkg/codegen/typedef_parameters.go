@@ -242,7 +242,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string) ([
 			JsonFieldName: param.ParamName,
 			Schema:        pSchema,
 			Extensions:    exts,
-			Constraints: getSchemaConstraints(oapiSchema, ConstraintsContext{
+			Constraints: newConstraints(oapiSchema, ConstraintsContext{
 				name:     param.ParamName,
 				required: param.Required,
 			}),

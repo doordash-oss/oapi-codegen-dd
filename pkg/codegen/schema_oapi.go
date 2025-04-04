@@ -14,7 +14,7 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string) (GoSchem
 	f := schema.Format
 	t := schema.Type
 
-	constraints := getSchemaConstraints(schema, ConstraintsContext{
+	constraints := newConstraints(schema, ConstraintsContext{
 		name:       "",
 		hasNilType: slices.Contains(t, "null"),
 	})
@@ -169,70 +169,4 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string) (GoSchem
 	}
 
 	return GoSchema{}, fmt.Errorf("unhandled GoSchema type: %v", t)
-}
-
-func getSchemaConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
-	if schema == nil {
-		return Constraints{}
-	}
-
-	name := opts.name
-	hasNilType := opts.hasNilType
-
-	required := opts.required
-	if !required && name != "" {
-		required = slices.Contains(schema.Required, name)
-	}
-
-	nullable := false
-	if !required || hasNilType {
-		nullable = true
-	} else if schema.Nullable != nil {
-		nullable = *schema.Nullable
-	}
-
-	if required && nullable {
-		nullable = true
-	}
-
-	readOnly := false
-	if schema.ReadOnly != nil {
-		readOnly = *schema.ReadOnly
-	}
-
-	writeOnly := false
-	if schema.WriteOnly != nil {
-		writeOnly = *schema.WriteOnly
-	}
-
-	minValue := float64(0)
-	if schema.Minimum != nil {
-		minValue = *schema.Minimum
-	}
-
-	maxValue := float64(0)
-	if schema.Maximum != nil {
-		maxValue = *schema.Maximum
-	}
-
-	minLength := int64(0)
-	if schema.MinLength != nil {
-		minLength = *schema.MinLength
-	}
-
-	maxLength := int64(0)
-	if schema.MaxLength != nil {
-		maxLength = *schema.MaxLength
-	}
-
-	return Constraints{
-		Nullable:  nullable,
-		Required:  required,
-		ReadOnly:  readOnly,
-		WriteOnly: writeOnly,
-		Min:       minValue,
-		Max:       maxValue,
-		MinLength: minLength,
-		MaxLength: maxLength,
-	}
 }

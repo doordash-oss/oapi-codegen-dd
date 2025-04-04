@@ -15,7 +15,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 	outSchema := GoSchema{
 		Description:   schema.Description,
 		OpenAPISchema: schema,
-		Constraints: getSchemaConstraints(schema, ConstraintsContext{
+		Constraints: newConstraints(schema, ConstraintsContext{
 			hasNilType: slices.Contains(schema.Type, "null"),
 		}),
 	}
@@ -119,7 +119,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 			if p.Schema() != nil {
 				hasNilType = slices.Contains(p.Schema().Type, "null")
 			}
-			constraints := getSchemaConstraints(p.Schema(), ConstraintsContext{
+			constraints := newConstraints(p.Schema(), ConstraintsContext{
 				name:       pName,
 				hasNilType: hasNilType,
 				required:   slices.Contains(required, pName),
