@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -24,6 +25,20 @@ func (p Property) IsEqual(other Property) bool {
 
 func (p Property) GoTypeDef() string {
 	typeDef := p.Schema.TypeDecl()
+
+	if p.Schema.OpenAPISchema != nil && slices.Contains(p.Schema.OpenAPISchema.Type, "array") {
+		return typeDef
+	}
+
+	if p.Schema.OpenAPISchema != nil && slices.Contains(p.Schema.OpenAPISchema.Type, "object") {
+		if p.Schema.OpenAPISchema.AdditionalProperties != nil && p.Schema.OpenAPISchema.AdditionalProperties.IsB() {
+			return typeDef
+		}
+	}
+
+	if strings.HasPrefix(typeDef, "map[") {
+		return typeDef
+	}
 
 	if !p.Schema.SkipOptionalPointer && p.Constraints.Nullable {
 		typeDef = "*" + strings.TrimPrefix(typeDef, "*")

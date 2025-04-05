@@ -1,0 +1,31 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: naming-conflict
+components:
+  schemas:
+    payments:
+      type: array
+      nullable: true
+      items:
+        type: string
+
+    data:
+      type: object
+      additionalProperties: true
+      nullable: true
+
+    user:
+      type: object
+      properties:
+        payments:
+          $ref: '#/components/schemas/payments'
+        data:
+          $ref: '#/components/schemas/data'
+        prefs:
+          type: array
+          items:
+            type: string
+            nullable: true
+        address:
+          type: object
