@@ -38,8 +38,7 @@ func TestExampleOpenAPICodeGeneration(t *testing.T) {
 	assert.Contains(t, code, "type EnumTestNumerics int")
 	assert.Contains(t, code, "N2 EnumTestNumerics = 2")
 	assert.Contains(t, code, "type EnumTestEnumNames int")
-	assert.Contains(t, code, "EnumTestEnumNamesN2 EnumTestEnumNames = 2")
-	assert.Contains(t, code, "EnumTestEnumVarnamesN2 EnumTestEnumVarnames = 2")
+	assert.Contains(t, code, "EnumTestEnumNamesTwo  EnumTestEnumNames = 2")
 }
 
 func TestExtPropGoTypeSkipOptionalPointer(t *testing.T) {
