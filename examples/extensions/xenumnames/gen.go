@@ -5,44 +5,29 @@ package xenumnames
 type ClientType string
 
 const (
-	ClientTypeACT ClientType = "ACT"
-	ClientTypeEXP ClientType = "EXP"
+	ACT ClientType = "ACT"
+	EXP ClientType = "EXP"
 )
 
 // All returns all possible values for ClientType.
 func (c ClientType) All() []ClientType {
 	return []ClientType{
-		ClientTypeACT,
-		ClientTypeEXP,
+		ACT,
+		EXP,
 	}
 }
 
 type ClientTypeWithNamesExtension string
 
 const (
-	ClientTypeWithNamesExtensionACT ClientTypeWithNamesExtension = "ACT"
-	ClientTypeWithNamesExtensionEXP ClientTypeWithNamesExtension = "EXP"
+	Active  ClientTypeWithNamesExtension = "ACT"
+	Expired ClientTypeWithNamesExtension = "EXP"
 )
 
 // All returns all possible values for ClientTypeWithNamesExtension.
 func (c ClientTypeWithNamesExtension) All() []ClientTypeWithNamesExtension {
 	return []ClientTypeWithNamesExtension{
-		ClientTypeWithNamesExtensionACT,
-		ClientTypeWithNamesExtensionEXP,
-	}
-}
-
-type ClientTypeWithVarNamesExtension string
-
-const (
-	ACT ClientTypeWithVarNamesExtension = "ACT"
-	EXP ClientTypeWithVarNamesExtension = "EXP"
-)
-
-// All returns all possible values for ClientTypeWithVarNamesExtension.
-func (c ClientTypeWithVarNamesExtension) All() []ClientTypeWithVarNamesExtension {
-	return []ClientTypeWithVarNamesExtension{
-		ACT,
-		EXP,
+		Active,
+		Expired,
 	}
 }

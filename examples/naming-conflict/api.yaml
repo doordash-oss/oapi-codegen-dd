@@ -1,0 +1,27 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: naming-conflict
+components:
+  schemas:
+    source:
+      type: object
+      properties:
+        ach_credit_transfer:
+          $ref: '#/components/schemas/source_type_ach_credit_transfer'
+
+    source_type_ach_credit_transfer:
+      properties:
+        account_number:
+          nullable: true
+          type: string
+        bank_name:
+          nullable: true
+          type: string
+
+    type:
+      type: string
+      enum:
+        # prefix will be added to avoid conflict
+        - source_type_ach_credit_transfer
+        - ach_debit

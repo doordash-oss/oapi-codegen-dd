@@ -63,7 +63,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 		// Until we have a concrete additional properties type, we default to
 		// any schema.
 		outSchema.AdditionalPropertiesType = &GoSchema{
-			GoType: "any`",
+			GoType: "any",
 		}
 
 		// If additional properties are defined, we will override the default

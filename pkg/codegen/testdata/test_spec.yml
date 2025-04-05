@@ -185,17 +185,11 @@ components:
         enumNames:
           type: integer
           enum: [0, 1, 2]
-          x-enumNames:
+          x-enum-names:
             - zero
             - one
             - two
-        enumVarnames:
-          type: integer
-          enum: [0, 1, 2]
-          x-enum-varnames:
-            - na
-            - single
-            - double
+
     User:
       allOf:
         - type: object

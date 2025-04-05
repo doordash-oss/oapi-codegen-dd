@@ -40,7 +40,7 @@ func (e *EnumDefinition) GetValues() map[string]string {
 func createEnumsSchema(schema *base.Schema, ref string, path []string) (GoSchema, error) {
 	outSchema, err := oapiSchemaToGoType(schema, ref, path)
 	if err != nil {
-		return GoSchema{}, nil
+		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
 	}
 
 	// Enums need to be typed, so that the values aren't interchangeable,
@@ -48,9 +48,6 @@ func createEnumsSchema(schema *base.Schema, ref string, path []string) (GoSchema
 	// new type.
 	outSchema.DefineViaAlias = false
 
-	if err != nil {
-		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
-	}
 	enumValues := make([]string, len(schema.Enum))
 	for i, enumNode := range schema.Enum {
 		enumValues[i] = enumNode.Value
@@ -58,12 +55,13 @@ func createEnumsSchema(schema *base.Schema, ref string, path []string) (GoSchema
 
 	enumNames := enumValues
 	exts := extractExtensions(schema.Extensions)
-	for _, key := range []string{extEnumVarNames, extEnumNames} {
+	for _, key := range []string{extEnumNames} {
 		if extension, ok := exts[key]; ok {
-			if extEnumNames, err := extParseEnumVarNames(extension); err == nil {
-				enumNames = extEnumNames
-				break
+			names, err := extParseEnumVarNames(extension)
+			if err != nil {
+				return outSchema, fmt.Errorf("invalid value for %q: %w", key, err)
 			}
+			enumNames = names
 		}
 	}
 
@@ -175,7 +173,6 @@ func filterOutEnums(types []TypeDefinition) ([]EnumDefinition, []TypeDefinition)
 				Schema:       p.Schema,
 				Name:         name,
 				ValueWrapper: wrapper,
-				// PrefixTypeName: true,
 			})
 			m[name] = true
 		}
@@ -189,7 +186,6 @@ func filterOutEnums(types []TypeDefinition) ([]EnumDefinition, []TypeDefinition)
 				Schema:       td.Schema,
 				Name:         td.Name,
 				ValueWrapper: wrapper,
-				// PrefixTypeName: true,
 			})
 			m[td.Name] = true
 		} else {

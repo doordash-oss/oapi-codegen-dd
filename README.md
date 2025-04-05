@@ -584,7 +584,7 @@ You can see this in more detail in [the example code](examples/extensions/xoapic
 <tr>
 <td>
 
-`x-enum-varnames` / `x-enumNames`
+`x-enum-names`
 
 </td>
 <td>
@@ -593,7 +593,8 @@ Override generated variable names for enum constants
 <td>
 <details>
 
-When consuming an enum value from an external system, the name may not produce a nice variable name. Using the `x-enum-varnames` extension allows overriding the name of the generated variable names.
+When consuming an enum value from an external system, the name may not produce a nice variable name. 
+Using the `x-enum-names` extension allows overriding the name of the generated variable names.
 
 We can see this at play with the following schemas:
 
@@ -601,7 +602,7 @@ We can see this at play with the following schemas:
 openapi: "3.0.0"
 info:
   version: 1.0.0
-  title: x-enumNames and x-enum-varnames
+  title: x-enum-names
 components:
   schemas:
     ClientType:
@@ -614,15 +615,7 @@ components:
       enum:
         - ACT
         - EXP
-      x-enumNames:
-        - Active
-        - Expired
-    ClientTypeWithVarNamesExtension:
-      type: string
-      enum:
-        - ACT
-        - EXP
-      x-enum-varnames:
+      x-enum-names:
         - Active
         - Expired
 ```
@@ -649,7 +642,7 @@ const (
 type ClientTypeWithExtension string
 ```
 
-You can see this in more detail in [the example code](examples/extensions/xenumvarnames/).
+You can see this in more detail in [the example code](examples/extensions/xenumnames/).
 
 </details>
 </td>

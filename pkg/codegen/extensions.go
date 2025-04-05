@@ -25,15 +25,16 @@ const (
 	// extGoTypeName overrides a generated typename for something.
 	extGoTypeName = "x-go-type-name"
 
-	extPropGoJsonIgnore  = "x-go-json-ignore"
-	extPropOmitEmpty     = "x-omitempty"
-	extPropExtraTags     = "x-oapi-codegen-extra-tags"
-	extEnumVarNames      = "x-enum-varnames"
-	extEnumNames         = "x-enumNames"
+	extPropGoJsonIgnore = "x-go-json-ignore"
+	extPropOmitEmpty    = "x-omitempty"
+	extPropExtraTags    = "x-oapi-codegen-extra-tags"
+
+	// Override generated variable names for enum constants.
+	extEnumNames         = "x-enum-names"
 	extDeprecationReason = "x-deprecated-reason"
 
-	// extOapiCodegenOnlyHonourGoName is to be used to explicitly enforce the generation of a
-	// field as the `x-go-name` extension has describe it.
+	// extOapiCodegenOnlyHonourGoName explicitly enforces the generation of a
+	// field as the `x-go-name` extension describes it.
 	extOapiCodegenOnlyHonourGoName = "x-oapi-codegen-only-honour-go-name"
 )
 
@@ -54,20 +55,12 @@ func extExtraTags(extPropValue any) (map[string]string, error) {
 	return tags, nil
 }
 
-func extParseEnumVarNames(extPropValue interface{}) ([]string, error) {
-	namesI, ok := extPropValue.([]interface{})
+func extParseEnumVarNames(extPropValue any) ([]string, error) {
+	strs, ok := extPropValue.([]string)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert type: %T", extPropValue)
+		return nil, fmt.Errorf("expected []string, got %T", extPropValue)
 	}
-	names := make([]string, len(namesI))
-	for i, v := range namesI {
-		vs, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("failed to convert type: %T", v)
-		}
-		names[i] = vs
-	}
-	return names, nil
+	return strs, nil
 }
 
 func extractExtensions(schemaExtensions *orderedmap.Map[string, *yaml.Node]) map[string]any {
@@ -79,8 +72,20 @@ func extractExtensions(schemaExtensions *orderedmap.Map[string, *yaml.Node]) map
 
 	for extType, node := range schemaExtensions.FromOldest() {
 		res[extType] = make(map[string]any)
+
 		if node.Kind == yaml.ScalarNode {
 			res[extType] = node.Value
+			continue
+		}
+
+		if node.Kind == yaml.SequenceNode {
+			seq := make([]string, len(node.Content))
+			for i, n := range node.Content {
+				if n.Kind == yaml.ScalarNode {
+					seq[i] = n.Value
+				}
+			}
+			res[extType] = seq
 			continue
 		}
 
