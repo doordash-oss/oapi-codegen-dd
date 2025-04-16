@@ -2,7 +2,7 @@
 
 {{- $root := . }}
 {{range $Enum := .Enums}}
-  {{- if $Enum.Schema.Description}}{{ toGoComment $Enum.Schema.Description $Enum.Name }}{{- end}}
+  {{- if and $Enum.Schema.Description (not $root.Config.Generate.OmitDescription)}}{{ toGoComment $Enum.Schema.Description $Enum.Name }}{{- end}}
     type {{$Enum.Name}} {{$Enum.Schema.GoType}}
     const (
       {{- $safeNames := slice }}

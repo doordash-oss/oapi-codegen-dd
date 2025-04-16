@@ -11,13 +11,13 @@ import (
 
 // getComponentsSchemas generates type definitions for any custom types defined in the
 // components/schemas section of the Swagger spec.
-func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy]) ([]TypeDefinition, error) {
+func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], options ParseOptions) ([]TypeDefinition, error) {
 	types := make([]TypeDefinition, 0)
 
 	// We're going to define Go types for every object under components/schemas
 	for schemaName, schemaRef := range schemas.FromOldest() {
 		ref := schemaRef.GoLow().GetReference()
-		goSchema, err := GenerateGoSchema(schemaRef, ref, []string{schemaName})
+		goSchema, err := GenerateGoSchema(schemaRef, ref, []string{schemaName}, options)
 		if err != nil {
 			return nil, fmt.Errorf("error converting GoSchema %s to Go type: %w", schemaName, err)
 		}
@@ -44,10 +44,10 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy]) ([
 
 // getComponentParameters generates type definitions for any custom types defined in the
 // components/parameters section of the Swagger spec.
-func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter]) ([]TypeDefinition, error) {
+func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], options ParseOptions) ([]TypeDefinition, error) {
 	var types []TypeDefinition
 	for paramName, paramOrRef := range params.FromOldest() {
-		goType, err := paramToGoType(paramOrRef, nil)
+		goType, err := paramToGoType(paramOrRef, nil, options)
 		if err != nil {
 			return nil, fmt.Errorf("error generating Go type for schema in parameter %s: %w", paramName, err)
 		}
@@ -85,7 +85,7 @@ func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter]) (
 
 // getComponentsRequestBodies generates type definitions for any custom types defined in the
 // components/requestBodies section of the Swagger spec.
-func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBody]) ([]TypeDefinition, error) {
+func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBody], options ParseOptions) ([]TypeDefinition, error) {
 	var types []TypeDefinition
 
 	for requestBodyName, requestBodyRef := range bodies.FromOldest() {
@@ -98,7 +98,7 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 			}
 
 			ref := response.GoLow().GetReference()
-			goType, err := GenerateGoSchema(body.Schema, ref, []string{requestBodyName})
+			goType, err := GenerateGoSchema(body.Schema, ref, []string{requestBodyName}, options)
 			if err != nil {
 				return nil, fmt.Errorf("error generating Go type for schema in body %s: %w", requestBodyName, err)
 			}
@@ -138,7 +138,7 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 
 // getContentResponses generates type definitions for any custom types defined in the
 // components/responses section of the OpenAPI spec.
-func getContentResponses(responses *orderedmap.Map[string, *v3high.Response]) ([]TypeDefinition, error) {
+func getContentResponses(responses *orderedmap.Map[string, *v3high.Response], options ParseOptions) ([]TypeDefinition, error) {
 	var types []TypeDefinition
 
 	for responseName, response := range responses.FromOldest() {
@@ -159,7 +159,7 @@ func getContentResponses(responses *orderedmap.Map[string, *v3high.Response]) ([
 			}
 
 			ref := content.GoLow().GetReference()
-			goType, err := GenerateGoSchema(content.Schema, ref, []string{responseName})
+			goType, err := GenerateGoSchema(content.Schema, ref, []string{responseName}, options)
 			if err != nil {
 				return nil, fmt.Errorf("error generating Go type for schema in response %s: %w", responseName, err)
 			}

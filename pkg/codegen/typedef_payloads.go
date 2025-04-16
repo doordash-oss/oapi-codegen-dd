@@ -47,7 +47,7 @@ type RequestBodyEncoding struct {
 
 // createBodyDefinition turns the OpenAPI body definitions into a list of our body definitions
 // which will be used for code generation.
-func createBodyDefinition(operationID string, body *v3high.RequestBody) (*RequestBodyDefinition, *TypeDefinition, error) {
+func createBodyDefinition(operationID string, body *v3high.RequestBody, options ParseOptions) (*RequestBodyDefinition, *TypeDefinition, error) {
 	if body == nil {
 		return nil, nil, nil
 	}
@@ -90,7 +90,7 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody) (*Reques
 	bodyTypeName := operationID + "Body"
 	ref := schemaProxy.GoLow().GetReference()
 
-	bodySchema, err := GenerateGoSchema(schemaProxy, ref, []string{bodyTypeName})
+	bodySchema, err := GenerateGoSchema(schemaProxy, ref, []string{bodyTypeName}, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 	}
@@ -107,7 +107,7 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody) (*Reques
 			}
 
 			// Regenerate the Golang struct adding the new form tag.
-			fields := genFieldsFromProperties(bodySchema.Properties)
+			fields := genFieldsFromProperties(bodySchema.Properties, options)
 			bodySchema.GoType = bodySchema.createGoStruct(fields)
 		}
 

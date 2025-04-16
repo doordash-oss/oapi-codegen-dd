@@ -34,6 +34,10 @@ type Parser struct {
 	cfg Configuration
 }
 
+type ParseOptions struct {
+	OmitDescription bool
+}
+
 type EnumContext struct {
 	Enums        []EnumDefinition
 	Imports      []string

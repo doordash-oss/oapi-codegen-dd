@@ -72,7 +72,7 @@ func createPropertyGoFieldName(jsonName string, extensions map[string]any) strin
 
 // genFieldsFromProperties produce corresponding field names with JSON annotations,
 // given a list of schema descriptors
-func genFieldsFromProperties(props []Property) []string {
+func genFieldsFromProperties(props []Property, options ParseOptions) []string {
 	var fields []string
 
 	for i, p := range props {
@@ -80,7 +80,7 @@ func genFieldsFromProperties(props []Property) []string {
 		goFieldName := p.GoName
 
 		// Add a comment to a field in case we have one, otherwise skip.
-		if p.Description != "" {
+		if !options.OmitDescription && p.Description != "" {
 			// Separate the comment from a previous-defined, unrelated field.
 			// Make sure the actual field is separated by a newline.
 			if i != 0 {

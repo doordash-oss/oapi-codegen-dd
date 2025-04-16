@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../configuration-schema.json
+package: filteringbytag
+output:
+  use-single-file: true
+filter:
+  include:
+    tags:
+      - purchase
+      - non-existent

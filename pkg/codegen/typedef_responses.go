@@ -34,7 +34,7 @@ type ResponseContentDefinition struct {
 	IsSuccess    bool
 }
 
-func getOperationResponses(operationID string, responses *v3high.Responses) (*ResponseDefinition, []TypeDefinition, error) {
+func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
 	var (
 		successDefinition *ResponseContentDefinition
 		errorDefinition   *ResponseContentDefinition
@@ -114,7 +114,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses) (*Re
 
 		ref := response.GoLow().GetReference()
 
-		contentSchema, err := GenerateGoSchema(content.Schema, ref, []string{operationID, typeSuffix})
+		contentSchema, err := GenerateGoSchema(content.Schema, ref, []string{operationID, typeSuffix}, options)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 		}

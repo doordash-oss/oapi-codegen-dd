@@ -17,12 +17,14 @@ if err != nil {
 {{- define "logReceivedResponse" -}}
 {{- end -}}
 
+{{ $config := .Config }}
+
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
 {{ template "httpRequestDoer" $ }}
 
-{{ $clientName := .Config.NameMapping.client }}
+{{ $clientName := $config.NameMapping.client }}
 // {{$clientName}} is the client for the API implementing the {{$clientName}} interface.
 // baseURL is the base URL for the API.
 // httpClient is the HTTP client to use for making requests.
@@ -75,14 +77,14 @@ func WithRequestEditorFn(fn RequestEditorFn) {{$clientName}}Option {
 // ClientInterface is the interface for the API client.
 type {{$clientName}}Interface interface {
     {{- range .Operations }}{{$op := .}}
-        {{ toGoComment $op.Summary $op.ID}}
+        {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
         {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) (*{{$op.Response.Success.ResponseName}}, error)
     {{ end }}
 }
 
 
 {{range .Operations}}{{$op := .}}
-{{ toGoComment $op.Summary $op.ID}}
+{{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
 func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) (*{{$op.Response.Success.ResponseName}}, error) {
     var err error
     reqURL := c.baseURL + "{{$op.Path}}"

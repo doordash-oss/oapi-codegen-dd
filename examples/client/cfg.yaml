@@ -4,3 +4,6 @@ output:
   use-single-file: false
 error-mapping:
   UpdateClientErrorResponse: code
+generate:
+  client: true
+  omit-description: true

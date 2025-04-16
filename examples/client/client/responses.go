@@ -3,7 +3,8 @@
 package client
 
 type GetClientResponse struct {
-	Name string `json:"name" validate:"required"`
+	Name string                 `json:"name" validate:"required"`
+	Type *GetClientResponseType `json:"type,omitempty"`
 }
 
 type UpdateClientErrorResponse struct {

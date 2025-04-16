@@ -3,5 +3,6 @@
 package client
 
 type ClientType struct {
-	Name string `json:"name" validate:"required"`
+	Name string          `json:"name" validate:"required"`
+	Type *ClientTypeType `json:"type,omitempty"`
 }

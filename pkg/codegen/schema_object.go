@@ -8,7 +8,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 )
 
-func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchema, error) {
+func createObjectSchema(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
 	var outType string
 	var (
 		description string
@@ -69,7 +69,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 		// If additional properties are defined, we will override the default
 		// above with the specific definition.
 		if schema.AdditionalProperties != nil && schema.AdditionalProperties.IsA() {
-			additionalSchema, err := GenerateGoSchema(schema.AdditionalProperties.A, ref, path)
+			additionalSchema, err := GenerateGoSchema(schema.AdditionalProperties.A, ref, path, options)
 			if err != nil {
 				return GoSchema{}, fmt.Errorf("error generating type for additional properties: %w", err)
 			}
@@ -115,7 +115,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 		for pName, p := range schema.Properties.FromOldest() {
 			propertyPath := append(path, pName)
 			pRef := p.GoLow().GetReference()
-			pSchema, err := GenerateGoSchema(p, pRef, propertyPath)
+			pSchema, err := GenerateGoSchema(p, pRef, propertyPath, options)
 			if err != nil {
 				return GoSchema{}, fmt.Errorf("error generating Go schema for property '%s': %w", pName, err)
 			}
@@ -196,13 +196,13 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 				continue
 			}
 			if len(nonNilDescrItems) == 1 {
-				res, err := GenerateGoSchema(nonNilDescrItems[0], ref, path)
+				res, err := GenerateGoSchema(nonNilDescrItems[0], ref, path, options)
 				if err != nil {
 					return GoSchema{}, fmt.Errorf("error generating single type for anyOf: %w", err)
 				}
 				return res, nil
 			} else {
-				res, err := generateUnion(descrItems, schema.Discriminator, path)
+				res, err := generateUnion(descrItems, schema.Discriminator, path, options)
 				if err != nil {
 					return GoSchema{}, fmt.Errorf("error generating type for anyOf: %w", err)
 				}
@@ -216,7 +216,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string) (GoSchem
 			}
 		}
 
-		fields := genFieldsFromProperties(outSchema.Properties)
+		fields := genFieldsFromProperties(outSchema.Properties, options)
 		outSchema.GoType = outSchema.createGoStruct(fields)
 	}
 

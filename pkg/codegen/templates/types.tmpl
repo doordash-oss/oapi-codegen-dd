@@ -8,7 +8,7 @@ var {{.SpecLocation}}TypesValidate = validator.New(validator.WithRequiredStructE
 
 {{ $config := .Config }}
 {{- range .Types}}{{ $td := . }}
-{{ toGoComment .Schema.Description .Name }}
+{{if not $config.Generate.OmitDescription}}{{ toGoComment .Schema.Description .Name }}{{end}}
 type {{.Name}} {{if .IsAlias}}={{end}} {{.Schema.TypeDecl}}
 
 {{ if $isParam }}

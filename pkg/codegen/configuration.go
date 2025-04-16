@@ -100,6 +100,9 @@ func (f FilterParamsConfig) isEmpty() bool {
 type GenerateOptions struct {
 	// Client specifies whether to generate a client. Defaults to true.
 	Client bool `yaml:"client"`
+
+	// OmitDescription specifies whether to omit schema description from the spec in the generated code. Defaults to false.
+	OmitDescription bool `yaml:"omit-description"`
 }
 
 type Output struct {

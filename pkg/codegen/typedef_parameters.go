@@ -124,7 +124,7 @@ func (p ParameterDefinitions) FindByName(name string) *ParameterDefinition {
 // describeOperationParameters walks the given parameters dictionary, and generates the above
 // descriptors into a flat list. This makes it a lot easier to traverse the
 // data in the template engine.
-func describeOperationParameters(params []*v3high.Parameter, path []string) ([]ParameterDefinition, error) {
+func describeOperationParameters(params []*v3high.Parameter, path []string, options ParseOptions) ([]ParameterDefinition, error) {
 	outParams := make([]ParameterDefinition, 0)
 	for _, param := range params {
 		schemaProxy := param.Schema
@@ -142,7 +142,7 @@ func describeOperationParameters(params []*v3high.Parameter, path []string) ([]P
 			inSuffix = "Header"
 		}
 
-		goSchema, err := paramToGoType(param, append(path, inSuffix, param.Name))
+		goSchema, err := paramToGoType(param, append(path, inSuffix, param.Name), options)
 		if err != nil {
 			return nil, fmt.Errorf("error generating type for param (%s): %s", param.Name, err)
 		}
@@ -205,7 +205,7 @@ func combineOperationParameters(globalParams []ParameterDefinition, localParams 
 }
 
 // generateParamsTypes defines the schema for a parameters definition object.
-func generateParamsTypes(objectParams []ParameterDefinition, typeName string) ([]TypeDefinition, []GoSchema) {
+func generateParamsTypes(objectParams []ParameterDefinition, typeName string, options ParseOptions) ([]TypeDefinition, []GoSchema) {
 	if len(objectParams) == 0 {
 		return nil, nil
 	}
@@ -254,7 +254,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string) ([
 	s := GoSchema{
 		Properties: properties,
 	}
-	fields := genFieldsFromProperties(properties)
+	fields := genFieldsFromProperties(properties, options)
 	s.GoType = s.createGoStruct(fields)
 
 	td := TypeDefinition{
@@ -268,7 +268,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string) ([
 
 // This constructs a Go type for a parameter, looking at either the schema or
 // the content, whichever is available
-func paramToGoType(param *v3high.Parameter, path []string) (GoSchema, error) {
+func paramToGoType(param *v3high.Parameter, path []string, options ParseOptions) (GoSchema, error) {
 	if param.Content == nil && param.Schema == nil {
 		return GoSchema{}, fmt.Errorf("parameter '%s' has no schema or content", param.Name)
 	}
@@ -277,7 +277,7 @@ func paramToGoType(param *v3high.Parameter, path []string) (GoSchema, error) {
 
 	// We can process the schema through the generic schema processor
 	if param.Schema != nil {
-		return GenerateGoSchema(param.Schema, ref, path)
+		return GenerateGoSchema(param.Schema, ref, path, options)
 	}
 
 	// At this point, we have a content type. We know how to deal with
@@ -302,5 +302,5 @@ func paramToGoType(param *v3high.Parameter, path []string) (GoSchema, error) {
 
 	mediaRef := mediaType.GoLow().GetReference()
 	// For json, we go through the standard schema mechanism
-	return GenerateGoSchema(mediaType.Schema, mediaRef, path)
+	return GenerateGoSchema(mediaType.Schema, mediaRef, path, options)
 }

@@ -75,6 +75,10 @@ func createParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		}
 	}
 
+	parseOptions := ParseOptions{
+		OmitDescription: cfg.Generate.OmitDescription,
+	}
+
 	builtModel, errs := doc.BuildV3Model()
 	if len(errs) > 0 {
 		return nil, errs[0]
@@ -91,7 +95,7 @@ func createParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		return nil, nil
 	}
 
-	opColl, err := collectOperationDefinitions(model)
+	opColl, err := collectOperationDefinitions(model, parseOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting operation definitions: %w", err)
 	}
@@ -103,7 +107,7 @@ func createParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	}
 
 	// Process Components
-	componentDefs, err := collectComponentDefinitions(model)
+	componentDefs, err := collectComponentDefinitions(model, parseOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting component definitions: %s", err)
 	}
@@ -183,7 +187,7 @@ func createParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	}, nil
 }
 
-func collectOperationDefinitions(model *v3high.Document) (*operationsCollection, error) {
+func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (*operationsCollection, error) {
 	if model.Paths == nil {
 		return nil, nil
 	}
@@ -197,7 +201,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 	for path, pathItem := range model.Paths.PathItems.FromOldest() {
 		// These are parameters defined for all methods on a given path. They
 		// are shared by all methods.
-		globalParams, err := describeOperationParameters(pathItem.Parameters, nil)
+		globalParams, err := describeOperationParameters(pathItem.Parameters, nil, options)
 		if err != nil {
 			return nil, fmt.Errorf("error describing global parameters for %s: %s", path, err)
 		}
@@ -215,7 +219,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 			}
 
 			// These are parameters defined for the specific path method that we're iterating over.
-			localParams, err := describeOperationParameters(operation.Parameters, []string{operationID})
+			localParams, err := describeOperationParameters(operation.Parameters, []string{operationID}, options)
 			if err != nil {
 				return nil, fmt.Errorf("error describing local parameters for %s/%s: %s", method, path, err)
 			}
@@ -234,7 +238,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 			// the path, not in the openapi spec, and validate that the parameter
 			// names match, as downstream code depends on that.
 			pathParameters := filterParameterDefinitionByType(allParams, "path")
-			pathDefs, pathSchemas := generateParamsTypes(pathParameters, operationID+"Path")
+			pathDefs, pathSchemas := generateParamsTypes(pathParameters, operationID+"Path", options)
 			if len(pathDefs) > 0 {
 				pathParamsDef = &pathDefs[len(pathDefs)-1]
 				typeDefs = append(typeDefs, pathDefs...)
@@ -244,7 +248,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 			}
 
 			queryParams := filterParameterDefinitionByType(allParams, "query")
-			queryDefs, querySchemas := generateParamsTypes(queryParams, operationID+"Query")
+			queryDefs, querySchemas := generateParamsTypes(queryParams, operationID+"Query", options)
 			if len(queryDefs) > 0 {
 				queryDef = &queryDefs[len(queryDefs)-1]
 				typeDefs = append(typeDefs, queryDefs...)
@@ -254,7 +258,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 			}
 
 			headerParams := filterParameterDefinitionByType(allParams, "header")
-			headerDefs, headerSchemas := generateParamsTypes(headerParams, operationID+"Headers")
+			headerDefs, headerSchemas := generateParamsTypes(headerParams, operationID+"Headers", options)
 			if len(headerDefs) > 0 {
 				headerDef = &headerDefs[len(headerDefs)-1]
 				typeDefs = append(typeDefs, headerDefs...)
@@ -264,7 +268,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 			}
 
 			// Process Request Body
-			bodyDefinition, bodyTypeDef, err := createBodyDefinition(operationID, operation.RequestBody)
+			bodyDefinition, bodyTypeDef, err := createBodyDefinition(operationID, operation.RequestBody, options)
 			if err != nil {
 				return nil, fmt.Errorf("error generating body definitions: %w", err)
 			}
@@ -277,7 +281,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 			}
 
 			// Process Responses
-			responseDef, responseTypes, err := getOperationResponses(operationID, operation.Responses)
+			responseDef, responseTypes, err := getOperationResponses(operationID, operation.Responses, options)
 			if err != nil {
 				return nil, fmt.Errorf("error getting operation responses: %w", err)
 			}
@@ -310,7 +314,7 @@ func collectOperationDefinitions(model *v3high.Document) (*operationsCollection,
 }
 
 // collectComponentDefinitions collects all the components from the model and returns them as a list of TypeDefinition.
-func collectComponentDefinitions(model *v3high.Document) ([]TypeDefinition, error) {
+func collectComponentDefinitions(model *v3high.Document, options ParseOptions) ([]TypeDefinition, error) {
 	if model.Components == nil {
 		return nil, nil
 	}
@@ -319,7 +323,7 @@ func collectComponentDefinitions(model *v3high.Document) ([]TypeDefinition, erro
 
 	// Parameters
 	if model.Components.Parameters != nil {
-		res, err := getComponentParameters(model.Components.Parameters)
+		res, err := getComponentParameters(model.Components.Parameters, options)
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +332,7 @@ func collectComponentDefinitions(model *v3high.Document) ([]TypeDefinition, erro
 
 	// Schemas
 	if model.Components.Schemas != nil {
-		schemas, err := getComponentsSchemas(model.Components.Schemas)
+		schemas, err := getComponentsSchemas(model.Components.Schemas, options)
 		if err != nil {
 			return nil, fmt.Errorf("error getting components schemas: %w", err)
 		}
@@ -337,7 +341,7 @@ func collectComponentDefinitions(model *v3high.Document) ([]TypeDefinition, erro
 
 	// RequestBodies
 	if model.Components.RequestBodies != nil {
-		bodyTypes, err := getComponentsRequestBodies(model.Components.RequestBodies)
+		bodyTypes, err := getComponentsRequestBodies(model.Components.RequestBodies, options)
 		if err != nil {
 			return nil, fmt.Errorf("error getting components request bodies: %w", err)
 		}
@@ -346,7 +350,7 @@ func collectComponentDefinitions(model *v3high.Document) ([]TypeDefinition, erro
 
 	// Responses
 	if model.Components.Responses != nil {
-		componentResponses, err := getContentResponses(model.Components.Responses)
+		componentResponses, err := getContentResponses(model.Components.Responses, options)
 		if err != nil {
 			return nil, fmt.Errorf("error getting content responses: %w", err)
 		}

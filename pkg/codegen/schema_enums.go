@@ -38,8 +38,8 @@ func (e *EnumDefinition) GetValues() map[string]string {
 	return newValues
 }
 
-func createEnumsSchema(schema *base.Schema, ref string, path []string) (GoSchema, error) {
-	outSchema, err := oapiSchemaToGoType(schema, ref, path)
+func createEnumsSchema(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
+	outSchema, err := oapiSchemaToGoType(schema, ref, path, options)
 	if err != nil {
 		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
 	}

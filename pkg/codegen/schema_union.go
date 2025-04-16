@@ -24,7 +24,7 @@ func (u UnionElement) Method() string {
 	return method
 }
 
-func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, path []string) (GoSchema, error) {
+func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, path []string, options ParseOptions) (GoSchema, error) {
 	outSchema := GoSchema{}
 
 	if discriminator != nil {
@@ -42,7 +42,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 		}
 		elementPath := append(path, fmt.Sprint(i))
 		ref := element.GoLow().GetReference()
-		elementSchema, err := GenerateGoSchema(element, ref, elementPath)
+		elementSchema, err := GenerateGoSchema(element, ref, elementPath, options)
 		if err != nil {
 			return GoSchema{}, err
 		}

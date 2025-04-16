@@ -107,7 +107,7 @@ func (d *Discriminator) PropertyName() string {
 	return schemaNameToTypeName(d.Property)
 }
 
-func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string) (GoSchema, error) {
+func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, options ParseOptions) (GoSchema, error) {
 	// Add a fallback value in case the schemaProxy is nil.
 	// i.e. the parent schema defines a type:array, but the array has
 	// no items defined. Therefore, we have at least valid Go-Code.
@@ -138,7 +138,7 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string) 
 	}
 
 	if schema.AllOf != nil {
-		mergedSchema, err := mergeSchemas(schema.AllOf, path)
+		mergedSchema, err := mergeSchemas(schema.AllOf, path, options)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error merging schemas: %w", err)
 		}
@@ -174,14 +174,14 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string) 
 	t := schema.Type
 	// Handle objects and empty schemas first as a special case
 	if t == nil || slices.Contains(t, "object") {
-		return createObjectSchema(schema, ref, path)
+		return createObjectSchema(schema, ref, path, options)
 	}
 
 	if len(schema.Enum) > 0 {
-		return createEnumsSchema(schema, ref, path)
+		return createEnumsSchema(schema, ref, path, options)
 	}
 
-	outSchema, err := oapiSchemaToGoType(schema, ref, path)
+	outSchema, err := oapiSchemaToGoType(schema, ref, path, options)
 	if err != nil {
 		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
 	}

@@ -10,7 +10,7 @@ import (
 
 // oapiSchemaToGoType converts an OpenApi schema into a Go type definition for
 // all non-object types.
-func oapiSchemaToGoType(schema *base.Schema, ref string, path []string) (GoSchema, error) {
+func oapiSchemaToGoType(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
 	f := schema.Format
 	t := schema.Type
 
@@ -26,7 +26,7 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string) (GoSchem
 		if schema != nil && schema.Items != nil && schema.Items.IsA() {
 			items = schema.Items.A
 		}
-		arrayType, err := GenerateGoSchema(items, ref, path)
+		arrayType, err := GenerateGoSchema(items, ref, path, options)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error generating type for array: %w", err)
 		}
