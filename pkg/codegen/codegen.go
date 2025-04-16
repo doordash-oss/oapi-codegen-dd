@@ -49,7 +49,7 @@ func Generate(docContents []byte, cfg Configuration) (GeneratedCode, error) {
 func CreateParseContext(docContents []byte, cfg Configuration) (*ParseContext, []error) {
 	cfg = cfg.Merge(NewDefaultConfiguration())
 
-	doc, err := FilterDocument(docContents, cfg)
+	doc, err := CreateDocument(docContents, cfg)
 	if err != nil {
 		return nil, []error{fmt.Errorf("error filtering document: %w", err)}
 	}
