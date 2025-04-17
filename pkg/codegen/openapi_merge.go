@@ -134,12 +134,16 @@ func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy) {
 		return
 	}
 
-	for key, value := range other.Schema().Properties.FromOldest() {
-		srcKeySchema, exists := src.Schema().Properties.Get(key)
-		if exists {
-			mergeSchemaProxy(srcKeySchema, value)
-		} else {
-			src.Schema().Properties.Set(key, value)
+	if src.Schema().Properties == nil {
+		src.Schema().Properties = other.Schema().Properties
+	} else {
+		for key, value := range other.Schema().Properties.FromOldest() {
+			srcKeySchema, exists := src.Schema().Properties.Get(key)
+			if exists {
+				mergeSchemaProxy(srcKeySchema, value)
+			} else {
+				src.Schema().Properties.Set(key, value)
+			}
 		}
 	}
 
