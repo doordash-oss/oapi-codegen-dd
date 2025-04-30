@@ -2,6 +2,7 @@ package codegen
 
 import (
 	_ "embed"
+	"fmt"
 	"os"
 	"testing"
 
@@ -34,6 +35,22 @@ func loadUserDocuments(t *testing.T, partialPath string) (libopenapi.Document, l
 
 	partialDoc, err := LoadDocumentFromContents(partialContent)
 	require.NoError(t, err)
+	return srcDoc, partialDoc
+}
+
+func loadPaymentIntentDocuments(t *testing.T, partialPath string) (libopenapi.Document, libopenapi.Document) {
+	srcContent, err := os.ReadFile("testdata/intent.yml")
+	require.NoError(t, err)
+
+	srcDoc, err := LoadDocumentFromContents(srcContent)
+	require.NoError(t, err)
+
+	partialContent, err := os.ReadFile(fmt.Sprintf("testdata/%s", partialPath))
+	require.NoError(t, err)
+
+	partialDoc, err := LoadDocumentFromContents(partialContent)
+	require.NoError(t, err)
+
 	return srcDoc, partialDoc
 }
 
@@ -187,6 +204,87 @@ func TestMergeDocuments(t *testing.T) {
 		expectedKeys := []string{"name", "city", "zip"}
 		props := getPropertyKeys(reqBody.Content.Value("application/json").Schema)
 		assert.Equal(t, expectedKeys, props)
+	})
+
+	t.Run("request bodies with nested properties merged", func(t *testing.T) {
+		srcDoc, partialDoc := loadPaymentIntentDocuments(t, "partial-intent.yml")
+
+		res, err := MergeDocuments(srcDoc, partialDoc)
+		require.NoError(t, err)
+
+		v3Model, errs := res.BuildV3Model()
+		if errs != nil {
+			t.Fatalf("error building document: %v", errs)
+		}
+		model := v3Model.Model
+
+		pathItem, exists := model.Paths.PathItems.Get("/v1/payment_intents")
+		require.True(t, exists)
+		assert.NotNil(t, pathItem.Post)
+
+		reqBody := pathItem.Post.RequestBody
+		require.NotNil(t, reqBody)
+		expectedKeys := []string{"user_data", "payment_method_data"}
+		schemaPr := reqBody.Content.Value("application/x-www-form-urlencoded").Schema
+
+		rootProps := getPropertyKeys(schemaPr)
+		assert.Equal(t, expectedKeys, rootProps)
+
+		paymentMethodData := schemaPr.Schema().Properties.Value("payment_method_data")
+		require.NotNil(t, paymentMethodData)
+		expectedPaymentMethodDataProps := []string{"payment_id", "card"}
+		paymentMethodDataProps := getPropertyKeys(paymentMethodData)
+		assert.Equal(t, expectedPaymentMethodDataProps, paymentMethodDataProps)
+
+		card := paymentMethodData.Schema().Properties.Value("card")
+		require.NotNil(t, card)
+		expectedCardProps := []string{"exp_month", "exp_year", "last4", "network_token"}
+		cardProps := getPropertyKeys(card)
+		assert.Equal(t, expectedCardProps, cardProps)
+	})
+
+	t.Run("new enums can be added to existing inside request body", func(t *testing.T) {
+		srcDoc, partialDoc := loadPaymentIntentDocuments(t, "partial-intent-enums.yml")
+
+		res, err := MergeDocuments(srcDoc, partialDoc)
+		require.NoError(t, err)
+
+		v3Model, errs := res.BuildV3Model()
+		if errs != nil {
+			t.Fatalf("error building document: %v", errs)
+		}
+		model := v3Model.Model
+
+		pathItem, exists := model.Paths.PathItems.Get("/v1/payment_intents")
+		require.True(t, exists)
+		assert.NotNil(t, pathItem.Post)
+
+		reqBody := pathItem.Post.RequestBody
+		schemaPr := reqBody.Content.Value("application/x-www-form-urlencoded").Schema
+
+		userData := schemaPr.Schema().Properties.Value("user_data")
+		userID := userData.Schema().Properties.Value("user_id")
+
+		expectedUserEnums := []string{"user-1", "user-2", "user-3", "user-4"}
+		var actualUserEnums []string
+		for _, node := range userID.Schema().Enum {
+			actualUserEnums = append(actualUserEnums, node.Value)
+		}
+		assert.Equal(t, expectedUserEnums, actualUserEnums)
+
+		params := pathItem.Post.Parameters
+		expectedApiKeyEnums := []string{"foo", "bar", "car"}
+		var actualApiKeyEnums []string
+
+		for _, param := range params {
+			if param.Name != "api-key" {
+				continue
+			}
+			for _, node := range param.Schema.Schema().Enum {
+				actualApiKeyEnums = append(actualApiKeyEnums, node.Value)
+			}
+		}
+		assert.Equal(t, expectedApiKeyEnums, actualApiKeyEnums)
 	})
 
 	t.Run("new response code appended", func(t *testing.T) {

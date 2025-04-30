@@ -1,0 +1,29 @@
+openapi: 3.0.4
+info:
+  title: Spec Customization
+  version: 1.0.0
+
+paths:
+  /v1/payment_intents:
+    post:
+      parameters:
+          - name: api-key
+            in: query
+            description: The ID of the user
+            schema:
+                type: string
+                enum:
+                - car
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                user_data:
+                  properties:
+                    user_id:
+                      type: string
+                      enum:
+                        - user-3
+                        - user-4
+      responses:

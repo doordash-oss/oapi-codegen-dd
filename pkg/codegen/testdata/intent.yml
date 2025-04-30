@@ -1,0 +1,44 @@
+openapi: 3.0.4
+info:
+  title: Intent API
+  version: 1.0.0
+
+paths:
+  /v1/payment_intents:
+    post:
+      parameters:
+        - name: api-key
+          in: query
+          required: true
+          description: The ID of the user
+          schema:
+            type: string
+            enum:
+              - foo
+              - bar
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                user_data:
+                  properties:
+                    user_id:
+                      type: string
+                      enum:
+                        - user-1
+                        - user-2
+                payment_method_data:
+                  properties:
+                    payment_id:
+                      type: string
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string

@@ -147,6 +147,12 @@ func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy) {
 		}
 	}
 
+	if len(src.Schema().Enum) > 0 {
+		for _, enumNode := range other.Schema().Enum {
+			src.Schema().Enum = append(src.Schema().Enum, enumNode)
+		}
+	}
+
 	for _, schemaProxies := range other.Schema().AllOf {
 		src.Schema().AllOf = append(src.Schema().AllOf, schemaProxies)
 	}

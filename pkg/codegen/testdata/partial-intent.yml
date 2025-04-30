@@ -1,0 +1,32 @@
+openapi: 3.0.4
+info:
+  title: Spec Customization
+  version: 1.0.0
+
+paths:
+  /v1/payment_intents:
+    post:
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                payment_method_data:
+                  properties:
+                    card:
+                      type: object
+                      properties:
+                        exp_month:
+                          type: integer
+                        exp_year:
+                          type: integer
+                        last4:
+                          type: string
+                        network_token:
+                          type: object
+                          properties:
+                            expiration:
+                              type: string
+                            token:
+                              type: string
+      responses:
