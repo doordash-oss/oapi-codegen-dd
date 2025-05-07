@@ -1,4 +1,4 @@
-func unmarshalAs[T any](v json.RawMessage) (T, error) {
+func UnmarshalAs[T any](v json.RawMessage) (T, error) {
     var res T
     err := json.Unmarshal(v, &res)
     return res, err
@@ -21,7 +21,6 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
     return json.Marshal(object)
 }
 
-
 {{ $config := .Config }}
 
 {{range .Types}}
@@ -36,13 +35,20 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 
     {{ $eitherType := eq (len .Schema.UnionElements) 2}}
 
-    {{range .Schema.UnionElements}}
+    {{ if not $eitherType }}
+    // Raw returns the union data inside the {{$typeName}} as bytes
+    func ({{$alias}} *{{$typeName}}) Raw() json.RawMessage {
+        return {{$alias}}.union
+    }
+    {{ end }}
+
+{{range .Schema.UnionElements}}
         {{$element := . -}}
 
         {{ if not $eitherType }}
         // As{{ .Method }} returns the union data inside the {{$typeName}} as a {{.}}
         func ({{$alias}} *{{$typeName}}) As{{ .Method }}() ({{.}}, error) {
-            return unmarshalAs[{{.}}]({{$alias}}.union)
+            return UnmarshalAs[{{.}}]({{$alias}}.union)
         }
 
         // From{{ .Method }} overwrites any union data inside the {{$typeName}} as the provided {{.}}

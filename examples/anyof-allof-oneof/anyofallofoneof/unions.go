@@ -10,7 +10,7 @@ import (
 	"github.com/doordash/oapi-codegen/v3/pkg/runtime"
 )
 
-func unmarshalAs[T any](v json.RawMessage) (T, error) {
+func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T
 	err := json.Unmarshal(v, &res)
 	return res, err
@@ -37,9 +37,14 @@ type ClientAndMaybeIdentity_Entity struct {
 	union json.RawMessage
 }
 
+// Raw returns the union data inside the ClientAndMaybeIdentity_Entity as bytes
+func (c *ClientAndMaybeIdentity_Entity) Raw() json.RawMessage {
+	return c.union
+}
+
 // AsClient returns the union data inside the ClientAndMaybeIdentity_Entity as a Client
 func (c *ClientAndMaybeIdentity_Entity) AsClient() (Client, error) {
-	return unmarshalAs[Client](c.union)
+	return UnmarshalAs[Client](c.union)
 }
 
 // FromClient overwrites any union data inside the ClientAndMaybeIdentity_Entity as the provided Client
@@ -51,7 +56,7 @@ func (c *ClientAndMaybeIdentity_Entity) FromClient(v Client) error {
 
 // AsIdentity returns the union data inside the ClientAndMaybeIdentity_Entity as a Identity
 func (c *ClientAndMaybeIdentity_Entity) AsIdentity() (Identity, error) {
-	return unmarshalAs[Identity](c.union)
+	return UnmarshalAs[Identity](c.union)
 }
 
 // FromIdentity overwrites any union data inside the ClientAndMaybeIdentity_Entity as the provided Identity
@@ -63,7 +68,7 @@ func (c *ClientAndMaybeIdentity_Entity) FromIdentity(v Identity) error {
 
 // AsClientWithID returns the union data inside the ClientAndMaybeIdentity_Entity as a ClientWithID
 func (c *ClientAndMaybeIdentity_Entity) AsClientWithID() (ClientWithID, error) {
-	return unmarshalAs[ClientWithID](c.union)
+	return UnmarshalAs[ClientWithID](c.union)
 }
 
 // FromClientWithID overwrites any union data inside the ClientAndMaybeIdentity_Entity as the provided ClientWithID

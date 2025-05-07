@@ -9,7 +9,7 @@ import (
 	"github.com/doordash/oapi-codegen/v3/pkg/runtime"
 )
 
-func unmarshalAs[T any](v json.RawMessage) (T, error) {
+func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T
 	err := json.Unmarshal(v, &res)
 	return res, err
@@ -62,9 +62,14 @@ func (c *ClientWithIDAndWithAddress) Set(fieldName string, value struct {
 	c.AdditionalProperties[fieldName] = value
 }
 
+// Raw returns the union data inside the ClientWithIDAndWithAddress as bytes
+func (c *ClientWithIDAndWithAddress) Raw() json.RawMessage {
+	return c.union
+}
+
 // AsClient returns the union data inside the ClientWithIDAndWithAddress as a Client
 func (c *ClientWithIDAndWithAddress) AsClient() (Client, error) {
-	return unmarshalAs[Client](c.union)
+	return UnmarshalAs[Client](c.union)
 }
 
 // FromClient overwrites any union data inside the ClientWithIDAndWithAddress as the provided Client
@@ -76,7 +81,7 @@ func (c *ClientWithIDAndWithAddress) FromClient(v Client) error {
 
 // AsClientID returns the union data inside the ClientWithIDAndWithAddress as a ClientID
 func (c *ClientWithIDAndWithAddress) AsClientID() (ClientID, error) {
-	return unmarshalAs[ClientID](c.union)
+	return UnmarshalAs[ClientID](c.union)
 }
 
 // FromClientID overwrites any union data inside the ClientWithIDAndWithAddress as the provided ClientID
@@ -88,7 +93,7 @@ func (c *ClientWithIDAndWithAddress) FromClientID(v ClientID) error {
 
 // AsString returns the union data inside the ClientWithIDAndWithAddress as a string
 func (c *ClientWithIDAndWithAddress) AsString() (string, error) {
-	return unmarshalAs[string](c.union)
+	return UnmarshalAs[string](c.union)
 }
 
 // FromString overwrites any union data inside the ClientWithIDAndWithAddress as the provided string
