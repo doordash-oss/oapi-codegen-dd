@@ -39,7 +39,7 @@ type ClientWithIDAndWithAddress struct {
 	union json.RawMessage
 }
 
-// Getter for additional properties for <no value>. Returns the specified
+// Getter for additional properties for ClientWithIDAndWithAddress. Returns the specified
 // element and whether it was found
 func (c ClientWithIDAndWithAddress) Get(fieldName string) (value struct {
 	Address *string `json:"address,omitempty"`
@@ -50,7 +50,7 @@ func (c ClientWithIDAndWithAddress) Get(fieldName string) (value struct {
 	return
 }
 
-// Setter for additional properties for <no value>
+// Setter for additional properties for ClientWithIDAndWithAddress
 func (c *ClientWithIDAndWithAddress) Set(fieldName string, value struct {
 	Address *string `json:"address,omitempty"`
 }) {
@@ -163,7 +163,7 @@ type ClientWithID struct {
 	runtime.Either[Client, ClientID]
 }
 
-// Getter for additional properties for <no value>. Returns the specified
+// Getter for additional properties for ClientWithID. Returns the specified
 // element and whether it was found
 func (c ClientWithID) Get(fieldName string) (value struct {
 	Address *string `json:"address,omitempty"`
@@ -174,7 +174,7 @@ func (c ClientWithID) Get(fieldName string) (value struct {
 	return
 }
 
-// Setter for additional properties for <no value>
+// Setter for additional properties for ClientWithID
 func (c *ClientWithID) Set(fieldName string, value struct {
 	Address *string `json:"address,omitempty"`
 }) {

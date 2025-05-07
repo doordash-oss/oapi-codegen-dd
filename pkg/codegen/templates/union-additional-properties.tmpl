@@ -8,7 +8,7 @@
 {{ $properties := $args.Schema.Properties -}}
 {{ $eitherType := eq (len .Schema.UnionElements) 2}}
 
-// Override default JSON handling for {{.Name}} to handle AdditionalProperties and union
+// Override default JSON handling for {{$args.Name}} to handle AdditionalProperties and union
 func ({{$args.alias}} *{{$args.Name}}) UnmarshalJSON(b []byte) error {
     {{- if $eitherType }}
     if err := {{$args.alias}}.Unmarshal(b); err != nil {
@@ -44,7 +44,7 @@ func ({{$args.alias}} *{{$args.Name}}) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Override default JSON handling for {{.Name}} to handle AdditionalProperties and union
+// Override default JSON handling for {{$args.Name}} to handle AdditionalProperties and union
 func ({{$args.alias}} {{$args.Name}}) MarshalJSON() ([]byte, error) {
     var err error
     {{- if $eitherType }}

@@ -20,7 +20,7 @@ type Address struct {
 	AdditionalProperties map[string]any `json:"-"`
 }
 
-// Getter for additional properties for <no value>. Returns the specified
+// Getter for additional properties for Address. Returns the specified
 // element and whether it was found
 func (a Address) Get(fieldName string) (value any, found bool) {
 	if a.AdditionalProperties != nil {
@@ -29,7 +29,7 @@ func (a Address) Get(fieldName string) (value any, found bool) {
 	return
 }
 
-// Setter for additional properties for <no value>
+// Setter for additional properties for Address
 func (a *Address) Set(fieldName string, value any) {
 	if a.AdditionalProperties == nil {
 		a.AdditionalProperties = make(map[string]any)
@@ -37,7 +37,7 @@ func (a *Address) Set(fieldName string, value any) {
 	a.AdditionalProperties[fieldName] = value
 }
 
-// Override default JSON handling for <no value> to handle AdditionalProperties
+// Override default JSON handling for Address to handle AdditionalProperties
 func (a *Address) UnmarshalJSON(b []byte) error {
 	object := make(map[string]json.RawMessage)
 	if err := json.Unmarshal(b, &object); err != nil {
@@ -64,7 +64,7 @@ func (a *Address) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Override default JSON handling for <no value> to handle AdditionalProperties
+// Override default JSON handling for Address to handle AdditionalProperties
 func (a Address) MarshalJSON() ([]byte, error) {
 	var err error
 	object := make(map[string]json.RawMessage)
