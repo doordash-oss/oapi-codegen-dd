@@ -7,6 +7,8 @@ type GetClientResponse struct {
 	Type *GetClientResponseType `json:"type,omitempty"`
 }
 
+type GetClientErrorResponse = Error
+
 type UpdateClientErrorResponse struct {
 	Code string `json:"code" validate:"required"`
 }

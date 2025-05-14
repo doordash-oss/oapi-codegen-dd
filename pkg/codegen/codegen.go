@@ -361,13 +361,16 @@ func collectResponseErrors(errNames []string, types []TypeDefinition) ([]string,
 		for {
 			typ, found := tds[name]
 			if !found {
-				return nil, fmt.Errorf("error finding type %s", name)
+				return nil, fmt.Errorf("error finding type '%s'", name)
 			}
 			if !typ.IsAlias() {
 				res = append(res, name)
 				break
 			}
 			name = typ.Schema.RefType
+			if name == "" {
+				break
+			}
 		}
 	}
 

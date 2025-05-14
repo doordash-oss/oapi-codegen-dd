@@ -43,6 +43,8 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 
 	var typeDefinitions []TypeDefinition
 
+	defaultResponse := responses.Default
+
 	// we just need success and error responses
 	for statusCode, response := range responses.Codes.FromOldest() {
 		if response == nil {
@@ -179,6 +181,49 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			ResponseName: "struct{}",
 		}
 		successCode = 204
+	}
+
+	if errorDefinition == nil && defaultResponse != nil {
+		typeSuffix := "ErrorResponse"
+		content := defaultResponse.Content.First()
+		contentType, contentVal := content.Key(), content.Value()
+		ref := contentVal.Schema.GetReference()
+		var refType string
+		var err error
+		if ref != "" {
+			refType, err = refPathToGoType(ref)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error turning reference (%s) into a Go type: %w", ref, err)
+			}
+		}
+
+		contentSchema, err := GenerateGoSchema(contentVal.Schema, ref, []string{operationID, typeSuffix}, options)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
+		}
+
+		if !contentSchema.IsZero() {
+			if refType != "" {
+				contentSchema.RefType = refType
+			}
+			responseName := operationID + typeSuffix
+			td := TypeDefinition{
+				Name:         responseName,
+				Schema:       contentSchema,
+				SpecLocation: SpecLocationResponse,
+			}
+			typeDefinitions = append(typeDefinitions, td)
+			typeDefinitions = append(typeDefinitions, contentSchema.AdditionalTypes...)
+
+			errorDefinition = &ResponseContentDefinition{
+				ResponseName: responseName,
+				IsSuccess:    false,
+				Description:  defaultResponse.Description,
+				Schema:       contentSchema,
+				Ref:          refType,
+				ContentType:  contentType,
+			}
+		}
 	}
 
 	res := &ResponseDefinition{

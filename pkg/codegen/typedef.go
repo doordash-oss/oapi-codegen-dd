@@ -43,11 +43,7 @@ func (t TypeDefinition) IsOptional() bool {
 func (t TypeDefinition) GetErrorResponse(errTypes map[string]string, alias string) string {
 	unknownRes := `return "unknown error"`
 
-	key := t.JsonName
-	if key == "" {
-		key = t.Name
-	}
-
+	key := t.Name
 	path, ok := errTypes[key]
 	if !ok || path == "" {
 		return unknownRes

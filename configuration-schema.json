@@ -38,7 +38,7 @@
     },
     "error-mapping": {
       "type": "object",
-      "description": "ErrorMapping is the configuration for mapping the OpenAPI error responses to Go types. The key is the spec error type name and the value is the dotted json path to the string result.",
+      "description": "ErrorMapping is the configuration for mapping the OpenAPI error responses to Go types. The key is the generated error type name and the value is the dotted json path to the string result.",
       "additionalProperties": {
         "type": "string"
       }

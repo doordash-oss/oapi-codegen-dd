@@ -3,6 +3,7 @@ package: client
 output:
   use-single-file: false
 error-mapping:
+  Error: message
   UpdateClientErrorResponse: code
 generate:
   client: true

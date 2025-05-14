@@ -15,6 +15,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClientType"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+          description: Error response.
     put:
       operationId: updateClient
       description: "updateClient description"
@@ -66,3 +72,13 @@ components:
       properties:
         id:
           type: integer
+
+    error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Error code description"
+        message:
+          type: string
+          description: "Error message description"
