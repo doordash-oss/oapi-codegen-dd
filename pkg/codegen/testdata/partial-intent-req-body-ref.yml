@@ -1,0 +1,51 @@
+openapi: 3.0.4
+info:
+  title: Spec Customization
+  version: 1.0.0
+
+paths:
+  /v1/payment_intents:
+    post:
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                payment_method_data:
+                  $ref: "#/components/schemas/payment_method_data"
+                options:
+                  type: object
+                  properties:
+                    is_recurring:
+                      type: boolean
+      responses:
+
+components:
+  schemas:
+    payment_method_data:
+      type: object
+      properties:
+        payment_id:
+          type: string
+        card:
+          $ref: "#/components/schemas/Card"
+
+    Card:
+      type: object
+      properties:
+        exp_month:
+          type: integer
+        exp_year:
+          type: integer
+        last4:
+          type: string
+
+    CustomLocation:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        zip:
+          type: string
