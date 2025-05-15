@@ -42,3 +42,28 @@ paths:
                 properties:
                   id:
                     type: string
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        card:
+          type: object
+          properties:
+            exp_month:
+              type: integer
+            exp_year:
+              type: integer
+            last4:
+              type: string

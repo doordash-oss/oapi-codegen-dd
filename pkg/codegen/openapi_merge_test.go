@@ -319,6 +319,42 @@ func TestMergeDocuments(t *testing.T) {
 		require.NotNil(t, paymentMethodDataComponent)
 	})
 
+	t.Run("foreign ref can be used in other doc", func(t *testing.T) {
+		srcDoc, partialDoc := loadPaymentIntentDocuments(t, "partial-intent-req-body-existing-ref.yml")
+
+		res, err := MergeDocuments(srcDoc, partialDoc)
+		require.NoError(t, err)
+
+		v3Model, errs := res.BuildV3Model()
+		if errs != nil {
+			t.Fatalf("error building document: %v", errs)
+		}
+		model := v3Model.Model
+
+		epPath, exists := model.Paths.PathItems.Get("/v1/payment_intents")
+		require.True(t, exists)
+		assert.NotNil(t, epPath.Post)
+
+		reqBody := epPath.Post.RequestBody
+		require.NotNil(t, reqBody)
+		expectedKeys := []string{"user_data", "payment_method_data"}
+		props := getPropertyKeys(reqBody.Content.Value("application/x-www-form-urlencoded").Schema)
+		assert.Equal(t, expectedKeys, props)
+
+		// instead of original user_id we have user object with id and name
+		userData := reqBody.Content.Value("application/x-www-form-urlencoded").Schema.Schema().Properties.Value("user_data")
+		require.NotNil(t, userData)
+		expectedUserDataProps := []string{"id", "name"}
+		userDataProps := getPropertyKeys(userData)
+		assert.Equal(t, expectedUserDataProps, userDataProps)
+
+		paymentMethodData := reqBody.Content.Value("application/x-www-form-urlencoded").Schema.Schema().Properties.Value("payment_method_data")
+		require.NotNil(t, paymentMethodData)
+		expectedPaymentMethodDataProps := []string{"payment_id"}
+		paymentMethodDataProps := getPropertyKeys(paymentMethodData)
+		assert.Equal(t, expectedPaymentMethodDataProps, paymentMethodDataProps)
+	})
+
 	t.Run("new response code appended", func(t *testing.T) {
 		srcDoc, partialDoc := loadUserDocuments(t, "testdata/partial-paths-user-new-response.yml")
 

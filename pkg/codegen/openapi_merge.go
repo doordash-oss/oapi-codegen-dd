@@ -10,6 +10,8 @@ import (
 	"github.com/pb33f/libopenapi/orderedmap"
 )
 
+const extSrcMergeRef = "x-src-merge-ref"
+
 func MergeDocuments(src, other libopenapi.Document) (libopenapi.Document, error) {
 	srcModel, errs := src.BuildV3Model()
 	if len(errs) > 0 {
@@ -36,7 +38,7 @@ func MergeDocuments(src, other libopenapi.Document) (libopenapi.Document, error)
 				srcModel.Model.Components.Schemas.Set(compName, schemaProxy)
 				continue
 			}
-			mergeSchemaProxy(current, schemaProxy)
+			mergeSchemaProxy(current, schemaProxy, srcModel)
 		}
 	}
 
@@ -99,7 +101,7 @@ func mergeOperations(srcModel, otherModel *libopenapi.DocumentModel[v3.Document]
 					}
 
 					if reqBodyExists {
-						mergeSchemaProxy(currentContent.Schema, content.Schema)
+						mergeSchemaProxy(currentContent.Schema, content.Schema, srcModel)
 					} else {
 						if currentOperation.RequestBody == nil {
 							currentOperation.RequestBody = operation.RequestBody
@@ -115,7 +117,7 @@ func mergeOperations(srcModel, otherModel *libopenapi.DocumentModel[v3.Document]
 				for code, response := range operation.Responses.Codes.FromOldest() {
 					currentResponse, resExists := currentOperation.Responses.Codes.Get(code)
 					if resExists {
-						mergeResponses(currentResponse, response)
+						mergeResponses(currentResponse, response, srcModel)
 						continue
 					}
 					currentOperation.Responses.Codes.Set(code, response)
@@ -125,7 +127,7 @@ func mergeOperations(srcModel, otherModel *libopenapi.DocumentModel[v3.Document]
 	}
 }
 
-func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy) {
+func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy, docModel *libopenapi.DocumentModel[v3.Document]) {
 	if src == nil || other == nil {
 		return
 	}
@@ -152,11 +154,16 @@ func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy) {
 	} else {
 		for key, value := range other.Schema().Properties.FromOldest() {
 			srcKeySchema, exists := src.Schema().Properties.Get(key)
-			if exists {
-				mergeSchemaProxy(srcKeySchema, value)
-			} else {
+			if !exists {
 				src.Schema().Properties.Set(key, value)
+				continue
 			}
+
+			if ok := setFromExtension(srcKeySchema, value, docModel); ok {
+				continue
+			}
+
+			mergeSchemaProxy(srcKeySchema, value, docModel)
 		}
 	}
 
@@ -184,7 +191,7 @@ func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy) {
 	}
 }
 
-func mergeResponses(src, other *v3.Response) {
+func mergeResponses(src, other *v3.Response, docModel *libopenapi.DocumentModel[v3.Document]) {
 	if src == nil || other == nil {
 		return
 	}
@@ -198,9 +205,31 @@ func mergeResponses(src, other *v3.Response) {
 	for contentType, content := range other.Content.FromOldest() {
 		srcContent, exists := src.Content.Get(contentType)
 		if exists {
-			mergeSchemaProxy(srcContent.Schema, content.Schema)
+			mergeSchemaProxy(srcContent.Schema, content.Schema, docModel)
 		} else {
 			src.Content.Set(contentType, content)
 		}
 	}
+}
+
+func setFromExtension(src, other *base.SchemaProxy, docModel *libopenapi.DocumentModel[v3.Document]) bool {
+	if src == nil || other == nil {
+		return false
+	}
+
+	// set source ref to the ref pointed to by the other schema
+	valueExtensions := other.Schema().Extensions
+	exts := extractExtensions(valueExtensions)
+	if exts == nil || exts[extSrcMergeRef] == nil {
+		return false
+	}
+
+	refName, _ := parseString(exts[extSrcMergeRef])
+	ref := docModel.Index.FindComponent(refName)
+	if ref != nil {
+		src.GoLow().SetReference(refName, ref.Node)
+		return true
+	}
+
+	return false
 }

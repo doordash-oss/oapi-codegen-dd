@@ -1,0 +1,17 @@
+openapi: 3.0.4
+info:
+  title: Spec Customization
+  version: 1.0.0
+
+paths:
+  /v1/payment_intents:
+    post:
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                user_data:
+                  x-src-merge-ref: "#/components/schemas/User"
+
+      responses:
