@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: optionalproperties
+output:
+  use-single-file: true
+generate:
+  client: true

@@ -31,7 +31,7 @@ func (p Property) GoTypeDef() string {
 	}
 
 	if p.Schema.OpenAPISchema != nil && slices.Contains(p.Schema.OpenAPISchema.Type, "object") {
-		if p.Schema.OpenAPISchema.AdditionalProperties != nil && p.Schema.OpenAPISchema.AdditionalProperties.IsB() {
+		if schemaHasAdditionalProperties(p.Schema.OpenAPISchema) {
 			return typeDef
 		}
 	}

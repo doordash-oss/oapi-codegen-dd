@@ -1,0 +1,36 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Generate models
+paths:
+  /payments:
+    post:
+      tags:
+        - Payments
+      summary: Start a transaction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Purchase'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+components:
+  schemas:
+    Purchase:
+      additionalProperties: false
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string

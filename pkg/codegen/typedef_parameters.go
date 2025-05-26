@@ -32,17 +32,6 @@ func (pd ParameterDefinition) TypeDef() string {
 	return typeDecl
 }
 
-// JsonTag generates the JSON annotation to map GoType to json type name. If Parameter
-// Foo is marshaled to json as "foo", this will create the annotation
-// 'json:"foo"'
-func (pd ParameterDefinition) JsonTag() string {
-	if pd.Required {
-		return fmt.Sprintf("`json:\"%s\"`", pd.ParamName)
-	} else {
-		return fmt.Sprintf("`json:\"%s,omitempty\"`", pd.ParamName)
-	}
-}
-
 func (pd ParameterDefinition) IsJson() bool {
 	p := pd.Spec
 	if p.Content.Len() == 1 {
