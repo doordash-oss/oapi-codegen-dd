@@ -17,6 +17,19 @@ if err != nil {
 {{- define "logReceivedResponse" -}}
 {{- end -}}
 
+{{- define "clientStructDefinition" -}}
+    {{ $clientName := .ClientName }}
+    // {{$clientName}} is the client for the API implementing the {{$clientName}} interface.
+    // baseURL is the base URL for the API.
+    // httpClient is the HTTP client to use for making requests.
+    // requestEditors is a list of callbacks for modifying requests which are generated before sending over the network.
+    type {{$clientName}} struct {
+        baseURL string
+        httpClient HttpRequestDoer
+        requestEditors []RequestEditorFn
+    }
+{{- end -}}
+
 {{ $config := .Config }}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
@@ -25,15 +38,7 @@ type RequestEditorFn func(ctx context.Context, req *http.Request) error
 {{ template "httpRequestDoer" $ }}
 
 {{ $clientName := $config.Client.Name }}
-// {{$clientName}} is the client for the API implementing the {{$clientName}} interface.
-// baseURL is the base URL for the API.
-// httpClient is the HTTP client to use for making requests.
-// requestEditors is a list of callbacks for modifying requests which are generated before sending over the network.
-type {{$clientName}} struct {
-    baseURL     string
-    httpClient  HttpRequestDoer
-    requestEditors []RequestEditorFn
-}
+{{ template "clientStructDefinition" (dict "ClientName" $clientName) }}
 
 // ClientOption allows setting custom parameters during construction.
 type {{$clientName}}Option func(*{{$clientName}}) error
