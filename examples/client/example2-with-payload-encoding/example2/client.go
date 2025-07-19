@@ -30,10 +30,10 @@ type HttpRequestDoer interface {
 // httpClient is the HTTP client to use for making requests.
 // requestEditors is a list of callbacks for modifying requests which are generated before sending over the network.
 type Client struct {
-	baseURL          string
-	httpClient       HttpRequestDoer
-	requestEditors   []RequestEditorFn
-	httpCallRecorder runtime.HTTPCallRecorder
+	baseURL        string
+	httpClient     HttpRequestDoer
+	requestEditors []RequestEditorFn
+	httpRecorder   runtime.HTTPCallRecorder
 }
 
 // ClientOption allows setting custom parameters during construction.
@@ -74,9 +74,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 	}
 }
 
-func WithHTTPCallRecorder(httpCallRecorder runtime.HTTPCallRecorder) ClientOption {
+func WithHTTPCallRecorder(httpRecorder runtime.HTTPCallRecorder) ClientOption {
 	return func(c *Client) error {
-		c.httpCallRecorder = httpCallRecorder
+		c.httpRecorder = httpRecorder
 		return nil
 	}
 }
@@ -112,16 +112,14 @@ func (c *Client) CreateOrder(ctx context.Context, options *CreateOrderRequestOpt
 
 	start := time.Now()
 	resp, err := c.httpClient.Do(ctx, req)
-	defer func() {
-		if c.httpCallRecorder != nil {
-			c.httpCallRecorder.Record(runtime.HTTPCall{
-				Method:  req.Method,
-				URL:     req.URL.String(),
-				Path:    "/order",
-				Latency: time.Since(start),
-			})
-		}
-	}()
+	if c.httpRecorder != nil {
+		c.httpRecorder.Record(runtime.HTTPCall{
+			Method:  req.Method,
+			URL:     req.URL.String(),
+			Path:    "/order",
+			Latency: time.Since(start),
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %w", err)
 	}
