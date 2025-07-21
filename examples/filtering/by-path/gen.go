@@ -105,11 +105,16 @@ func (c *Client) GetClient(ctx context.Context, reqEditors ...RequestEditorFn) (
 	start := time.Now()
 	resp, err := c.httpClient.Do(ctx, req)
 	if c.httpCallRecorder != nil {
+		responseCode := 0
+		if resp != nil {
+			responseCode = resp.StatusCode
+		}
 		c.httpCallRecorder.Record(runtime.HTTPCall{
-			Method:  req.Method,
-			URL:     req.URL.String(),
-			Path:    "/client",
-			Latency: time.Since(start),
+			Latency:      time.Since(start),
+			Method:       req.Method,
+			Path:         "/client",
+			ResponseCode: responseCode,
+			URL:          req.URL.String(),
 		})
 	}
 	if err != nil {

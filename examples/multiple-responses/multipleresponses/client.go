@@ -106,11 +106,16 @@ func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingReques
 	start := time.Now()
 	resp, err := c.httpClient.Do(ctx, req)
 	if c.httpCallRecorder != nil {
+		responseCode := 0
+		if resp != nil {
+			responseCode = resp.StatusCode
+		}
 		c.httpCallRecorder.Record(runtime.HTTPCall{
-			Method:  req.Method,
-			URL:     req.URL.String(),
-			Path:    "/bookings",
-			Latency: time.Since(start),
+			Latency:      time.Since(start),
+			Method:       req.Method,
+			Path:         "/bookings",
+			ResponseCode: responseCode,
+			URL:          req.URL.String(),
 		})
 	}
 	if err != nil {
