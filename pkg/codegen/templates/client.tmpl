@@ -7,6 +7,21 @@ Do(context context.Context, req *http.Request) (*http.Response, error)
 }
 {{- end -}}
 
+{{- define "operationResponse" -}}
+(*{{ . }}, error)
+{{- end -}}
+
+{{- define "createRequest" -}}
+req, err := createRequest(ctx, reqParams)
+if err != nil {
+    return nil, fmt.Errorf("error creating request: %w", err)
+}
+
+if err = c.applyEditors(ctx, req, reqEditors); err != nil {
+    return nil, fmt.Errorf("error applying request editors: %w", err)
+}
+{{- end -}}
+
 {{- define "executeRequest" -}}
 start := time.Now()
 resp, err := c.httpClient.Do(ctx, req)
@@ -28,7 +43,85 @@ if err != nil {
 }
 {{- end -}}
 
+{{- define "extractResponseBody" -}}
+{{ template "extractResponseBodyDefault" .}}
+{{- end -}}
+
+{{- define "extractResponseBodyDefault" -}}
+var bodyBytes []byte
+if resp.Body != nil {
+    defer resp.Body.Close()
+    bodyBytes, err = io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
+}
+{{- end -}}
+
 {{- define "logReceivedResponse" -}}
+{{- end -}}
+
+{{- define "handleResponseError" }}
+{{ template "handleResponseErrorDefault" . }}
+{{- end -}}
+
+{{- define "handleResponseErrorDefault" }}
+{{- $op := .op }}
+if resp.StatusCode != {{$op.Response.SuccessStatusCode}} {
+    {{- with $op.Response.Error }}
+        {{- if .ResponseName }}
+            target := new({{ .ResponseName }})
+            err = json.Unmarshal(bodyBytes, target)
+            if err != nil {
+                return nil, fmt.Errorf("error decoding response: %w", err)
+            }
+            return nil, runtime.NewClientAPIError(*target, runtime.WithStatusCode(resp.StatusCode))
+        {{- else }}
+            return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+                runtime.WithStatusCode(resp.StatusCode))
+        {{- end }}
+    {{- else }}
+        return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+            runtime.WithStatusCode(resp.StatusCode))
+    {{- end }}
+}
+{{- end }}
+
+{{- define "handleResponseSuccess" -}}
+{{ template "handleResponseSuccessDefault" . }}
+{{- end -}}
+
+{{- define "handleResponseSuccessDefault" -}}
+{{- $op := .op }}
+{{- $respName := $op.Response.Success.ResponseName }}
+{{- if eq $op.Response.SuccessStatusCode 204 -}}
+    return nil, nil
+{{- else -}}
+    target := new({{ $respName }})
+    {{ if eq $op.Response.Success.NameTag "Formdata" }}
+        values, err := url.ParseQuery(string(bodyBytes))
+        if err != nil {
+            return nil, fmt.Errorf("error parsing form-encoded body: %w", err)
+        }
+
+        data := make(map[string]any, len(values))
+        for key := range values {
+            data[key] = values.Get(key)
+        }
+
+        // Convert back to JSON
+        bodyBytes, err = json.Marshal(data)
+        if err != nil {
+            return nil, fmt.Errorf("error marshaling to JSON: %w", err)
+        }
+
+    {{ end -}}
+    if err = json.Unmarshal(bodyBytes, target); err != nil {
+        err = fmt.Errorf("error decoding response: %w", err)
+        return nil, err
+    }
+    return target, nil
+{{- end }}
 {{- end -}}
 
 {{- define "clientStructDefinition" -}}
@@ -104,13 +197,13 @@ func WithHTTPCallRecorder(httpCallRecorder runtime.HTTPCallRecorder) {{$clientNa
 type {{$clientName}}Interface interface {
     {{- range .Operations }}{{$op := .}}
         {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
-        {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) (*{{$op.Response.Success.ResponseName}}, error)
+        {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) {{ template "operationResponse" $op.Response.Success.ResponseName }}
     {{ end }}
 }
 
 {{range .Operations}}{{$op := .}}
 {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
-func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) (*{{$op.Response.Success.ResponseName}}, error) {
+func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) {{ template "operationResponse" $op.Response.Success.ResponseName }} {
     var err error
     {{- if and $op.Body $op.Body.Encoding }}
         bodyEncoding := make(map[string]runtime.FieldEncoding)
@@ -133,75 +226,14 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
         bodyEncoding: bodyEncoding,
         {{- end }}
     }
-    req, err := createRequest(ctx, reqParams)
-    if err != nil {
-        return nil, fmt.Errorf("error creating request: %w", err)
-    }
-
-    if err = c.applyEditors(ctx, req, reqEditors); err != nil {
-        return nil, fmt.Errorf("error applying request editors: %w", err)
-    }
+    {{ template "createRequest" }}
 
     {{ template "executeRequest" (dict "operation" $op "config" $config) }}
 
-    var bodyBytes []byte
-    if resp.Body != nil {
-        defer resp.Body.Close()
-        bodyBytes, err = io.ReadAll(resp.Body)
-        if err != nil {
-            return nil, fmt.Errorf("failed to read response body: %w", err)
-        }
-    }
-
+    {{ template "extractResponseBody" }}
     {{ template "logReceivedResponse" $ }}
-
-    if resp.StatusCode != {{$op.Response.SuccessStatusCode}} {
-        {{- with $op.Response.Error }}
-            {{- if .ResponseName }}
-            target := new({{.ResponseName}})
-            err = json.Unmarshal(bodyBytes, target)
-            if err != nil {
-                return nil, fmt.Errorf("error decoding response: %w", err)
-            }
-            return nil, runtime.NewClientAPIError(*target, runtime.WithStatusCode(resp.StatusCode))
-            {{- else }}
-                return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
-                    runtime.WithStatusCode(resp.StatusCode))
-            {{ end }}
-        {{ else }}
-        return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
-            runtime.WithStatusCode(resp.StatusCode))
-        {{ end -}}
-    }
-
-    {{- if eq $op.Response.SuccessStatusCode 204 }}
-    return nil, nil
-    {{ else }}
-    target := new({{ $op.Response.Success.ResponseName }})
-    {{ if eq $op.Response.Success.NameTag "Formdata" }}
-        values, err := url.ParseQuery(string(bodyBytes))
-        if err != nil {
-            return nil, fmt.Errorf("error parsing form-encoded body: %w", err)
-        }
-
-        data := make(map[string]any, len(values))
-        for key := range values {
-            data[key] = values.Get(key)
-        }
-
-        // Convert back to JSON
-        bodyBytes, err = json.Marshal(data)
-        if err != nil {
-            return nil, fmt.Errorf("error marshaling to JSON: %w", err)
-        }
-
-    {{ end -}}
-    if err = json.Unmarshal(bodyBytes, target); err != nil {
-        err = fmt.Errorf("error decoding response: %w", err)
-        return nil, err
-    }
-    return target, nil
-    {{ end -}}
+    {{ template "handleResponseError" (dict "op" $op) }}
+    {{ template "handleResponseSuccess" (dict "op" $op) }}
 }
 
 {{end -}}
