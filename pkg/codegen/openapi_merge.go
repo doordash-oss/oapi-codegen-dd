@@ -155,6 +155,9 @@ func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy, docModel *
 		for key, value := range other.Schema().Properties.FromOldest() {
 			srcKeySchema, exists := src.Schema().Properties.Get(key)
 			if !exists {
+				if setFromExtension(srcKeySchema, value, docModel) {
+					continue
+				}
 				src.Schema().Properties.Set(key, value)
 				continue
 			}
@@ -219,12 +222,18 @@ func mergeResponses(src, other *v3.Response, docModel *libopenapi.DocumentModel[
 }
 
 func setFromExtension(src, other *base.SchemaProxy, docModel *libopenapi.DocumentModel[v3.Document]) bool {
-	if src == nil || other == nil {
+	if src == nil {
 		return false
 	}
 
+	// find the source for the extensions
+	extSrc := other
+	if extSrc == nil {
+		extSrc = src
+	}
+
 	// set source ref to the ref pointed to by the other schema
-	valueExtensions := other.Schema().Extensions
+	valueExtensions := extSrc.Schema().Extensions
 	exts := extractExtensions(valueExtensions)
 	if exts == nil || exts[extSrcMergeRef] == nil {
 		return false

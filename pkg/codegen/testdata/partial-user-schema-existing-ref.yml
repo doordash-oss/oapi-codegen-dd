@@ -1,0 +1,22 @@
+openapi: 3.0.4
+info:
+  title: Spec Customization
+  version: 1.0.0
+
+
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        errors:
+          type: object
+          properties:
+            length:
+              type: integer
+              format: int32
+            error_data:
+              type: array
+              items:
+                x-src-merge-ref: "#/components/schemas/Error"

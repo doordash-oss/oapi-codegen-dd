@@ -369,6 +369,37 @@ func TestMergeDocuments(t *testing.T) {
 		require.NotNil(t, paymentMethodDataComponent)
 	})
 
+	t.Run("schema previously inlined can use overwriting ref", func(t *testing.T) {
+		srcDoc, partialDoc := loadPaymentIntentDocuments(t, "partial-user-schema-existing-ref.yml")
+
+		res, err := MergeDocuments(srcDoc, partialDoc)
+		require.NoError(t, err)
+
+		v3Model, errs := res.BuildV3Model()
+		if errs != nil {
+			t.Fatalf("error building document: %v", errs)
+		}
+		model := v3Model.Model
+
+		user := model.Components.Schemas.Value("User")
+		require.NotNil(t, user)
+		expectedKeys := []string{"id", "name", "errors"}
+		props := getPropertyKeys(user)
+		assert.Equal(t, expectedKeys, props)
+
+		errors := user.Schema().Properties.Value("errors")
+		require.NotNil(t, errors)
+		expectedErrorsProps := []string{"length", "error_data"}
+		errorsProps := getPropertyKeys(errors)
+		assert.Equal(t, expectedErrorsProps, errorsProps)
+
+		errorData := errors.Schema().Properties.Value("error_data")
+		require.NotNil(t, errorData)
+		expectedErrorDataProps := []string{"code", "message"}
+		errorDataProps := getPropertyKeys(errorData)
+		assert.Equal(t, expectedErrorDataProps, errorDataProps)
+	})
+
 	t.Run("foreign ref can be used in other doc", func(t *testing.T) {
 		srcDoc, partialDoc := loadPaymentIntentDocuments(t, "partial-intent-req-body-existing-ref.yml")
 
