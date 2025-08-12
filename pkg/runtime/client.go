@@ -138,28 +138,23 @@ func (c *Client) ExecuteRequest(ctx context.Context, req *http.Request, operatio
 		return nil, fmt.Errorf("error sending request: %w", err)
 	}
 
-	var bodyBytes []byte
+	return c.CreateResponse(ctx, resp)
+}
 
-	if resp != nil && resp.Body != nil {
+// CreateResponse creates a Response object from the HTTP response.
+// It reads the response body and logs the response if a logger is set.
+func (c *Client) CreateResponse(ctx context.Context, resp *http.Response) (*Response, error) {
+	if resp == nil {
+		return nil, nil
+	}
+
+	var bodyBytes []byte
+	if resp.Body != nil {
 		defer resp.Body.Close()
+		var err error
 		bodyBytes, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("error reading response body: %w", err)
-		}
-	}
-
-	var (
-		headers    http.Header
-		statusCode int
-		reqURL     string
-		method     string
-	)
-
-	if resp != nil {
-		headers = resp.Header
-		statusCode = resp.StatusCode
-		if resp.Request != nil {
-			reqURL = resp.Request.URL.String()
 		}
 	}
 
@@ -168,11 +163,11 @@ func (c *Client) ExecuteRequest(ctx context.Context, req *http.Request, operatio
 			Message: "Received response",
 			Prefix:  "response.",
 			Data: &LogFields{
-				Headers: headers,
+				Headers: resp.Header,
 				Body:    bodyBytes,
 				Extras: map[string]any{
-					"method": method,
-					"url":    reqURL,
+					"method": resp.Request.Method,
+					"url":    resp.Request.URL.String(),
 				},
 			},
 		})
@@ -180,8 +175,8 @@ func (c *Client) ExecuteRequest(ctx context.Context, req *http.Request, operatio
 
 	return &Response{
 		Content:    bodyBytes,
-		StatusCode: statusCode,
-		Headers:    headers,
+		StatusCode: resp.StatusCode,
+		Headers:    resp.Header,
 		Raw:        resp,
 	}, nil
 }
