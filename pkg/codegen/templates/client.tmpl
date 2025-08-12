@@ -1,6 +1,10 @@
 {{ template "header" $ }}
 
-{{ $config := .Config }}
+{{ define "client" }}
+{{ $args := . }}
+{{ $config := $args.config }}
+{{ $operations := $args.operations }}
+
 {{ $clientName := $config.Client.Name }}
 
 // {{$clientName}} is the client for the API implementing the {{$clientName}} interface.
@@ -24,13 +28,13 @@ func NewDefault{{$clientName}}(baseURL string, opts ...runtime.APIClientOption) 
 
 // ClientInterface is the interface for the API client.
 type {{$clientName}}Interface interface {
-    {{- range .Operations }}{{$op := .}}
+    {{- range $operations }}{{$op := .}}
         {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
         {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...runtime.RequestEditorFn) (*{{ $op.Response.Success.ResponseName }}, error)
     {{ end }}
 }
 
-{{range .Operations}}{{$op := .}}
+{{range $operations}}{{$op := .}}
 {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
 func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...runtime.RequestEditorFn) (*{{ $op.Response.Success.ResponseName }}, error) {
     var err error
@@ -73,6 +77,9 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
 {{end -}}
 
 var _ {{$clientName}}Interface = (*{{$clientName}})(nil)
+{{ end -}}
+
+{{ template "client" dict "config" .Config "operations" .Operations }}
 
 {{- define "responseParserFn" }}{{- $op := .op }}
 {{- $respName := $op.Response.Success.ResponseName }}
