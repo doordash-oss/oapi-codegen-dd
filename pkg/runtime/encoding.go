@@ -55,6 +55,23 @@ func EncodeFormFields(data any, encoding map[string]FieldEncoding) (string, erro
 	return values.Encode(), nil
 }
 
+// ConvertFormFields converts a raw form-encoded response body to JSON format.
+// It parses the form-encoded data, converts it to a map, and then marshals it to JSON.
+func ConvertFormFields(resp []byte) ([]byte, error) {
+	values, err := url.ParseQuery(string(resp))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing form-encoded body: %w", err)
+	}
+
+	data := make(map[string]any, len(values))
+	for key := range values {
+		data[key] = values.Get(key)
+	}
+
+	// Convert back to JSON
+	return json.Marshal(data)
+}
+
 func encodeForm(prefix string, value any, values url.Values, explode bool) {
 	switch v := value.(type) {
 	case map[string]any:

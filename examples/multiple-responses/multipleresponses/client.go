@@ -3,276 +3,75 @@
 package multipleresponses
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"sort"
-	"strings"
-	"time"
 
 	"github.com/doordash/oapi-codegen/v3/pkg/runtime"
 )
 
-// RequestEditorFn is the function signature for the RequestEditor callback function
-type RequestEditorFn func(ctx context.Context, req *http.Request) error
-
-// HttpRequestDoer performs HTTP requests.
-type HttpRequestDoer interface {
-	Do(context context.Context, req *http.Request) (*http.Response, error)
-}
-
 // Client is the client for the API implementing the Client interface.
-// baseURL is the base URL for the API.
-// httpClient is the HTTP client to use for making requests.
-// requestEditors is a list of callbacks for modifying requests which are generated before sending over the network.
 type Client struct {
-	baseURL          string
-	httpClient       HttpRequestDoer
-	requestEditors   []RequestEditorFn
-	httpCallRecorder runtime.HTTPCallRecorder
-	logger           runtime.Logger
+	apiClient runtime.APIClient
 }
 
-// ClientOption allows setting custom parameters during construction.
-type ClientOption func(*Client) error
-
-// NewClient creates a new client, with reasonable defaults.
-func NewClient(baseURL string, opts ...ClientOption) (*Client, error) {
-	// create a client with sane default values
-	res := &Client{
-		baseURL: strings.TrimSuffix(baseURL, "/"),
-	}
-
-	// mutate client and add all optional params
-	for _, opt := range opts {
-		if err := opt(res); err != nil {
-			return nil, err
-		}
-	}
-
-	return res, nil
+// NewClient creates a new instance of the Client client.
+func NewClient(apiClient runtime.APIClient) *Client {
+	return &Client{apiClient: apiClient}
 }
 
-// WithHTTPClient allows overriding the default Doer, which is
-// automatically created using http.Client.
-func WithHTTPClient(doer HttpRequestDoer) ClientOption {
-	return func(c *Client) error {
-		c.httpClient = doer
-		return nil
+// NewDefaultClient creates a new instance of the Client client with default api client.
+func NewDefaultClient(baseURL string, opts ...runtime.APIClientOption) (*Client, error) {
+	apiClient, err := runtime.NewAPIClient(baseURL, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating API client: %w", err)
 	}
-}
-
-// WithRequestEditorFn allows setting up a callback function, which will be
-// called right before sending the request. This can be used to mutate the request.
-func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
-	return func(c *Client) error {
-		c.requestEditors = append(c.requestEditors, fn)
-		return nil
-	}
-}
-
-func WithHTTPCallRecorder(httpCallRecorder runtime.HTTPCallRecorder) ClientOption {
-	return func(c *Client) error {
-		c.httpCallRecorder = httpCallRecorder
-		return nil
-	}
-}
-
-func WithLogger(logger runtime.Logger) ClientOption {
-	return func(c *Client) error {
-		c.logger = logger
-		return nil
-	}
+	return &Client{apiClient: apiClient}, nil
 }
 
 // ClientInterface is the interface for the API client.
 type ClientInterface interface {
-	CreateBooking(ctx context.Context, options *CreateBookingRequestOptions, reqEditors ...RequestEditorFn) (*CreateBookingResponse, error)
+	CreateBooking(ctx context.Context, options *CreateBookingRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreateBookingResponse, error)
 }
 
-func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingRequestOptions, reqEditors ...RequestEditorFn) (*CreateBookingResponse, error) {
+func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreateBookingResponse, error) {
 	var err error
-	reqParams := RequestOptionsParameters{
-		reqURL:      c.baseURL + "/bookings",
-		method:      "POST",
-		options:     options,
-		contentType: "application/json",
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL:  c.apiClient.GetBaseURL() + "/bookings",
+		Method:      "POST",
+		Options:     options,
+		ContentType: "application/json",
 	}
-	req, err := createRequest(ctx, reqParams)
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	if err = c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, fmt.Errorf("error applying request editors: %w", err)
-	}
-
-	start := time.Now()
-	resp, err := c.httpClient.Do(ctx, req)
-	if c.httpCallRecorder != nil {
-		responseCode := 0
-		if resp != nil {
-			responseCode = resp.StatusCode
-		}
-		c.httpCallRecorder.Record(runtime.HTTPCall{
-			Latency:      time.Since(start),
-			Method:       req.Method,
-			Path:         "/bookings",
-			ResponseCode: responseCode,
-			URL:          req.URL.String(),
-		})
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
-	}
-
-	var bodyBytes []byte
-	if resp.Body != nil {
-		defer resp.Body.Close()
-		bodyBytes, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %w", err)
-		}
-	}
-
-	if resp.StatusCode != 201 {
-		target := new(CreateBookingErrorResponse)
-		err = json.Unmarshal(bodyBytes, target)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding response: %w", err)
-		}
-		return nil, runtime.NewClientAPIError(*target, runtime.WithStatusCode(resp.StatusCode))
-	}
-	target := new(CreateBookingResponse)
-	if err = json.Unmarshal(bodyBytes, target); err != nil {
-		err = fmt.Errorf("error decoding response: %w", err)
-		return nil, err
-	}
-	return target, nil
-}
-
-// applyEditors applies all the request editors to the request.
-func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
-	for _, r := range c.requestEditors {
-		if err := r(ctx, req); err != nil {
-			return err
-		}
-	}
-
-	for _, r := range additionalEditors {
-		if err := r(ctx, req); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type RequestOptions interface {
-	GetPathParams() (map[string]any, error)
-	GetQuery() (map[string]any, error)
-	GetBody() any
-	GetHeader() (map[string]string, error)
-}
-
-// RequestOptionsParameters holds the parameters for creating a request.
-type RequestOptionsParameters struct {
-	options      RequestOptions
-	reqURL       string
-	method       string
-	contentType  string
-	bodyEncoding map[string]runtime.FieldEncoding
-}
-
-// createRequest creates a new POST request with the given URL, payload and headers.
-func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.Request, error) {
-	options := params.options
-
-	pathParams, err := options.GetPathParams()
-	if err != nil {
-		return nil, err
-	}
-	reqURL := strings.TrimSuffix(params.reqURL, "/")
-	reqURL = replacePathPlaceholders(reqURL, pathParams)
-
-	queryParams, err := options.GetQuery()
-	if err != nil {
-		return nil, err
-	}
-	if len(queryParams) > 0 {
-		values := url.Values{}
-		for k, v := range queryParams {
-			values.Set(k, fmt.Sprintf("%v", v))
-		}
-		reqURL = fmt.Sprintf("%s?%s", reqURL, values.Encode())
-	}
-
-	contentType := "application/json"
-	if params.contentType != "" {
-		contentType = params.contentType
-	}
-
-	headers, err := options.GetHeader()
-	if err != nil {
-		return nil, err
-	}
-	if headers == nil {
-		headers = map[string]string{
-			"Content-Type": contentType,
-		}
-	}
-
-	httpHeaders := http.Header{}
-
-	keys := make([]string, 0, len(headers))
-	for k := range headers {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		httpHeaders.Set(k, headers[k])
-	}
-
-	var bodyReader io.Reader
-	var encodedPayload string
-
-	payload := options.GetBody()
-	if payload != nil {
-		// Check if request should be form-encoded
-		if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
-			encodedPayload, err = runtime.EncodeFormFields(payload, params.bodyEncoding)
+	responseParser := func(resp *runtime.Response) (*CreateBookingResponse, error) {
+		raw := resp.Raw
+		bodyBytes := resp.Content
+		if raw.StatusCode != 201 {
+			target := new(CreateBookingErrorResponse)
+			err = json.Unmarshal(bodyBytes, target)
 			if err != nil {
-				return nil, fmt.Errorf("error encoding form values: %w", err)
+				return nil, fmt.Errorf("error decoding response: %w", err)
 			}
-			bodyReader = strings.NewReader(encodedPayload)
-		} else {
-			// Default to JSON encoding
-			body, err := json.Marshal(payload)
-			if err != nil {
-				return nil, err
-			}
-			encodedPayload = string(body)
-			bodyReader = bytes.NewBuffer(body)
+			return nil, runtime.NewClientAPIError(*target, runtime.WithStatusCode(resp.StatusCode))
 		}
+		target := new(CreateBookingResponse)
+		if err = json.Unmarshal(bodyBytes, target); err != nil {
+			err = fmt.Errorf("error decoding response: %w", err)
+			return nil, err
+		}
+		return target, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, params.method, reqURL, bodyReader)
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/bookings")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-
-	req.Header = httpHeaders
-
-	return req, nil
-}
-
-func replacePathPlaceholders(reqURL string, pathParams map[string]any) string {
-	for k, v := range pathParams {
-		reqURL = strings.Replace(reqURL, fmt.Sprintf("{%s}", k), fmt.Sprintf("%v", v), -1)
-	}
-	return reqURL
+	return responseParser(resp)
 }
 
 var _ ClientInterface = (*Client)(nil)

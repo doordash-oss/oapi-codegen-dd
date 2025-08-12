@@ -1,217 +1,38 @@
 {{ template "header" $ }}
 
-{{ define "httpRequestDoer" -}}
-// HttpRequestDoer performs HTTP requests.
-type HttpRequestDoer interface {
-Do(context context.Context, req *http.Request) (*http.Response, error)
-}
-{{- end -}}
-
-{{- define "operationResponse" -}}
-(*{{ . }}, error)
-{{- end -}}
-
-{{- define "createRequest" -}}
-req, err := createRequest(ctx, reqParams)
-if err != nil {
-    return nil, fmt.Errorf("error creating request: %w", err)
-}
-
-if err = c.applyEditors(ctx, req, reqEditors); err != nil {
-    return nil, fmt.Errorf("error applying request editors: %w", err)
-}
-{{- end -}}
-
-{{- define "executeRequest" -}}
-start := time.Now()
-resp, err := c.httpClient.Do(ctx, req)
-if c.httpCallRecorder != nil {
-    responseCode := 0
-    if resp != nil {
-        responseCode = resp.StatusCode
-    }
-    c.httpCallRecorder.Record(runtime.HTTPCall{
-            Latency: time.Since(start),
-            Method: req.Method,
-            Path: "{{ $.operation.Path }}",
-            ResponseCode: responseCode,
-            URL:    req.URL.String(),
-    })
-}
-if err != nil {
-    return nil, fmt.Errorf("error sending request: %w", err)
-}
-{{- end -}}
-
-{{- define "extractResponseBody" -}}
-{{ template "extractResponseBodyDefault" .}}
-{{- end -}}
-
-{{- define "extractResponseBodyDefault" -}}
-var bodyBytes []byte
-if resp.Body != nil {
-    defer resp.Body.Close()
-    bodyBytes, err = io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read response body: %w", err)
-    }
-}
-{{- end -}}
-
-{{- define "logReceivedResponse" -}}
-{{- end -}}
-
-{{- define "handleResponseError" }}
-{{ template "handleResponseErrorDefault" . }}
-{{- end -}}
-
-{{- define "handleResponseErrorDefault" }}
-{{- $op := .op }}
-if resp.StatusCode != {{$op.Response.SuccessStatusCode}} {
-    {{- with $op.Response.Error }}
-        {{- if .ResponseName }}
-            target := new({{ .ResponseName }})
-            err = json.Unmarshal(bodyBytes, target)
-            if err != nil {
-                return nil, fmt.Errorf("error decoding response: %w", err)
-            }
-            return nil, runtime.NewClientAPIError(*target, runtime.WithStatusCode(resp.StatusCode))
-        {{- else }}
-            return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
-                runtime.WithStatusCode(resp.StatusCode))
-        {{- end }}
-    {{- else }}
-        return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
-            runtime.WithStatusCode(resp.StatusCode))
-    {{- end }}
-}
-{{- end }}
-
-{{- define "handleResponseSuccess" -}}
-{{ template "handleResponseSuccessDefault" . }}
-{{- end -}}
-
-{{- define "handleResponseSuccessDefault" -}}
-{{- $op := .op }}
-{{- $respName := $op.Response.Success.ResponseName }}
-{{- if eq $op.Response.SuccessStatusCode 204 -}}
-    return nil, nil
-{{- else -}}
-    target := new({{ $respName }})
-    {{ if eq $op.Response.Success.NameTag "Formdata" }}
-        values, err := url.ParseQuery(string(bodyBytes))
-        if err != nil {
-            return nil, fmt.Errorf("error parsing form-encoded body: %w", err)
-        }
-
-        data := make(map[string]any, len(values))
-        for key := range values {
-            data[key] = values.Get(key)
-        }
-
-        // Convert back to JSON
-        bodyBytes, err = json.Marshal(data)
-        if err != nil {
-            return nil, fmt.Errorf("error marshaling to JSON: %w", err)
-        }
-
-    {{ end -}}
-    if err = json.Unmarshal(bodyBytes, target); err != nil {
-        err = fmt.Errorf("error decoding response: %w", err)
-        return nil, err
-    }
-    return target, nil
-{{- end }}
-{{- end -}}
-
-{{- define "clientStructDefinition" -}}
-    {{ $clientName := .ClientName }}
-    // {{$clientName}} is the client for the API implementing the {{$clientName}} interface.
-    // baseURL is the base URL for the API.
-    // httpClient is the HTTP client to use for making requests.
-    // requestEditors is a list of callbacks for modifying requests which are generated before sending over the network.
-    type {{$clientName}} struct {
-        baseURL string
-        httpClient HttpRequestDoer
-        requestEditors []RequestEditorFn
-        httpCallRecorder runtime.HTTPCallRecorder
-        logger runtime.Logger
-    }
-{{- end -}}
-
 {{ $config := .Config }}
-
-// RequestEditorFn is the function signature for the RequestEditor callback function
-type RequestEditorFn func(ctx context.Context, req *http.Request) error
-
-{{ template "httpRequestDoer" $ }}
-
 {{ $clientName := $config.Client.Name }}
-{{ template "clientStructDefinition" (dict "ClientName" $clientName) }}
 
-// ClientOption allows setting custom parameters during construction.
-type {{$clientName}}Option func(*{{$clientName}}) error
-
-// NewClient creates a new client, with reasonable defaults.
-func NewClient(baseURL string, opts ...{{$clientName}}Option) (*{{$clientName}}, error) {
-    // create a client with sane default values
-    res := &{{$clientName}}{
-      baseURL: strings.TrimSuffix(baseURL, "/"),
-    }
-
-    // mutate client and add all optional params
-    for _, opt := range opts {
-        if err := opt(res); err != nil {
-            return nil, err
-        }
-    }
-
-    return res, nil
+// {{$clientName}} is the client for the API implementing the {{$clientName}} interface.
+type {{$clientName}} struct {
+    apiClient runtime.APIClient
 }
 
-// WithHTTPClient allows overriding the default Doer, which is
-// automatically created using http.Client.
-func WithHTTPClient(doer HttpRequestDoer) {{$clientName}}Option {
-    return func(c *{{$clientName}}) error {
-        c.httpClient = doer
-        return nil
-    }
+// New{{$clientName}} creates a new instance of the {{$clientName}} client.
+func New{{$clientName}}(apiClient runtime.APIClient) *{{$clientName}} {
+    return &{{$clientName}}{apiClient: apiClient}
 }
 
-// WithRequestEditorFn allows setting up a callback function, which will be
-// called right before sending the request. This can be used to mutate the request.
-func WithRequestEditorFn(fn RequestEditorFn) {{$clientName}}Option {
-    return func(c *{{$clientName}}) error {
-        c.requestEditors = append(c.requestEditors, fn)
-        return nil
+// NewDefault{{$clientName}} creates a new instance of the {{$clientName}} client with default api client.
+func NewDefault{{$clientName}}(baseURL string, opts ...runtime.APIClientOption) (*{{$clientName}}, error) {
+    apiClient, err := runtime.NewAPIClient(baseURL, opts...)
+    if err != nil {
+        return nil, fmt.Errorf("error creating API client: %w", err)
     }
-}
-
-func WithHTTPCallRecorder(httpCallRecorder runtime.HTTPCallRecorder) {{$clientName}}Option {
-    return func(c *{{$clientName}}) error {
-        c.httpCallRecorder = httpCallRecorder
-        return nil
-    }
-}
-
-func WithLogger(logger runtime.Logger) {{$clientName}}Option {
-    return func(c *{{$clientName}}) error {
-        c.logger = logger
-        return nil
-    }
+    return &{{$clientName}}{apiClient: apiClient}, nil
 }
 
 // ClientInterface is the interface for the API client.
 type {{$clientName}}Interface interface {
     {{- range .Operations }}{{$op := .}}
         {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
-        {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) {{ template "operationResponse" $op.Response.Success.ResponseName }}
+        {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...runtime.RequestEditorFn) (*{{ $op.Response.Success.ResponseName }}, error)
     {{ end }}
 }
 
 {{range .Operations}}{{$op := .}}
 {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
-func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...RequestEditorFn) {{ template "operationResponse" $op.Response.Success.ResponseName }} {
+func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...runtime.RequestEditorFn) (*{{ $op.Response.Success.ResponseName }}, error) {
     var err error
     {{- if and $op.Body $op.Body.Encoding }}
         bodyEncoding := make(map[string]runtime.FieldEncoding)
@@ -225,155 +46,70 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
             }
         {{- end }}
     {{- end }}
-    reqParams := RequestOptionsParameters{
-        reqURL:  c.baseURL + "{{$op.Path}}",
-        method:  "{{$op.Method}}",{{- if $op.HasRequestOptions }}
-        options: options,{{- end}}{{- if $op.Body }}
-        contentType: "{{$op.Body.ContentType}}",{{- end }}
+    reqParams := runtime.RequestOptionsParameters{
+        RequestURL:  c.apiClient.GetBaseURL() + "{{$op.Path}}",
+        Method:  "{{$op.Method}}",{{- if $op.HasRequestOptions }}
+        Options: options,{{- end}}{{- if $op.Body }}
+        ContentType: "{{$op.Body.ContentType}}",{{- end }}
         {{- if and $op.Body $op.Body.Encoding }}
-        bodyEncoding: bodyEncoding,
+        BodyEncoding: bodyEncoding,
         {{- end }}
     }
-    {{ template "createRequest" }}
 
-    {{ template "executeRequest" (dict "operation" $op "config" $config) }}
+    req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %w", err)
+    }
 
-    {{ template "extractResponseBody" }}
-    {{ template "logReceivedResponse" $ }}
-    {{ template "handleResponseError" (dict "op" $op) }}
-    {{ template "handleResponseSuccess" (dict "op" $op) }}
+    {{ template "responseParserFn" (dict "op" $op) }}
+
+    resp, err := c.apiClient.ExecuteRequest(ctx, req, "{{ $op.Path }}")
+    if err != nil {
+        return nil, fmt.Errorf("error executing request: %w", err)
+    }
+    return responseParser(resp)
 }
 
 {{end -}}
 
-// applyEditors applies all the request editors to the request.
-func (c *{{$clientName}}) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
-    for _, r := range c.requestEditors {
-        if err := r(ctx, req); err != nil {
-            return err
-        }
-    }
-
-    for _, r := range additionalEditors {
-        if err := r(ctx, req); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-
-{{ template "clientHelperMethods" $ }}
-
-type RequestOptions interface {
-    GetPathParams() (map[string]any, error)
-    GetQuery() (map[string]any, error)
-    GetBody() any
-    GetHeader() (map[string]string, error)
-}
-
-// RequestOptionsParameters holds the parameters for creating a request.
-type RequestOptionsParameters struct {
-    options RequestOptions
-    reqURL string
-    method string
-    contentType string
-    bodyEncoding map[string]runtime.FieldEncoding
-}
-
-// createRequest creates a new POST request with the given URL, payload and headers.
-func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.Request, error) {
-    options := params.options
-
-    pathParams, err := options.GetPathParams()
-    if err != nil {
-        return nil, err
-    }
-    reqURL := strings.TrimSuffix(params.reqURL, "/")
-    reqURL = replacePathPlaceholders(reqURL, pathParams)
-
-    queryParams, err := options.GetQuery()
-    if err != nil {
-        return nil, err
-    }
-    if len(queryParams) > 0 {
-        values := url.Values{}
-        for k, v := range queryParams {
-            values.Set(k, fmt.Sprintf("%v", v))
-        }
-        reqURL = fmt.Sprintf("%s?%s", reqURL, values.Encode())
-    }
-
-    contentType := "application/json"
-    if params.contentType != "" {
-        contentType = params.contentType
-    }
-
-    headers, err := options.GetHeader()
-    if err != nil {
-        return nil, err
-    }
-    if headers == nil {
-        headers = map[string]string{
-            "Content-Type": contentType,
-        }
-    }
-
-    httpHeaders := http.Header{}
-
-    keys := make([]string, 0, len(headers))
-    for k := range headers {
-        keys = append(keys, k)
-    }
-    sort.Strings(keys)
-    for _, k := range keys {
-        httpHeaders.Set(k, headers[k])
-    }
-
-    var bodyReader io.Reader
-    var encodedPayload string
-
-    payload := options.GetBody()
-    if payload != nil {
-        // Check if request should be form-encoded
-        if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
-            encodedPayload, err = runtime.EncodeFormFields(payload, params.bodyEncoding)
-            if err != nil {
-                return nil, fmt.Errorf("error encoding form values: %w", err)
-            }
-            bodyReader = strings.NewReader(encodedPayload)
-        } else {
-            // Default to JSON encoding
-            body, err := json.Marshal(payload)
-            if err != nil {
-                return nil, err
-            }
-            encodedPayload = string(body)
-            bodyReader = bytes.NewBuffer(body)
-        }
-    }
-    req, err := http.NewRequestWithContext(ctx, params.method, reqURL, bodyReader)
-    if err != nil {
-        return nil, err
-    }
-
-    req.Header = httpHeaders
-
-    return req, nil
-}
-
-func replacePathPlaceholders(reqURL string, pathParams map[string]any) string {
-    for k, v := range pathParams {
-        reqURL = strings.Replace(reqURL, fmt.Sprintf("{%s}", k), fmt.Sprintf("%v", v), -1)
-    }
-    return reqURL
-}
-
-{{ define "clientHelperMethods" -}}
-{{ end }}
-
-{{ define "clientHelperFunctions" -}}
-{{ end }}
-
-{{ template "clientHelperFunctions" $ }}
-
 var _ {{$clientName}}Interface = (*{{$clientName}})(nil)
+
+{{- define "responseParserFn" }}{{- $op := .op }}
+{{- $respName := $op.Response.Success.ResponseName }}
+responseParser := func(resp *runtime.Response) (*{{$op.Response.Success.ResponseName}}, error) {
+    raw := resp.Raw
+    bodyBytes := resp.Content
+    if raw.StatusCode != {{$op.Response.SuccessStatusCode}} {
+        {{- with $op.Response.Error }}
+            {{- if .ResponseName }}
+                target := new({{ .ResponseName }})
+                err = json.Unmarshal(bodyBytes, target)
+                if err != nil {
+                    return nil, fmt.Errorf("error decoding response: %w", err)
+                }
+                return nil, runtime.NewClientAPIError(*target, runtime.WithStatusCode(resp.StatusCode))
+            {{- else }}
+                return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+                        runtime.WithStatusCode(resp.StatusCode))
+            {{- end }}
+        {{- else }}
+            return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+                runtime.WithStatusCode(resp.StatusCode))
+        {{- end }}
+    }
+
+    {{- if eq $op.Response.SuccessStatusCode 204 }}
+        return nil, nil
+    {{ else }}
+        target := new({{ $respName }})
+        {{ if eq $op.Response.Success.NameTag "Formdata" }}
+            bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
+        {{ end -}}
+        if err = json.Unmarshal(bodyBytes, target); err != nil {
+            err = fmt.Errorf("error decoding response: %w", err)
+            return nil, err
+        }
+        return target, nil
+    {{ end -}}
+}
+{{- end }}
