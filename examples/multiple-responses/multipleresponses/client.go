@@ -48,7 +48,7 @@ func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingReques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*CreateBookingResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*CreateBookingResponse, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 201 {
@@ -71,7 +71,7 @@ func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingReques
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 var _ ClientInterface = (*Client)(nil)

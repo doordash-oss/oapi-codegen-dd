@@ -49,7 +49,7 @@ func (c *Client) GetClient(ctx context.Context, options *GetClientRequestOptions
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetClientResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetClientResponse, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -72,7 +72,7 @@ func (c *Client) GetClient(ctx context.Context, options *GetClientRequestOptions
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 func (c *Client) UpdateClient(ctx context.Context, options *UpdateClientRequestOptions, reqEditors ...runtime.RequestEditorFn) (*struct{}, error) {
@@ -89,7 +89,7 @@ func (c *Client) UpdateClient(ctx context.Context, options *UpdateClientRequestO
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*struct{}, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*struct{}, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 204 {
@@ -107,7 +107,7 @@ func (c *Client) UpdateClient(ctx context.Context, options *UpdateClientRequestO
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 var _ ClientInterface = (*Client)(nil)

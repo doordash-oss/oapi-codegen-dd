@@ -49,7 +49,7 @@ func (c *Client) GetPurchases(ctx context.Context, reqEditors ...runtime.Request
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetPurchasesResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetPurchasesResponse, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -68,7 +68,7 @@ func (c *Client) GetPurchases(ctx context.Context, reqEditors ...runtime.Request
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 func (c *Client) GetPurchase(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetPurchaseResponse, error) {
@@ -83,7 +83,7 @@ func (c *Client) GetPurchase(ctx context.Context, reqEditors ...runtime.RequestE
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetPurchaseResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetPurchaseResponse, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -102,7 +102,7 @@ func (c *Client) GetPurchase(ctx context.Context, reqEditors ...runtime.RequestE
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 var _ ClientInterface = (*Client)(nil)

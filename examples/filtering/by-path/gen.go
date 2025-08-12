@@ -47,7 +47,7 @@ func (c *Client) GetClient(ctx context.Context, reqEditors ...runtime.RequestEdi
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetClientResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetClientResponse, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -66,7 +66,7 @@ func (c *Client) GetClient(ctx context.Context, reqEditors ...runtime.RequestEdi
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 var _ ClientInterface = (*Client)(nil)

@@ -52,7 +52,7 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetUserSingleResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserSingleResponse, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -73,7 +73,7 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion1Response, error) {
@@ -88,7 +88,7 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetUserUnion1Response, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion1Response, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -109,7 +109,7 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion2Response, error) {
@@ -124,7 +124,7 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetUserUnion2Response, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion2Response, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -145,7 +145,7 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion3Response, error) {
@@ -160,7 +160,7 @@ func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(resp *runtime.Response) (*GetUserUnion3Response, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion3Response, error) {
 		raw := resp.Raw
 		bodyBytes := resp.Content
 		if raw.StatusCode != 200 {
@@ -181,7 +181,7 @@ func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.Reques
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %w", err)
 	}
-	return responseParser(resp)
+	return responseParser(ctx, resp)
 }
 
 var _ ClientInterface = (*Client)(nil)
