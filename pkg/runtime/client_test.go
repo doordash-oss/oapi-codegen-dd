@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockRequestOptions struct {
@@ -99,6 +100,22 @@ func TestClient_CreateRequest(t *testing.T) {
 			assert.Equal(t, tt.expectedURL, req.URL.String())
 		})
 	}
+}
+
+func TestClient_CreateRequest_no_options_passed(t *testing.T) {
+	params := RequestOptionsParameters{
+		RequestURL:  "https://api.example.com/users",
+		Method:      "POST",
+		ContentType: "application/json",
+	}
+	client := &Client{}
+
+	req, err := client.CreateRequest(context.Background(), params)
+	require.NoError(t, err)
+
+	assert.Equal(t, "POST", req.Method)
+	assert.Equal(t, "https://api.example.com/users", req.URL.String())
+	assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
 }
 
 func TestClient_ExecuteRequest(t *testing.T) {

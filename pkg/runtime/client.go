@@ -251,22 +251,37 @@ func WithLogger(logger Logger) APIClientOption {
 // createRequest creates a new POST request with the given URL, payload and headers.
 func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.Request, error) {
 	options := params.Options
-	if options == nil {
-		return nil, ErrMissingRequestOptions
-	}
 
-	pathParams, err := options.GetPathParams()
-	if err != nil {
-		return nil, err
+	var (
+		err         error
+		pathParams  map[string]any
+		queryParams map[string]any
+		headers     map[string]string
+		payload     any
+	)
+
+	if options != nil {
+		pathParams, err = options.GetPathParams()
+		if err != nil {
+			return nil, err
+		}
+
+		queryParams, err = options.GetQuery()
+		if err != nil {
+			return nil, err
+		}
+
+		headers, err = options.GetHeader()
+		if err != nil {
+			return nil, err
+		}
+
+		payload = options.GetBody()
 	}
 
 	reqURL := strings.TrimSuffix(params.RequestURL, "/")
 	reqURL = replacePathPlaceholders(reqURL, pathParams)
 
-	queryParams, err := options.GetQuery()
-	if err != nil {
-		return nil, err
-	}
 	if len(queryParams) > 0 {
 		values := url.Values{}
 		for k, v := range queryParams {
@@ -280,11 +295,7 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 		contentType = params.ContentType
 	}
 
-	headers, err := options.GetHeader()
-	if err != nil {
-		return nil, err
-	}
-	if headers == nil {
+	if len(headers) == 0 {
 		headers = map[string]string{
 			"Content-Type": contentType,
 		}
@@ -306,7 +317,6 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 		bodyReader io.Reader
 	)
 
-	payload := options.GetBody()
 	if payload != nil {
 		// Check if the request should be form-encoded
 		if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
