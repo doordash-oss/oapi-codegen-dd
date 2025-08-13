@@ -203,6 +203,26 @@ func mergeSchemaProxy(src *base.SchemaProxy, other *base.SchemaProxy, docModel *
 			src.Schema().Extensions.Set(key, value)
 		}
 	}
+
+	if len(other.Schema().Required) > 0 {
+		src.Schema().Required = other.Schema().Required
+	}
+
+	if other.Schema().Minimum != nil {
+		src.Schema().Minimum = other.Schema().Minimum
+	}
+
+	if other.Schema().Maximum != nil {
+		src.Schema().Maximum = other.Schema().Maximum
+	}
+
+	if other.Schema().ExclusiveMinimum != nil {
+		src.Schema().ExclusiveMinimum = other.Schema().ExclusiveMinimum
+	}
+
+	if other.Schema().ExclusiveMaximum != nil {
+		src.Schema().ExclusiveMaximum = other.Schema().ExclusiveMaximum
+	}
 }
 
 func mergeResponses(src, other *v3.Response, docModel *libopenapi.DocumentModel[v3.Document]) {

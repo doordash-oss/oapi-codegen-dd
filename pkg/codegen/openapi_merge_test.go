@@ -512,6 +512,24 @@ func TestMergeDocuments(t *testing.T) {
 		assert.Equal(t, expected, props)
 	})
 
+	t.Run("existing properties can be overwritten with corresponding attributes", func(t *testing.T) {
+		srcDoc, partialDoc := loadTestDocuments(t, "partial-schema-error-overwrites.yml")
+
+		res, err := MergeDocuments(srcDoc, partialDoc)
+		require.NoError(t, err)
+
+		props, errSchemaPr := getSchemaProperties(t, res, "Error")
+		expected := []string{"code", "message"}
+		assert.Equal(t, expected, props)
+
+		required := errSchemaPr.Schema().Required
+		assert.Equal(t, []string{"code", "message"}, required)
+
+		codeSchema := errSchemaPr.Schema().Properties.Value("code").Schema()
+		assert.Equal(t, 1000, int(*codeSchema.Minimum))
+		assert.Equal(t, 2000, int(*codeSchema.Maximum))
+	})
+
 	t.Run("new nested properties can be added to existing", func(t *testing.T) {
 		srcDoc, partialDoc := loadTestDocuments(t, "partial-schema-location.yml")
 

@@ -1,0 +1,24 @@
+openapi: 3.0.1
+
+info:
+  title: OpenAPI-CodeGen Test
+  description: 'This is a test OpenAPI Spec'
+  version: 1.0.0
+
+paths:
+
+
+components:
+  schemas:
+    Error:
+      properties:
+        code:
+          type: integer
+          format: int32
+          minimum: 1000
+          maximum: 2000
+        message:
+          type: string
+      required:
+        - code
+        - message
