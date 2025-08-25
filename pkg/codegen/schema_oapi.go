@@ -27,10 +27,12 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string, options 
 			items = schema.Items.A
 			ref = items.GoLow().GetReference()
 		}
+
 		arrayType, err := GenerateGoSchema(items, ref, path, options)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error generating type for array: %w", err)
 		}
+
 		if (arrayType.HasAdditionalProperties || len(arrayType.UnionElements) != 0) && arrayType.RefType == "" {
 			// If we have items which have additional properties or union values,
 			// but are not a pre-defined type, we need to define a type
@@ -47,17 +49,11 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string, options 
 			arrayType.RefType = typeName
 		}
 
-		defineViaAlias := true
-		if disableTypeAliasesForArray {
-			defineViaAlias = false
-		}
-
 		return GoSchema{
 			GoType:          "[]" + arrayType.TypeDecl(),
 			ArrayType:       &arrayType,
 			AdditionalTypes: arrayType.AdditionalTypes,
 			Properties:      arrayType.Properties,
-			DefineViaAlias:  defineViaAlias,
 			Description:     schema.Description,
 			OpenAPISchema:   schema,
 			Constraints:     constraints,

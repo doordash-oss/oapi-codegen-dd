@@ -68,6 +68,9 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 	contentType, content := pair.Key(), pair.Value()
 
 	schemaProxy := content.Schema
+	if schemaProxy == nil {
+		return nil, nil, nil
+	}
 
 	var tag string
 	var defaultBody bool

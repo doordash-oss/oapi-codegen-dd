@@ -25,7 +25,7 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 			continue
 		}
 
-		goTypeName, err := renameSchema(schemaName, schemaRef)
+		goTypeName, err := renameComponent(schemaName, schemaRef)
 		if err != nil {
 			return nil, fmt.Errorf("error making name for components/schemas/%s: %w", schemaName, err)
 		}
@@ -39,6 +39,7 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 
 		types = append(types, goSchema.AdditionalTypes...)
 	}
+
 	return types, nil
 }
 
@@ -106,7 +107,7 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 				continue
 			}
 
-			goTypeName, err := renameRequestBody(requestBodyName, body.Schema)
+			goTypeName, err := renameComponent(requestBodyName, body.Schema)
 			if err != nil {
 				return nil, fmt.Errorf("error making name for components/schemas/%s: %w", requestBodyName, err)
 			}
@@ -155,7 +156,7 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 				return nil, fmt.Errorf("error generating Go type for schema in response %s: %w", responseName, err)
 			}
 
-			goTypeName, err := renameResponse(responseName, content.Schema)
+			goTypeName, err := renameComponent(responseName, content.Schema)
 			if err != nil {
 				return nil, fmt.Errorf("error making name for components/responses/%s: %w", responseName, err)
 			}

@@ -1,0 +1,4 @@
+# yaml-language-server: $schema=../../configuration-schema.json
+package: oneof
+output:
+  use-single-file: true

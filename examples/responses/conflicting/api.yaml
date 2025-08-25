@@ -1,0 +1,67 @@
+openapi: 3.0.0
+info:
+  version: 1.8.0
+  title: ePayment API
+paths:
+  /v1/payments:
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      requestBody:
+        description: New `CreatePaymentRequest` body.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Payment'
+        '201':
+          $ref: '#/components/responses/CreatePaymentResponse'
+
+components:
+  schemas:
+# TODO: check if we can handle this case.
+#    Payment:
+#      type: object
+#      properties:
+#       requestPaymentId:
+#          type: string
+
+    CreatePaymentRequest:
+      title: Create payment request
+      description: The `CreatePaymentRequest` object.
+      type: object
+      properties:
+        minimumUserAge:
+          type: integer
+        customerInteraction:
+          type: string
+
+    CreatePaymentResponse:
+      title: Schema for Create payment response
+      description: Schema for The `CreatePaymentResponse` object.
+      type: object
+      properties:
+        redirectUrl:
+          type: string
+          format: uri
+
+  responses:
+    CreatePaymentResponse:
+      description: Response for Create Payment response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreatePaymentResponse'
+
+    Payment:
+      description: Response for Create Payment response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              responsePaymentId:
+                type: string
