@@ -32,11 +32,44 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type GetUserUnion2Response struct {
+type GetUserUnion1ResponseOneOf struct {
+	union json.RawMessage
+}
+
+// Raw returns the union data inside the GetUserUnion1ResponseOneOf as bytes
+func (g *GetUserUnion1ResponseOneOf) Raw() json.RawMessage {
+	return g.union
+}
+
+// AsUser returns the union data inside the GetUserUnion1ResponseOneOf as a User
+func (g *GetUserUnion1ResponseOneOf) AsUser() (User, error) {
+	return UnmarshalAs[User](g.union)
+}
+
+// FromUser overwrites any union data inside the GetUserUnion1ResponseOneOf as the provided User
+func (g *GetUserUnion1ResponseOneOf) FromUser(v User) error {
+	bts, err := json.Marshal(v)
+	g.union = bts
+	return err
+}
+
+func (g GetUserUnion1ResponseOneOf) MarshalJSON() ([]byte, error) {
+	bts, err := g.union.MarshalJSON()
+
+	return bts, err
+}
+
+func (g *GetUserUnion1ResponseOneOf) UnmarshalJSON(bts []byte) error {
+	err := g.union.UnmarshalJSON(bts)
+
+	return err
+}
+
+type GetUserUnion2ResponseOneOf struct {
 	runtime.Either[User, string]
 }
 
-func (g *GetUserUnion2Response) MarshalJSON() ([]byte, error) {
+func (g *GetUserUnion2ResponseOneOf) MarshalJSON() ([]byte, error) {
 	data := g.Value()
 	if data == nil {
 		return nil, nil
@@ -49,62 +82,62 @@ func (g *GetUserUnion2Response) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (g *GetUserUnion2Response) UnmarshalJSON(data []byte) error {
+func (g *GetUserUnion2ResponseOneOf) UnmarshalJSON(data []byte) error {
 	return g.Unmarshal(data)
 }
 
-type GetUserUnion3Response struct {
+type GetUserUnion3ResponseOneOf struct {
 	union json.RawMessage
 }
 
-// Raw returns the union data inside the GetUserUnion3Response as bytes
-func (g *GetUserUnion3Response) Raw() json.RawMessage {
+// Raw returns the union data inside the GetUserUnion3ResponseOneOf as bytes
+func (g *GetUserUnion3ResponseOneOf) Raw() json.RawMessage {
 	return g.union
 }
 
-// AsUser returns the union data inside the GetUserUnion3Response as a User
-func (g *GetUserUnion3Response) AsUser() (User, error) {
+// AsUser returns the union data inside the GetUserUnion3ResponseOneOf as a User
+func (g *GetUserUnion3ResponseOneOf) AsUser() (User, error) {
 	return UnmarshalAs[User](g.union)
 }
 
-// FromUser overwrites any union data inside the GetUserUnion3Response as the provided User
-func (g *GetUserUnion3Response) FromUser(v User) error {
+// FromUser overwrites any union data inside the GetUserUnion3ResponseOneOf as the provided User
+func (g *GetUserUnion3ResponseOneOf) FromUser(v User) error {
 	bts, err := json.Marshal(v)
 	g.union = bts
 	return err
 }
 
-// AsString returns the union data inside the GetUserUnion3Response as a string
-func (g *GetUserUnion3Response) AsString() (string, error) {
+// AsString returns the union data inside the GetUserUnion3ResponseOneOf as a string
+func (g *GetUserUnion3ResponseOneOf) AsString() (string, error) {
 	return UnmarshalAs[string](g.union)
 }
 
-// FromString overwrites any union data inside the GetUserUnion3Response as the provided string
-func (g *GetUserUnion3Response) FromString(v string) error {
+// FromString overwrites any union data inside the GetUserUnion3ResponseOneOf as the provided string
+func (g *GetUserUnion3ResponseOneOf) FromString(v string) error {
 	bts, err := json.Marshal(v)
 	g.union = bts
 	return err
 }
 
-// AsInt returns the union data inside the GetUserUnion3Response as a int
-func (g *GetUserUnion3Response) AsInt() (int, error) {
+// AsInt returns the union data inside the GetUserUnion3ResponseOneOf as a int
+func (g *GetUserUnion3ResponseOneOf) AsInt() (int, error) {
 	return UnmarshalAs[int](g.union)
 }
 
-// FromInt overwrites any union data inside the GetUserUnion3Response as the provided int
-func (g *GetUserUnion3Response) FromInt(v int) error {
+// FromInt overwrites any union data inside the GetUserUnion3ResponseOneOf as the provided int
+func (g *GetUserUnion3ResponseOneOf) FromInt(v int) error {
 	bts, err := json.Marshal(v)
 	g.union = bts
 	return err
 }
 
-func (g GetUserUnion3Response) MarshalJSON() ([]byte, error) {
+func (g GetUserUnion3ResponseOneOf) MarshalJSON() ([]byte, error) {
 	bts, err := g.union.MarshalJSON()
 
 	return bts, err
 }
 
-func (g *GetUserUnion3Response) UnmarshalJSON(bts []byte) error {
+func (g *GetUserUnion3ResponseOneOf) UnmarshalJSON(bts []byte) error {
 	err := g.union.UnmarshalJSON(bts)
 
 	return err

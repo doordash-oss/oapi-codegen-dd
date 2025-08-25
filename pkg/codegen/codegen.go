@@ -65,8 +65,9 @@ func CreateParseContext(docContents []byte, cfg Configuration) (*ParseContext, [
 func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) (*ParseContext, error) {
 	cfg = cfg.Merge(NewDefaultConfiguration())
 	parseOptions := ParseOptions{
-		OmitDescription: cfg.Generate.OmitDescription,
-		DefaultIntType:  cfg.Generate.DefaultIntType,
+		OmitDescription:        cfg.Generate.OmitDescription,
+		DefaultIntType:         cfg.Generate.DefaultIntType,
+		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
 	}
 
 	builtModel, errs := doc.BuildV3Model()
@@ -78,7 +79,6 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	var (
 		operations     []OperationDefinition
 		importSchemas  []GoSchema
-		typeDefs       []TypeDefinition
 		responseErrors []string
 	)
 
@@ -86,7 +86,20 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		return nil, nil
 	}
 
-	opColl, err := collectOperationDefinitions(model, parseOptions)
+	// Process Components
+	typeDefs, err := collectComponentDefinitions(model, parseOptions)
+	if err != nil {
+		return nil, fmt.Errorf("error collecting component definitions: %s", err)
+	}
+
+	// group current type definitions by name for easy lookup.
+	currentTypes := make(map[string]TypeDefinition)
+	for _, comp := range typeDefs {
+		currentTypes[comp.Name] = comp
+	}
+
+	// collect operations
+	opColl, err := collectOperationDefinitions(model, currentTypes, parseOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting operation definitions: %w", err)
 	}
@@ -94,19 +107,12 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	if opColl != nil {
 		operations = opColl.operations
 		importSchemas = opColl.importSchemas
-		typeDefs = opColl.typeDefs
+		typeDefs = append(typeDefs, opColl.typeDefs...)
 		responseErrors = opColl.responseErrors
 	}
 
-	// Process Components
-	componentDefs, err := collectComponentDefinitions(model, parseOptions)
-	if err != nil {
-		return nil, fmt.Errorf("error collecting component definitions: %s", err)
-	}
-	typeDefs = append(typeDefs, componentDefs...)
-
 	// Collect Schemas from components
-	for _, componentDef := range componentDefs {
+	for _, componentDef := range typeDefs {
 		importSchemas = append(importSchemas, componentDef.Schema)
 	}
 
@@ -120,12 +126,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		mergeImports(imprts, importRes)
 	}
 
-	typeDefs, err = checkDuplicates(typeDefs)
-	if err != nil {
-		return nil, fmt.Errorf("error checking for duplicate type definitions: %w", err)
-	}
-
-	enums, typeDefs, registry := filterOutEnums(typeDefs)
+	enums, typeDefs, registry := filterOutEnums(typeDefs, parseOptions)
 
 	groupedTypeDefs := make(map[SpecLocation][]TypeDefinition)
 	var unionTypes []TypeDefinition
@@ -170,8 +171,8 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	}, nil
 }
 
-func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (*operationsCollection, error) {
-	if model.Paths == nil {
+func collectOperationDefinitions(model *v3high.Document, currentTypes map[string]TypeDefinition, options ParseOptions) (*operationsCollection, error) {
+	if model.Paths == nil || model.Paths.PathItems == nil {
 		return nil, nil
 	}
 
@@ -266,7 +267,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 			// Process Responses
 			response := ResponseDefinition{}
-			responseDef, responseTypes, err := getOperationResponses(operationID, operation.Responses, options)
+			responseDef, responseTypes, err := getOperationResponses(operationID, operation.Responses, currentTypes, options)
 			if err != nil {
 				return nil, fmt.Errorf("error getting operation responses: %w", err)
 			}
@@ -299,10 +300,12 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		}
 	}
 
+	allTypeDefs := extractAllTypeDefinitions(typeDefs)
+
 	return &operationsCollection{
 		operations:     operations,
 		importSchemas:  importSchemas,
-		typeDefs:       typeDefs,
+		typeDefs:       allTypeDefs,
 		responseErrors: responseErrors,
 	}, nil
 }
@@ -351,7 +354,17 @@ func collectComponentDefinitions(model *v3high.Document, options ParseOptions) (
 		typeDefs = append(typeDefs, componentResponses...)
 	}
 
-	return typeDefs, nil
+	all := extractAllTypeDefinitions(typeDefs)
+	return all, nil
+}
+
+func extractAllTypeDefinitions(types []TypeDefinition) []TypeDefinition {
+	var res []TypeDefinition
+	for _, typeDef := range types {
+		res = append(res, typeDef)
+		res = append(res, extractAllTypeDefinitions(typeDef.Schema.AdditionalTypes)...)
+	}
+	return res
 }
 
 // collectResponseErrors collects the response errors from the type definitions.

@@ -168,6 +168,7 @@ func describeOperationParameters(params []*v3high.Parameter, path []string, opti
 func combineOperationParameters(globalParams []ParameterDefinition, localParams []ParameterDefinition) ([]ParameterDefinition, error) {
 	allParams := make([]ParameterDefinition, 0, len(globalParams)+len(localParams))
 	dupCheck := make(map[string]map[string]string)
+
 	for _, p := range localParams {
 		if dupCheck[p.In] == nil {
 			dupCheck[p.In] = make(map[string]string)
@@ -179,6 +180,7 @@ func combineOperationParameters(globalParams []ParameterDefinition, localParams 
 			return nil, fmt.Errorf("duplicate local parameter %s/%s", p.In, p.ParamName)
 		}
 	}
+
 	for _, p := range globalParams {
 		if dupCheck[p.In] == nil {
 			dupCheck[p.In] = make(map[string]string)

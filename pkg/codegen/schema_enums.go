@@ -138,7 +138,7 @@ func sanitizeEnumNames(enumNames, enumValues []string) map[string]string {
 	return sanitizedDeDup
 }
 
-func filterOutEnums(types []TypeDefinition) ([]EnumDefinition, []TypeDefinition, TypeRegistry) {
+func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinition, []TypeDefinition, TypeRegistry) {
 	var enums []EnumDefinition
 	var rest []TypeDefinition
 
@@ -171,9 +171,10 @@ func filterOutEnums(types []TypeDefinition) ([]EnumDefinition, []TypeDefinition,
 			}
 
 			enums = append(enums, EnumDefinition{
-				Schema:       p.Schema,
-				Name:         name,
-				ValueWrapper: wrapper,
+				Schema:         p.Schema,
+				Name:           name,
+				ValueWrapper:   wrapper,
+				PrefixTypeName: options.AlwaysPrefixEnumValues,
 			})
 			m[name] = 1
 		}
@@ -184,9 +185,10 @@ func filterOutEnums(types []TypeDefinition) ([]EnumDefinition, []TypeDefinition,
 				wrapper = `"`
 			}
 			enums = append(enums, EnumDefinition{
-				Schema:       td.Schema,
-				Name:         td.Name,
-				ValueWrapper: wrapper,
+				Schema:         td.Schema,
+				Name:           td.Name,
+				ValueWrapper:   wrapper,
+				PrefixTypeName: options.AlwaysPrefixEnumValues,
 			})
 		} else {
 			rest = append(rest, td)

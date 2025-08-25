@@ -88,7 +88,7 @@
       "properties": {
         "client": {
           "type": "boolean",
-          "description": "Client specifies whether to generate a client. Defaults to true."
+          "description": "Client specifies whether to generate a client. Defaults to false."
         },
         "omit-description": {
           "type": "boolean",
@@ -97,6 +97,10 @@
         "default-int-type": {
           "type": "string",
           "description": "DefaultIntType specifies the default integer type to use in the generated code. Can be 'int', 'int32', or 'int64'. Defaults to 'int'."
+        },
+        "always-prefix-enum-values": {
+            "type": "boolean",
+            "description": "AlwaysPrefixEnumValues specifies whether to always prefix enum values with the schema name. Defaults to true."
         }
       },
       "required": []
