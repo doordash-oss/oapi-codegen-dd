@@ -9,8 +9,8 @@ import (
 var bodyTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type CreateOrderBody struct {
-	UserID     *string     `form:"user_id,omitempty" json:"user_id,omitempty" url:"user_id,omitempty"`
-	ClientType *ClientType `form:"client_type,omitempty" json:"client_type,omitempty" url:"client_type,omitempty"`
+	UserID     *string     `json:"user_id,omitempty"`
+	ClientType *ClientType `json:"client_type,omitempty"`
 }
 
 func (c CreateOrderBody) Validate() error {

@@ -8,6 +8,8 @@ import (
 
 var headerTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
+type MSN = string
+
 type GetClientHeaders struct {
 	MerchantSerialNumber MSN `json:"Merchant-Serial-Number" validate:"required,max=7,min=4"`
 }
@@ -23,5 +25,3 @@ type UpdateClientHeaders struct {
 func (u UpdateClientHeaders) Validate() error {
 	return headerTypesValidate.Struct(u)
 }
-
-type MSN = string

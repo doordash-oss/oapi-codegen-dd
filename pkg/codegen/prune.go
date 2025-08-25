@@ -116,6 +116,9 @@ func findOperationRefs(model *v3high.Document) []string {
 					refSet[ref] = true
 				}
 				for _, mediaType := range op.RequestBody.Content.FromOldest() {
+					if mediaType.Schema == nil {
+						continue
+					}
 					medRef := mediaType.Schema.GetReference()
 					if medRef != "" {
 						refSet[medRef] = true

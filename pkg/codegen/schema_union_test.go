@@ -51,10 +51,14 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
 		require.NoError(t, err)
 
-		assert.Equal(t, "struct {\n// Name User name\n    Name *string`json:\"name,omitempty\"`\n}", res.GoType)
+		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
 
 		assert.Nil(t, res.UnionElements)
-		assert.Nil(t, res.AdditionalTypes)
+		assert.Equal(t, 1, len(res.AdditionalTypes))
+		assert.Equal(t, "UserOneOf", res.AdditionalTypes[0].Name)
+		assert.Equal(t, "struct {\nunion json.RawMessage\n}", res.AdditionalTypes[0].Schema.GoType)
+		assert.Equal(t, 1, len(res.AdditionalTypes[0].Schema.UnionElements))
+		assert.Equal(t, UnionElement("User"), res.AdditionalTypes[0].Schema.UnionElements[0])
 	})
 
 	t.Run("one-of 2 possible values", func(t *testing.T) {
@@ -64,13 +68,10 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
 		require.NoError(t, err)
 
-		assert.Equal(t, "struct {\nruntime.Either[User, string]\n}", res.GoType)
-		assert.Equal(t, []UnionElement{
-			"User",
-			"string",
-		}, res.UnionElements)
-
-		assert.Nil(t, res.AdditionalTypes)
+		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
+		assert.Equal(t, 1, len(res.AdditionalTypes))
+		assert.Equal(t, "UserOneOf", res.AdditionalTypes[0].Name)
+		assert.Equal(t, "struct {\nruntime.Either[User, string]\n}", res.AdditionalTypes[0].Schema.GoType)
 	})
 
 	t.Run("one-of 3 possible values", func(t *testing.T) {
@@ -80,13 +81,11 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
 		require.NoError(t, err)
 
-		assert.Equal(t, "struct {\nunion json.RawMessage\n}", res.GoType)
-		assert.Equal(t, []UnionElement{
-			"User",
-			"Error",
-			"string",
-		}, res.UnionElements)
-
-		assert.Len(t, res.AdditionalTypes, 0)
+		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
+		assert.Nil(t, res.UnionElements)
+		assert.Equal(t, 1, len(res.AdditionalTypes))
+		assert.Equal(t, "UserOneOf", res.AdditionalTypes[0].Name)
+		assert.Equal(t, "struct {\nunion json.RawMessage\n}", res.AdditionalTypes[0].Schema.GoType)
+		assert.Equal(t, []UnionElement{"User", "Error", "string"}, res.AdditionalTypes[0].Schema.UnionElements)
 	})
 }
