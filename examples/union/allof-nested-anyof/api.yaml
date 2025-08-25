@@ -1,0 +1,47 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Using complex schemas
+  description: An example of `allOf` with `anyOf` inside
+paths:
+  /foo:
+    get:
+      responses:
+        '200':
+          description: Foo
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    Order:
+      type: object
+      properties:
+        product:
+          allOf:
+            - anyOf:
+                - $ref: '#/components/schemas/VariantA'
+                - $ref: '#/components/schemas/VariantB'
+            - $ref: '#/components/schemas/Base'
+
+    Base:
+      type: object
+      required:
+        - weight
+      properties:
+        weight:
+          type: number
+
+    VariantA:
+      type: object
+      properties:
+        color:
+          type: string
+
+    VariantB:
+      type: object
+      properties:
+        country:
+          type: string

@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=../../configuration-schema.json
-package: anyofwithextra
-skip-prune: true
-generate:
-  client: false
-output:
-  use-single-file: false

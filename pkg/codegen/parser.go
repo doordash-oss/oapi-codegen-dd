@@ -223,7 +223,9 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		for name := range typesOut {
 			typeNames = append(typeNames, name)
 		}
+
 		sort.Strings(typeNames)
+
 		for _, name := range typeNames {
 			code, ok := typesOut[name]
 			if !ok {
@@ -232,6 +234,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			res += code + "\n"
 			delete(typesOut, name)
 		}
+
 		formatted, err := FormatCode(res)
 		if err != nil {
 			return nil, err

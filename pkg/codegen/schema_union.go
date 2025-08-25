@@ -7,7 +7,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 )
 
-// UnionElement describe union element, based on prefix externalRef\d+ and real ref name from external schema.
+// UnionElement describe a union element, based on the prefix externalRef\d+ and real ref name from external schema.
 type UnionElement string
 
 // Method generate union method name for template functions `As/From`.
@@ -19,8 +19,8 @@ func (u UnionElement) Method() string {
 	return method
 }
 
-func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, path []string, options ParseOptions) (*GoSchema, error) {
-	outSchema := &GoSchema{}
+func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, path []string, options ParseOptions) (GoSchema, error) {
+	outSchema := GoSchema{}
 
 	if discriminator != nil {
 		outSchema.Discriminator = &Discriminator{
@@ -55,7 +55,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 		ref := element.GoLow().GetReference()
 		elementSchema, err := GenerateGoSchema(element, ref, elementPath, options)
 		if err != nil {
-			return nil, err
+			return GoSchema{}, err
 		}
 
 		// define new types only for non-primitive types
@@ -75,7 +75,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 
 		if discriminator != nil {
 			if discriminator.Mapping.Len() != 0 && element.GetReference() == "" {
-				return nil, ErrAmbiguousDiscriminatorMapping
+				return GoSchema{}, ErrAmbiguousDiscriminatorMapping
 			}
 
 			// Explicit mapping.
@@ -96,7 +96,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	}
 
 	if (outSchema.Discriminator != nil) && len(outSchema.Discriminator.Mapping) != len(elements) {
-		return nil, ErrDiscriminatorNotAllMapped
+		return GoSchema{}, ErrDiscriminatorNotAllMapped
 	}
 
 	return outSchema, nil

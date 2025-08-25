@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=../../configuration-schema.json
-package: multipleresponses
-output:
-  use-single-file: false
-generate:
-  client: true
-  omit-description: true

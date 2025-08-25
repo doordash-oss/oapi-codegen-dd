@@ -466,11 +466,11 @@ func escapePathElements(path string) string {
 	return strings.Join(elems, "/")
 }
 
-// renameSchema takes as input the name of a schema as provided in the spec,
+// renameComponent takes as input the name of a schema as provided in the spec,
 // and the definition of the schema. If the schema overrides the name via
 // x-go-name, the new name is returned, otherwise, the original name is
 // returned.
-func renameSchema(schemaName string, schemaRef *base.SchemaProxy) (string, error) {
+func renameComponent(schemaName string, schemaRef *base.SchemaProxy) (string, error) {
 	// References will not change type names.
 	if schemaRef.IsReference() {
 		return schemaNameToTypeName(schemaName), nil
@@ -504,44 +504,6 @@ func renameParameter(parameterName string, parameterRef *v3.Parameter) (string, 
 		return typeName, nil
 	}
 	return schemaNameToTypeName(parameterName), nil
-}
-
-// renameResponse generates the name for a parameter, taking x-go-name into
-// account
-func renameResponse(responseName string, responseRef *base.SchemaProxy) (string, error) {
-	if responseRef.IsReference() {
-		return schemaNameToTypeName(responseName), nil
-	}
-	response := responseRef.Schema()
-
-	exts := extractExtensions(response.Extensions)
-	if extension, ok := exts[extGoName]; ok {
-		typeName, err := parseString(extension)
-		if err != nil {
-			return "", fmt.Errorf("invalid value for %q: %w", extPropGoType, err)
-		}
-		return typeName, nil
-	}
-	return schemaNameToTypeName(responseName), nil
-}
-
-// renameRequestBody generates the name for a parameter, taking x-go-name into
-// account
-func renameRequestBody(requestBodyName string, requestBodyRef *base.SchemaProxy) (string, error) {
-	if requestBodyRef.IsReference() {
-		return schemaNameToTypeName(requestBodyName), nil
-	}
-	requestBody := requestBodyRef.Schema()
-
-	exts := extractExtensions(requestBody.Extensions)
-	if extension, ok := exts[extGoName]; ok {
-		typeName, err := parseString(extension)
-		if err != nil {
-			return "", fmt.Errorf("invalid value for %q: %w", extPropGoType, err)
-		}
-		return typeName, nil
-	}
-	return schemaNameToTypeName(requestBodyName), nil
 }
 
 func isMediaTypeJson(mediaType string) bool {

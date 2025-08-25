@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -122,48 +121,4 @@ func (tr TypeRegistry) GetName(name string) string {
 		return fmt.Sprintf("%s%d", name, next)
 	}
 	return name
-}
-
-func checkDuplicates(types []TypeDefinition) ([]TypeDefinition, error) {
-	m := map[string]TypeDefinition{}
-	var ts []TypeDefinition
-
-	for _, typ := range types {
-		if other, found := m[typ.Name]; found {
-			// If type names collide, we need to see if they refer to the same
-			// exact type definition, in which case, we can de-dupe.
-			// If they don't match, we error out.
-			if typeDefinitionsEquivalent(other, typ) {
-				continue
-			}
-			// We want to create an error when we try to define the same type twice.
-			return nil, fmt.Errorf("duplicate typename '%s' detected, can't auto-rename, "+
-				"please use x-go-name to specify your own name for one of them", typ.Name)
-		}
-
-		m[typ.Name] = typ
-
-		ts = append(ts, typ)
-	}
-
-	return ts, nil
-}
-
-// typeDefinitionsEquivalent checks for equality between two type definitions, but
-// not every field is considered.
-// We only want to know if they are fundamentally the same type.
-func typeDefinitionsEquivalent(t1, t2 TypeDefinition) bool {
-	if equal := t1.Name == t2.Name &&
-		t1.Schema.TypeDecl() == t2.Schema.TypeDecl() &&
-		slices.Equal(t1.Schema.UnionElements, t2.Schema.UnionElements) &&
-		slices.Equal(t1.Schema.OpenAPISchema.Enum, t2.Schema.OpenAPISchema.Enum); equal {
-		return true
-	}
-
-	for ix, prop := range t1.Schema.Properties {
-		if !prop.IsEqual(t2.Schema.Properties[ix]) {
-			return false
-		}
-	}
-	return true
 }

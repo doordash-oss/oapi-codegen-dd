@@ -8,8 +8,8 @@ type GetUserSingleResponse struct {
 	Address *string `json:"address,omitempty"`
 }
 
-type GetUserUnion1Response struct {
-	ID      string  `json:"id" validate:"required"`
-	Name    *string `json:"name,omitempty"`
-	Address *string `json:"address,omitempty"`
-}
+type GetUserUnion1Response GetUserUnion1ResponseOneOf
+
+type GetUserUnion2Response GetUserUnion2ResponseOneOf
+
+type GetUserUnion3Response GetUserUnion3ResponseOneOf
