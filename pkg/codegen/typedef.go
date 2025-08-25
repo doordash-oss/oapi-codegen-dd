@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type SpecLocation string
@@ -153,17 +155,36 @@ func checkDuplicates(types []TypeDefinition) ([]TypeDefinition, error) {
 // not every field is considered.
 // We only want to know if they are fundamentally the same type.
 func typeDefinitionsEquivalent(t1, t2 TypeDefinition) bool {
-	if equal := t1.Name == t2.Name &&
-		t1.Schema.TypeDecl() == t2.Schema.TypeDecl() &&
-		slices.Equal(t1.Schema.UnionElements, t2.Schema.UnionElements) &&
-		slices.Equal(t1.Schema.OpenAPISchema.Enum, t2.Schema.OpenAPISchema.Enum); equal {
-		return true
+	if t1.Name != t2.Name {
+		return false
+	}
+	if t1.Schema.TypeDecl() != t2.Schema.TypeDecl() {
+		return false
+	}
+	if !slices.Equal(t1.Schema.UnionElements, t2.Schema.UnionElements) {
+		return false
 	}
 
-	for ix, prop := range t1.Schema.Properties {
-		if !prop.IsEqual(t2.Schema.Properties[ix]) {
+	var e1, e2 []*yaml.Node
+	if t1.Schema.OpenAPISchema != nil {
+		e1 = t1.Schema.OpenAPISchema.Enum
+	}
+	if t2.Schema.OpenAPISchema != nil {
+		e2 = t2.Schema.OpenAPISchema.Enum
+	}
+	if !slices.Equal(e1, e2) {
+		return false
+	}
+
+	if len(t1.Schema.Properties) != len(t2.Schema.Properties) {
+		return false
+	}
+
+	for i := range t1.Schema.Properties {
+		if !t1.Schema.Properties[i].IsEqual(t2.Schema.Properties[i]) {
 			return false
 		}
 	}
+
 	return true
 }

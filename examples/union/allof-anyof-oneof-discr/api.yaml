@@ -1,0 +1,68 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Using complex schemas
+  description: An example of `anyOf`, `allOf` and `oneOf`
+paths:
+  /foo:
+    get:
+      responses:
+        '200':
+          description: Foo
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    # base types
+    Client:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+
+    Identity:
+      type: object
+      required:
+        - issuer
+      properties:
+        issuer:
+          type: string
+
+    # anyOf results in a type that has an `AsClient`/`FromClient` and an `AsIdentity`/`FromIdentity` method
+    # so you can choose which of them you want to retrieve
+    ClientAndMaybeIdentity:
+      properties:
+        entity:
+          anyOf:
+            - $ref: '#/components/schemas/Client'
+            - $ref: '#/components/schemas/Identity'
+        type:
+          type: string
+          enum:
+            - client
+            - identity
+            - client-with-id
+      required:
+        - type
+
+    # oneOf results in a type that has an `AsClient`/`FromClient` and an `AsString`/`FromString` method
+    # so you can choose which of them you want to retrieve
+    ClientOrId:
+      oneOf:
+        - $ref: '#/components/schemas/Client'
+        - type: string
+
+    ClientOrIdentityWithDiscriminator:
+      oneOf:
+        - $ref: '#/components/schemas/Client'
+        - $ref: '#/components/schemas/Identity'
+      discriminator:
+        propertyName: type
+        mapping:
+          client: '#/components/schemas/Client'
+          identity: '#/components/schemas/Identity'

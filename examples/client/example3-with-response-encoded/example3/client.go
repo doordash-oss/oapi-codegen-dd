@@ -31,16 +31,16 @@ func NewDefaultClient(baseURL string, opts ...runtime.APIClientOption) (*Client,
 
 // ClientInterface is the interface for the API client.
 type ClientInterface interface {
-	GetUserSingle(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserSingleResponse, error)
+	GetUserSingle(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserSingleResponseFormdata, error)
 
-	GetUserUnion1(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion1Response, error)
+	GetUserUnion1(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion1ResponseFormdata, error)
 
-	GetUserUnion2(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion2Response, error)
+	GetUserUnion2(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion2ResponseFormdata, error)
 
-	GetUserUnion3(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion3Response, error)
+	GetUserUnion3(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion3ResponseFormdata, error)
 }
 
-func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserSingleResponse, error) {
+func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserSingleResponseFormdata, error) {
 	var err error
 	reqParams := runtime.RequestOptionsParameters{
 		RequestURL: c.apiClient.GetBaseURL() + "/users/{userId}/single",
@@ -52,13 +52,13 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserSingleResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserSingleResponseFormdata, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
 			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
 				runtime.WithStatusCode(resp.StatusCode))
 		}
-		target := new(GetUserSingleResponse)
+		target := new(GetUserSingleResponseFormdata)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
@@ -75,7 +75,7 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 	return responseParser(ctx, resp)
 }
 
-func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion1Response, error) {
+func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion1ResponseFormdata, error) {
 	var err error
 	reqParams := runtime.RequestOptionsParameters{
 		RequestURL: c.apiClient.GetBaseURL() + "/users/{userId}/union-1",
@@ -87,13 +87,13 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion1Response, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion1ResponseFormdata, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
 			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
 				runtime.WithStatusCode(resp.StatusCode))
 		}
-		target := new(GetUserUnion1Response)
+		target := new(GetUserUnion1ResponseFormdata)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
@@ -110,7 +110,7 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 	return responseParser(ctx, resp)
 }
 
-func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion2Response, error) {
+func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion2ResponseFormdata, error) {
 	var err error
 	reqParams := runtime.RequestOptionsParameters{
 		RequestURL: c.apiClient.GetBaseURL() + "/users/{userId}/union-2",
@@ -122,13 +122,13 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion2Response, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion2ResponseFormdata, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
 			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
 				runtime.WithStatusCode(resp.StatusCode))
 		}
-		target := new(GetUserUnion2Response)
+		target := new(GetUserUnion2ResponseFormdata)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
@@ -145,7 +145,7 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 	return responseParser(ctx, resp)
 }
 
-func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion3Response, error) {
+func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetUserUnion3ResponseFormdata, error) {
 	var err error
 	reqParams := runtime.RequestOptionsParameters{
 		RequestURL: c.apiClient.GetBaseURL() + "/users/{userId}/union-3",
@@ -157,13 +157,13 @@ func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.Reques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion3Response, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetUserUnion3ResponseFormdata, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
 			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
 				runtime.WithStatusCode(resp.StatusCode))
 		}
-		target := new(GetUserUnion3Response)
+		target := new(GetUserUnion3ResponseFormdata)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		if err = json.Unmarshal(bodyBytes, target); err != nil {

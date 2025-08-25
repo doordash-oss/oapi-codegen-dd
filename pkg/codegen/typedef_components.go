@@ -39,6 +39,7 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 
 		types = append(types, goSchema.AdditionalTypes...)
 	}
+
 	return types, nil
 }
 

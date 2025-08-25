@@ -120,10 +120,10 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		mergeImports(imprts, importRes)
 	}
 
-	typeDefs, err = checkDuplicates(typeDefs)
-	if err != nil {
-		return nil, fmt.Errorf("error checking for duplicate type definitions: %w", err)
-	}
+	// typeDefs, err = checkDuplicates(typeDefs)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error checking for duplicate type definitions: %w", err)
+	// }
 
 	enums, typeDefs, registry := filterOutEnums(typeDefs)
 
@@ -299,10 +299,12 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		}
 	}
 
+	allTypeDefs := extractAllTypeDefinitions(typeDefs)
+
 	return &operationsCollection{
 		operations:     operations,
 		importSchemas:  importSchemas,
-		typeDefs:       typeDefs,
+		typeDefs:       allTypeDefs,
 		responseErrors: responseErrors,
 	}, nil
 }
@@ -351,7 +353,17 @@ func collectComponentDefinitions(model *v3high.Document, options ParseOptions) (
 		typeDefs = append(typeDefs, componentResponses...)
 	}
 
-	return typeDefs, nil
+	all := extractAllTypeDefinitions(typeDefs)
+	return all, nil
+}
+
+func extractAllTypeDefinitions(types []TypeDefinition) []TypeDefinition {
+	var res []TypeDefinition
+	for _, typeDef := range types {
+		res = append(res, typeDef)
+		res = append(res, extractAllTypeDefinitions(typeDef.Schema.AdditionalTypes)...)
+	}
+	return res
 }
 
 // collectResponseErrors collects the response errors from the type definitions.

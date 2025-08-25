@@ -9,8 +9,8 @@ import (
 )
 
 func createObjectSchema(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
-	var outType string
 	var (
+		outType     string
 		description string
 		hasNilType  bool
 	)
@@ -35,6 +35,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 	if schema != nil &&
 		(schema.Properties == nil || schema.Properties.Len() == 0) &&
 		!schemaHasAdditionalProperties(schema) &&
+		schema.AllOf == nil &&
 		schema.AnyOf == nil &&
 		schema.OneOf == nil {
 		t := schema.Type
@@ -98,9 +99,8 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 		// early-out here and generate a map[string]<schema> instead of an object
 		// that contains this map. We skip over anyOf/oneOf here because they can
 		// introduce properties. allOf was handled above.
-		if schema != nil &&
-			(schema.Properties == nil || schema.Properties.Len() == 0) &&
-			schema.AnyOf == nil && schema.OneOf == nil {
+		if (schema.Properties == nil || schema.Properties.Len() == 0) &&
+			schema.AllOf == nil && schema.AnyOf == nil && schema.OneOf == nil {
 			// We have a dictionary here. Returns the goType to be just a map from
 			// string to the property type. HasAdditionalProperties=false means
 			// that we won't generate custom json.Marshaler and json.Unmarshaler functions,
@@ -136,7 +136,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 				// but are not a pre-defined type, we need to define a type
 				// for them, which will be based on the field names we followed
 				// to get to the type.
-				typeName := pathToTypeName(propertyPath) // schemaNameToTypeName(pathToTypeName(propertyPath))
+				typeName := pathToTypeName(append(propertyPath, "AdditionalProperties"))
 				var specLocation = SpecLocationSchema
 				if len(pSchema.UnionElements) != 0 {
 					specLocation = SpecLocationUnion
@@ -149,7 +149,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 					SpecLocation: specLocation,
 				}
 				pSchema.AdditionalTypes = append(pSchema.AdditionalTypes, typeDef)
-				pSchema.RefType = typeName
+				// pSchema.RefType = typeName
 			}
 
 			description := ""
@@ -177,44 +177,6 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 			outSchema.Properties = append(outSchema.Properties, prop)
 			if len(pSchema.AdditionalTypes) > 0 {
 				outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, pSchema.AdditionalTypes...)
-			}
-		}
-
-		descrs := [][]*base.SchemaProxy{schema.AnyOf, schema.OneOf}
-		for _, descrItems := range descrs {
-			nonNilDescrItems := make([]*base.SchemaProxy, 0)
-			for _, item := range descrItems {
-				if item != nil {
-					t := item.Schema().Type
-					if len(t) == 1 && t[0] == "null" {
-						continue
-					}
-					nonNilDescrItems = append(nonNilDescrItems, item)
-				}
-			}
-			if len(nonNilDescrItems) == 0 {
-				continue
-			}
-			if len(nonNilDescrItems) == 1 {
-				res, err := GenerateGoSchema(nonNilDescrItems[0], ref, path, options)
-				if err != nil {
-					return GoSchema{}, fmt.Errorf("error generating single type for anyOf: %w", err)
-				}
-				return res, nil
-			} else {
-				res, err := generateUnion(descrItems, schema.Discriminator, path, options)
-				if err != nil {
-					return GoSchema{}, fmt.Errorf("error generating type for anyOf: %w", err)
-				}
-				if res.Discriminator != nil {
-					outSchema.Discriminator = res.Discriminator
-				}
-				if len(res.UnionElements) != 0 {
-					outSchema.UnionElements = append(outSchema.UnionElements, res.UnionElements...)
-				}
-				outSchema.DefineViaAlias = res.DefineViaAlias
-				outSchema.RefType = res.RefType
-				outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, res.AdditionalTypes...)
 			}
 		}
 
