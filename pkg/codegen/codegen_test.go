@@ -113,8 +113,8 @@ func TestGoTypeImport(t *testing.T) {
 		`github.com/fatih/color`,               // parameters - query
 		`github.com/go-openapi/swag`,           // parameters - path
 		`github.com/jackc/pgtype`,              // direct parameters - path
-		`github.com/mailru/easyjson`,           // direct parameters - query
 		`github.com/subosito/gotenv`,           // direct request body
+		`"github.com/doordash/oapi-codegen/v3/pkg/runtime"`,
 	}
 
 	// Check import

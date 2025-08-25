@@ -36,14 +36,14 @@ const (
 	FileLinkObjectFileLink FileLinkObject = "file_link"
 )
 
-type GetFilesResponse []GetFiles_Response_Item
+type GetFilesResponse []GetFiles_Response_OneOf
 
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type File struct {
-	Filename *string      `json:"filename,omitempty" validate:"omitempty,max=5000"`
-	ID       string       `json:"id" validate:"required,max=5000"`
-	Author   *File_Author `json:"author,omitempty"`
+	Filename *string            `json:"filename,omitempty" validate:"omitempty,max=5000"`
+	ID       string             `json:"id" validate:"required,max=5000"`
+	Author   *File_Author_AnyOf `json:"author,omitempty"`
 	Links    *struct {
 		Data    []FileLink      `json:"data" validate:"required"`
 		HasMore bool            `json:"has_more"`
@@ -61,13 +61,13 @@ func (f File) Validate() error {
 }
 
 type FileLink struct {
-	Created  int               `json:"created" validate:"required"`
-	File     FileLink_File     `json:"file" validate:"required"`
-	ID       string            `json:"id" validate:"required,max=5000"`
-	Livemode *bool             `json:"livemode,omitempty"`
-	Metadata map[string]string `json:"metadata,omitempty"`
-	Object   *FileLinkObject   `json:"object,omitempty"`
-	URL      *string           `json:"url,omitempty" validate:"omitempty,max=5000"`
+	Created  int                 `json:"created" validate:"required"`
+	File     FileLink_File_AnyOf `json:"file" validate:"required"`
+	ID       string              `json:"id" validate:"required,max=5000"`
+	Livemode *bool               `json:"livemode,omitempty"`
+	Metadata map[string]string   `json:"metadata,omitempty"`
+	Object   *FileLinkObject     `json:"object,omitempty"`
+	URL      *string             `json:"url,omitempty" validate:"omitempty,max=5000"`
 }
 
 func (f FileLink) Validate() error {
@@ -75,8 +75,8 @@ func (f FileLink) Validate() error {
 }
 
 type User struct {
-	ID     string       `json:"id" validate:"required,max=50"`
-	Avatar *User_Avatar `json:"avatar,omitempty"`
+	ID     string             `json:"id" validate:"required,max=50"`
+	Avatar *User_Avatar_AnyOf `json:"avatar,omitempty"`
 }
 
 func (u User) Validate() error {
@@ -106,32 +106,11 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type GetFiles_Response_Item struct {
-	runtime.Either[string, File]
-}
-
-func (g *GetFiles_Response_Item) MarshalJSON() ([]byte, error) {
-	data := g.Value()
-	if data == nil {
-		return nil, nil
-	}
-
-	obj, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-func (g *GetFiles_Response_Item) UnmarshalJSON(data []byte) error {
-	return g.Unmarshal(data)
-}
-
-type File_Author struct {
+type File_Author_AnyOf struct {
 	runtime.Either[User, string]
 }
 
-func (f *File_Author) MarshalJSON() ([]byte, error) {
+func (f *File_Author_AnyOf) MarshalJSON() ([]byte, error) {
 	data := f.Value()
 	if data == nil {
 		return nil, nil
@@ -144,15 +123,15 @@ func (f *File_Author) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (f *File_Author) UnmarshalJSON(data []byte) error {
+func (f *File_Author_AnyOf) UnmarshalJSON(data []byte) error {
 	return f.Unmarshal(data)
 }
 
-type FileLink_File struct {
+type FileLink_File_AnyOf struct {
 	runtime.Either[string, File]
 }
 
-func (f *FileLink_File) MarshalJSON() ([]byte, error) {
+func (f *FileLink_File_AnyOf) MarshalJSON() ([]byte, error) {
 	data := f.Value()
 	if data == nil {
 		return nil, nil
@@ -165,15 +144,15 @@ func (f *FileLink_File) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (f *FileLink_File) UnmarshalJSON(data []byte) error {
+func (f *FileLink_File_AnyOf) UnmarshalJSON(data []byte) error {
 	return f.Unmarshal(data)
 }
 
-type User_Avatar struct {
+type User_Avatar_AnyOf struct {
 	runtime.Either[File, string]
 }
 
-func (u *User_Avatar) MarshalJSON() ([]byte, error) {
+func (u *User_Avatar_AnyOf) MarshalJSON() ([]byte, error) {
 	data := u.Value()
 	if data == nil {
 		return nil, nil
@@ -186,6 +165,27 @@ func (u *User_Avatar) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (u *User_Avatar) UnmarshalJSON(data []byte) error {
+func (u *User_Avatar_AnyOf) UnmarshalJSON(data []byte) error {
 	return u.Unmarshal(data)
+}
+
+type GetFiles_Response_OneOf struct {
+	runtime.Either[string, File]
+}
+
+func (g *GetFiles_Response_OneOf) MarshalJSON() ([]byte, error) {
+	data := g.Value()
+	if data == nil {
+		return nil, nil
+	}
+
+	obj, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+func (g *GetFiles_Response_OneOf) UnmarshalJSON(data []byte) error {
+	return g.Unmarshal(data)
 }

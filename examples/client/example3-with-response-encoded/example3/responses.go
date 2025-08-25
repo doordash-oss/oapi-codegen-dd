@@ -2,14 +2,14 @@
 
 package example3
 
-type GetUserSingleResponse struct {
+type GetUserSingleResponseFormdata struct {
 	ID      string  `json:"id" validate:"required"`
 	Name    *string `json:"name,omitempty"`
 	Address *string `json:"address,omitempty"`
 }
 
-type GetUserUnion1Response struct {
-	ID      string  `json:"id" validate:"required"`
-	Name    *string `json:"name,omitempty"`
-	Address *string `json:"address,omitempty"`
-}
+type GetUserUnion1ResponseFormdata GetUserUnion1_Response_OneOf
+
+type GetUserUnion2ResponseFormdata GetUserUnion2_Response_OneOf
+
+type GetUserUnion3ResponseFormdata GetUserUnion3_Response_OneOf

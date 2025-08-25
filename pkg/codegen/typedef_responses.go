@@ -38,7 +38,7 @@ type ResponseContentDefinition struct {
 	Headers      map[string]GoSchema
 }
 
-func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
+func getOperationResponses(operationID string, responses *v3high.Responses, currentTypes map[string]TypeDefinition, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
 	if responses == nil {
 		return nil, nil, nil
 	}
@@ -46,6 +46,8 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	var (
 		successCode     int
 		errorCode       int
+		fstErrorCode    int
+		fstSuccessCode  int
 		typeDefinitions []TypeDefinition
 	)
 
@@ -88,6 +90,18 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			continue
 		}
 
+		// we need to set the error in response out of all error codes.
+		// so we pick the first one.
+		// TODO: consider having that in parse options.
+		if fstErrorCode == 0 && !isSuccess {
+			fstErrorCode = status
+		}
+
+		if fstSuccessCode == 0 && isSuccess {
+			fstSuccessCode = status
+		}
+
+		codeName := strconv.Itoa(status)
 		typeSuffix := "Response"
 		if !isSuccess {
 			typeSuffix = "ErrorResponse"
@@ -155,9 +169,16 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			tag = "Text"
 		}
 
+		// JSON is presumably the most used one, so omit from the type name
+		// to reduce verbosity.
 		responseName := operationID + typeSuffix
-		if responseName == contentSchema.RefType {
-			responseName = operationID + typeSuffix + tag
+		responseTypeName := tag
+		if tag == "JSON" && currentTypes[responseName].Name == "" {
+			responseTypeName = ""
+		}
+		responseName += responseTypeName
+		if (isSuccess && fstSuccessCode != status) || (!isSuccess && fstErrorCode != status) {
+			responseName += codeName
 		}
 
 		td := TypeDefinition{
@@ -196,6 +217,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 
 	if errorCode == 0 && defaultResponse != nil {
 		errorCode = 500
+		fstErrorCode = 500
 		typeSuffix := "ErrorResponse"
 		content := defaultResponse.Content.First()
 
@@ -260,7 +282,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	res := &ResponseDefinition{
 		SuccessStatusCode: successCode,
 		Success:           all[successCode],
-		Error:             all[errorCode],
+		Error:             all[fstErrorCode],
 		All:               all,
 	}
 

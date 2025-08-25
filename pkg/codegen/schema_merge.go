@@ -3,50 +3,219 @@ package codegen
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
 )
 
-// mergeSchemas merges all the fields in the schemas supplied into one giant schema.
-// The idea is that we merge all fields into one schema.
-func mergeSchemas(allOf []*base.SchemaProxy, path []string, options ParseOptions) (GoSchema, error) {
-	n := len(allOf)
-	if n == 0 {
+func createFromCombinator(schema *base.Schema, path []string, options ParseOptions) (GoSchema, error) {
+	if schema == nil {
 		return GoSchema{}, nil
 	}
 
-	if n == 1 {
-		ref := allOf[0].GoLow().GetReference()
-		return GenerateGoSchema(allOf[0], ref, path, options)
+	hasAllOf := len(schema.AllOf) > 0
+	hasAnyOf := len(schema.AnyOf) > 0
+	hasOneOf := len(schema.OneOf) > 0
+	hasAdditionalProperties := schemaHasAdditionalProperties(schema)
+
+	if !hasAllOf && !hasAnyOf && !hasOneOf {
+		return GoSchema{}, nil
 	}
 
-	schema := allOf[0].Schema()
+	var (
+		out             GoSchema
+		fieldName       string
+		allOfSchema     GoSchema
+		anyOfSchema     GoSchema
+		oneOfSchema     GoSchema
+		additionalTypes []TypeDefinition
+		// err             error
+	)
 
-	for i := 1; i < n; i++ {
+	if hasAllOf {
 		var err error
-		oneOfSchema := allOf[i].Schema()
-		schema, err = mergeOpenapiSchemas(schema, oneOfSchema, true)
+		allOfSchema, err = mergeAllOfSchemas(schema.AllOf, path, options)
 		if err != nil {
-			return GoSchema{}, fmt.Errorf("error merging schemas for AllOf: %w", err)
+			return GoSchema{}, fmt.Errorf("error merging allOf: %w", err)
+		}
+		out.Properties = append(out.Properties, allOfSchema.Properties...)
+		additionalTypes = append(additionalTypes, allOfSchema.AdditionalTypes...)
+	}
+
+	if hasAnyOf {
+		anyOfPath := append(path, "anyOf")
+		var err error
+		anyOfSchema, err = generateUnion(schema.AnyOf, nil, anyOfPath, options)
+		if err != nil {
+			return GoSchema{}, fmt.Errorf("error resolving anyOf: %w", err)
+		}
+		anyOfFields := genFieldsFromProperties(anyOfSchema.Properties, options)
+		anyOfSchema.GoType = anyOfSchema.createGoStruct(anyOfFields)
+
+		anyOfName := pathToTypeName(anyOfPath)
+		fieldName = anyOfName
+		additionalTypes = append(additionalTypes, TypeDefinition{
+			Name:         anyOfName,
+			Schema:       anyOfSchema,
+			SpecLocation: SpecLocationUnion,
+		})
+
+		out.Properties = append(out.Properties, Property{
+			GoName:      anyOfName,
+			Schema:      GoSchema{RefType: anyOfName},
+			Constraints: Constraints{Nullable: true},
+		})
+	}
+
+	if hasOneOf {
+		oneOfPath := append(path, "oneOf")
+		var err error
+		oneOfSchema, err = generateUnion(schema.OneOf, schema.Discriminator, oneOfPath, options)
+		if err != nil {
+			return GoSchema{}, fmt.Errorf("error resolving oneOf: %w", err)
+		}
+		oneOfFields := genFieldsFromProperties(oneOfSchema.Properties, options)
+		oneOfSchema.GoType = oneOfSchema.createGoStruct(oneOfFields)
+
+		oneOfName := pathToTypeName(oneOfPath)
+		fieldName = oneOfName
+		additionalTypes = append(additionalTypes, TypeDefinition{
+			Name:         oneOfName,
+			Schema:       oneOfSchema,
+			SpecLocation: SpecLocationUnion,
+		})
+
+		out.Properties = append(out.Properties, Property{
+			GoName:      oneOfName,
+			Schema:      GoSchema{RefType: oneOfName},
+			Constraints: Constraints{Nullable: true},
+		})
+	}
+
+	fields := genFieldsFromProperties(out.Properties, options)
+	out.GoType = out.createGoStruct(fields)
+	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
+
+	if fieldName != "" && !hasAdditionalProperties {
+		out.RefType = fieldName
+	}
+
+	return out, nil
+}
+
+func containsUnion(schema *base.Schema) bool {
+	if schema == nil {
+		return false
+	}
+
+	if len(schema.AnyOf) > 0 || len(schema.OneOf) > 0 {
+		return true
+	}
+
+	for _, s := range schema.AllOf {
+		if containsUnion(s.Schema()) {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeAllOfSchemas merges all the fields in the schemas supplied into one giant schema.
+// The idea is that we merge all fields into one schema.
+func mergeAllOfSchemas(allOf []*base.SchemaProxy, path []string, options ParseOptions) (GoSchema, error) {
+	if len(allOf) == 0 {
+		return GoSchema{}, nil
+	}
+
+	allMergeable := true
+	for _, s := range allOf {
+		if containsUnion(s.Schema()) {
+			allMergeable = false
+			break
 		}
 	}
 
-	// TODO: check if that's ok, previously panicked
-	schemaProxy := base.CreateSchemaProxy(schema)
-	ref := ""
-	if low := schemaProxy.GoLow(); low != nil {
-		ref = low.GetReference()
+	if allMergeable {
+		var merged *base.Schema
+		for _, schemaProxy := range allOf {
+			s := schemaProxy.Schema()
+
+			var err error
+			merged, err = mergeOpenapiSchemas(merged, s)
+			if err != nil {
+				return GoSchema{}, fmt.Errorf("error merging schemas for allOf: %w", err)
+			}
+		}
+
+		schemaProxy := base.CreateSchemaProxy(merged)
+		ref := ""
+		if low := schemaProxy.GoLow(); low != nil {
+			ref = low.GetReference()
+		}
+		return GenerateGoSchema(schemaProxy, ref, path, options)
 	}
 
-	return GenerateGoSchema(schemaProxy, ref, path, options)
+	var (
+		out             GoSchema
+		additionalTypes []TypeDefinition
+	)
+
+	for i, schemaProxy := range allOf {
+		subPath := append(path, fmt.Sprintf("allOf_%d", i))
+
+		// check if this is a $ref
+		if ref := schemaProxy.GoLow().GetReference(); ref != "" {
+			typeName, _ := refPathToGoType(ref)
+			out.Properties = append(out.Properties, Property{
+				GoName:      typeName,
+				Schema:      GoSchema{RefType: typeName},
+				Constraints: Constraints{Nullable: false},
+			})
+			continue
+		}
+
+		// not a $ref - resolve as usual
+		schema := schemaProxy.Schema()
+		resolved, err := createFromCombinator(schema, subPath, options)
+		if err != nil {
+			return GoSchema{}, fmt.Errorf("error resolving allOf[%d]: %w", i, err)
+		}
+
+		fieldName := pathToTypeName(subPath)
+		out.Properties = append(out.Properties, Property{
+			GoName:      fieldName,
+			Schema:      GoSchema{RefType: fieldName},
+			Constraints: Constraints{Nullable: true},
+		})
+
+		additionalTypes = append(additionalTypes, TypeDefinition{
+			Name:         fieldName,
+			Schema:       resolved,
+			SpecLocation: SpecLocationUnion,
+		})
+		additionalTypes = append(additionalTypes, resolved.AdditionalTypes...)
+	}
+
+	out.GoType = out.createGoStruct(genFieldsFromProperties(out.Properties, options))
+
+	td := TypeDefinition{
+		Name:         pathToTypeName(path),
+		JsonName:     strings.Join(path, "."),
+		Schema:       out,
+		SpecLocation: SpecLocationUnion,
+	}
+	out.AdditionalTypes = append(out.AdditionalTypes, td)
+	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
+
+	return out, nil
 }
 
 func mergeAllOf(allOf []*base.SchemaProxy) (*base.Schema, error) {
 	var schema *base.Schema
 	for _, schemaRef := range allOf {
 		var err error
-		schema, err = mergeOpenapiSchemas(schema, schemaRef.Schema(), true)
+		schema, err = mergeOpenapiSchemas(schema, schemaRef.Schema())
 		if err != nil {
 			return nil, fmt.Errorf("error merging schemas for AllOf: %w", err)
 		}
@@ -56,16 +225,18 @@ func mergeAllOf(allOf []*base.SchemaProxy) (*base.Schema, error) {
 
 // mergeOpenapiSchemas merges two openAPI schemas and returns the schema
 // all of whose fields are composed.
-func mergeOpenapiSchemas(s1, s2 *base.Schema, allOf bool) (*base.Schema, error) {
-	result := &base.Schema{
-		// Properties: orderedmap.New[string, *base.SchemaProxy](),
-		// Extensions: orderedmap.New[string, *yaml.Node](),
+func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
+	if s1 == nil {
+		// First schema, nothing to merge yet
+		return s2, nil
 	}
+
+	result := &base.Schema{}
 
 	t1 := getSchemaType(s1)
 	t2 := getSchemaType(s2)
 	if !slices.Equal(t1, t2) {
-		return nil, fmt.Errorf("can not merge incompatible types: %v, %v", s1.Type, s2.Type)
+		return nil, fmt.Errorf("can not merge incompatible types: %v, %v", t1, t2)
 	}
 
 	if t1 == nil && t2 == nil {
@@ -201,11 +372,6 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema, allOf bool) (*base.Schema, error) 
 				}
 			}
 		}
-	}
-
-	// Allow discriminators for allOf merges, but disallow for one/anyOfs.
-	if !allOf && (s1.Discriminator != nil || s2.Discriminator != nil) {
-		return nil, ErrMergingSchemasWithDifferentDiscriminators
 	}
 
 	return result, nil
