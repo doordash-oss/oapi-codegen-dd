@@ -2,16 +2,16 @@
 
 package example1
 
-type GetClientResponseType string
-
-const (
-	GetClientResponseTypeCompany    GetClientResponseType = "company"
-	GetClientResponseTypeIndividual GetClientResponseType = "individual"
-)
-
 type ClientTypeType string
 
 const (
 	ClientTypeTypeCompany    ClientTypeType = "company"
 	ClientTypeTypeIndividual ClientTypeType = "individual"
+)
+
+type GetClientResponseType string
+
+const (
+	GetClientResponseTypeCompany    GetClientResponseType = "company"
+	GetClientResponseTypeIndividual GetClientResponseType = "individual"
 )

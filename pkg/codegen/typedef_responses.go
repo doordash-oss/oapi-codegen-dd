@@ -38,7 +38,7 @@ type ResponseContentDefinition struct {
 	Headers      map[string]GoSchema
 }
 
-func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
+func getOperationResponses(operationID string, responses *v3high.Responses, currentTypes map[string]TypeDefinition, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
 	if responses == nil {
 		return nil, nil, nil
 	}
@@ -46,6 +46,8 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	var (
 		successCode     int
 		errorCode       int
+		fstErrorCode    int
+		fstSuccessCode  int
 		typeDefinitions []TypeDefinition
 	)
 
@@ -88,9 +90,15 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			continue
 		}
 
-		typeSuffix := "Response"
-		if !isSuccess {
-			typeSuffix = "ErrorResponse"
+		// we need to set the error in response out of all error codes.
+		// so we pick the first one.
+		// TODO: consider having that in parse options.
+		if fstErrorCode == 0 && !isSuccess {
+			fstErrorCode = status
+		}
+
+		if fstSuccessCode == 0 && isSuccess {
+			fstSuccessCode = status
 		}
 
 		var (
@@ -124,6 +132,11 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 
 		ref := response.GoLow().GetReference()
 
+		typeSuffix := "Response"
+		if !isSuccess {
+			typeSuffix = "ErrorResponse"
+		}
+
 		contentSchema, err := GenerateGoSchema(content.Schema, ref, []string{operationID, typeSuffix}, options)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
@@ -155,10 +168,10 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			tag = "Text"
 		}
 
-		responseName := operationID + typeSuffix
-		if responseName == contentSchema.RefType {
-			responseName = operationID + typeSuffix + tag
-		}
+		codeName := strconv.Itoa(status)
+		baseName := operationID + typeSuffix
+		nameSuffixes := []string{tag, tag + codeName}
+		responseName := getResponseTypeName(currentTypes, baseName, nameSuffixes)
 
 		td := TypeDefinition{
 			Name:         responseName,
@@ -196,6 +209,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 
 	if errorCode == 0 && defaultResponse != nil {
 		errorCode = 500
+		fstErrorCode = 500
 		typeSuffix := "ErrorResponse"
 		content := defaultResponse.Content.First()
 
@@ -260,7 +274,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	res := &ResponseDefinition{
 		SuccessStatusCode: successCode,
 		Success:           all[successCode],
-		Error:             all[errorCode],
+		Error:             all[fstErrorCode],
 		All:               all,
 	}
 
@@ -277,4 +291,22 @@ func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], op
 		res[hName] = hSchema
 	}
 	return res, nil
+}
+
+func getResponseTypeName(currentTypes map[string]TypeDefinition, baseName string, suffixes []string) string {
+	if _, exists := currentTypes[baseName]; !exists {
+		return baseName
+	}
+
+	for i := 0; ; i++ {
+		for _, suffix := range suffixes {
+			name := fmt.Sprintf("%s%s", baseName, suffix)
+			if i > 0 {
+				name = fmt.Sprintf("%s%d", name, i)
+			}
+			if _, exists := currentTypes[name]; !exists {
+				return name
+			}
+		}
+	}
 }

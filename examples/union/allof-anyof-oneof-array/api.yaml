@@ -1,0 +1,80 @@
+openapi: 3.0.0
+info:
+  contact:
+    email: psp@example.com
+    name: PSP Platform Team
+  title: PSP API
+  version: 1.0.0
+paths:
+  /users/{userId}:
+    post:
+      operationId: createUser
+      responses:
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    score:
+                      type: number
+                  required:
+                    - id
+                pages:
+                  type: array
+                  items:
+                    type: object
+                    allOf:
+                      - type: object
+                        properties:
+                          limit:
+                            type: integer
+                          tag1:
+                            type: string
+                        required:
+                          - limit
+                      - type: object
+                        properties:
+                          tag2:
+                            type: string
+                    anyOf:
+                      - type: object
+                        properties:
+                          offset:
+                            type: integer
+                        required:
+                          - offset
+                      - type: object
+                        properties:
+                          query:
+                            type: string
+                        required:
+                          - query
+                    oneOf:
+                      - type: object
+                        properties:
+                          first:
+                            type: integer
+                          second:
+                            type: integer
+                        required:
+                          - first
+                          - second
+                      - type: object
+                        properties:
+                          last:
+                            type: integer
+                        required:
+                          - last
+                    not:
+                      type: object
+                      properties:
+                        second:
+                          type: integer
