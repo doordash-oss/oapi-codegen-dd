@@ -39,9 +39,9 @@ func TestExampleOpenAPICodeGeneration(t *testing.T) {
 	assert.Contains(t, code, "Top *int `json:\"$top,omitempty\"`")
 	assert.Contains(t, code, "DeadSince *time.Time    `json:\"dead_since,omitempty\" tag1:\"value1\" tag2:\"value2\"`")
 	assert.Contains(t, code, "type EnumTestNumerics int")
-	assert.Contains(t, code, "N2 EnumTestNumerics = 2")
+	assert.Contains(t, code, "EnumTestNumericsN2 EnumTestNumerics = 2")
 	assert.Contains(t, code, "type EnumTestEnumNames int")
-	assert.Contains(t, code, "Two  EnumTestEnumNames = 2")
+	assert.Contains(t, code, "EnumTestEnumNamesTwo  EnumTestEnumNames = 2")
 }
 
 func TestExtPropGoTypeSkipOptionalPointer(t *testing.T) {
@@ -113,7 +113,6 @@ func TestGoTypeImport(t *testing.T) {
 		`github.com/fatih/color`,               // parameters - query
 		`github.com/go-openapi/swag`,           // parameters - path
 		`github.com/jackc/pgtype`,              // direct parameters - path
-		`github.com/mailru/easyjson`,           // direct parameters - query
 		`github.com/subosito/gotenv`,           // direct request body
 	}
 

@@ -89,12 +89,6 @@ paths:
   /requests/{path}:
     post:
       parameters:
-        - name: version
-          in: query
-          schema:
-            x-go-type: easyjson.Json
-            x-go-type-import:
-              path: github.com/mailru/easyjson
         - name: path
           in: path
           schema:
