@@ -2,11 +2,6 @@ package codegen
 
 import "time"
 
-const (
-	// TODO: check if needed
-	disableTypeAliasesForArray = true
-)
-
 // Configuration defines code generation customizations.
 // PackageName to generate the code under.
 // CopyrightHeader is the header to add to the generated code. Use without //.

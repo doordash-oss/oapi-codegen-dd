@@ -139,13 +139,15 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 		OpenAPISchema: schema,
 	}
 
-	if schema.AllOf != nil {
-		mergedSchema, err := mergeSchemas(schema.AllOf, path, options)
+	var (
+		merged GoSchema
+		err    error
+	)
+	if len(schema.AllOf) > 0 || len(schema.OneOf) > 0 || len(schema.AnyOf) > 0 {
+		merged, err = createFromCombinator(schema, path, options)
 		if err != nil {
-			return GoSchema{}, fmt.Errorf("error merging schemas: %w", err)
+			return GoSchema{}, err
 		}
-		mergedSchema.OpenAPISchema = schema
-		return mergedSchema, nil
 	}
 
 	extensions := extractExtensions(schema.Extensions)
@@ -159,7 +161,7 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 		outSchema.GoType = typeName
 		outSchema.DefineViaAlias = true
 
-		return outSchema, nil
+		return enhanceSchema(outSchema, merged, options), nil
 	}
 
 	// Check x-go-type-skip-optional-pointer, which will override if the type
@@ -176,18 +178,27 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 	t := schema.Type
 	// Handle objects and empty schemas first as a special case
 	if t == nil || slices.Contains(t, "object") {
-		return createObjectSchema(schema, ref, path, options)
+		res, err := createObjectSchema(schema, ref, path, options)
+		if err != nil {
+			return GoSchema{}, err
+		}
+		return enhanceSchema(res, merged, options), err
 	}
 
 	if len(schema.Enum) > 0 {
-		return createEnumsSchema(schema, ref, path, options)
+		res, err := createEnumsSchema(schema, ref, path, options)
+		if err != nil {
+			return GoSchema{}, err
+		}
+		return enhanceSchema(res, merged, options), err
 	}
 
-	outSchema, err := oapiSchemaToGoType(schema, ref, path, options)
+	outSchema, err = oapiSchemaToGoType(schema, ref, path, options)
 	if err != nil {
 		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
 	}
-	return outSchema, nil
+
+	return enhanceSchema(outSchema, merged, options), nil
 }
 
 // SchemaDescriptor describes a GoSchema, a type definition.
@@ -232,4 +243,22 @@ func schemaHasAdditionalProperties(schema *base.Schema) bool {
 		return true
 	}
 	return false
+}
+
+func enhanceSchema(src, other GoSchema, options ParseOptions) GoSchema {
+	if len(other.UnionElements) == 0 && len(other.Properties) == 0 {
+		return src
+	}
+
+	src.Properties = append(src.Properties, other.Properties...)
+	src.Discriminator = other.Discriminator
+	src.UnionElements = other.UnionElements
+	src.AdditionalTypes = other.AdditionalTypes
+
+	srcFields := genFieldsFromProperties(src.Properties, options)
+	src.GoType = src.createGoStruct(srcFields)
+
+	src.RefType = other.RefType
+
+	return src
 }

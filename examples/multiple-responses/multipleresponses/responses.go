@@ -15,7 +15,17 @@ type CreateBookingResponse struct {
 	Links         *LinksSelf `json:"links,omitempty"`
 }
 
-type CreateBookingErrorResponse = BadRequest
+type CreateBookingErrorResponseApplicationProblemPlusJSON = BadRequest
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON401 = Unauthorized
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON404 = NotFound
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON409 = Conflict
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON429 = TooManyRequests
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON500 = InternalServerError
 
 type BadRequest = Problem
 

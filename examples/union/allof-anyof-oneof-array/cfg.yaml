@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../../configuration-schema.json
-package: anyofwithextra
+package: union
 skip-prune: true
 generate:
   client: false
 output:
-  use-single-file: false
+  use-single-file: true

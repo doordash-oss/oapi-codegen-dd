@@ -51,7 +51,7 @@ func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingReques
 	responseParser := func(ctx context.Context, resp *runtime.Response) (*CreateBookingResponse, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 201 {
-			target := new(CreateBookingErrorResponse)
+			target := new(CreateBookingErrorResponseApplicationProblemPlusJSON)
 			err = json.Unmarshal(bodyBytes, target)
 			if err != nil {
 				return nil, fmt.Errorf("error decoding response: %w", err)

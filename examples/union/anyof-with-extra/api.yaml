@@ -32,9 +32,11 @@ components:
           type: string
 
     ClientWithIdAndWithAddress:
+      type: object
       anyOf:
         - $ref: '#/components/schemas/Client'
         - $ref: '#/components/schemas/ClientId'
+        - type: number
         - type: string
       additionalProperties:
         properties:
