@@ -11,7 +11,6 @@ type Property struct {
 	Description   string
 	JsonFieldName string
 	Schema        GoSchema
-	NeedsFormTag  bool
 	Extensions    map[string]any
 	Deprecated    bool
 	Constraints   Constraints
@@ -130,18 +129,9 @@ func genFieldsFromProperties(props []Property, options ParseOptions) []string {
 			fieldTags["validate"] = strings.Join(c.ValidationTags, ",")
 		}
 
-		if !omitEmpty {
-			fieldTags["json"] = p.JsonFieldName
-			if p.NeedsFormTag {
-				fieldTags["form"] = p.JsonFieldName
-				fieldTags["url"] = p.JsonFieldName
-			}
-		} else {
-			fieldTags["json"] = p.JsonFieldName + ",omitempty"
-			if p.NeedsFormTag {
-				fieldTags["form"] = p.JsonFieldName + ",omitempty"
-				fieldTags["url"] = p.JsonFieldName + ",omitempty"
-			}
+		fieldTags["json"] = p.JsonFieldName
+		if omitEmpty {
+			fieldTags["json"] += ",omitempty"
 		}
 
 		// Support x-go-json-ignore

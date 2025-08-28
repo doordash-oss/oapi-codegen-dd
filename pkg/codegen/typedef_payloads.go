@@ -107,19 +107,6 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 	// type under #/components, we'll define a type for it, so
 	// that we have an easy-to-use type for marshaling.
 	if !bodySchema.DefineViaAlias {
-		if contentType == "application/x-www-form-urlencoded" {
-			// Apply the appropriate structure tag if the request
-			// schema was defined under the operations' section.
-			for i := range bodySchema.Properties {
-				bodySchema.Properties[i].NeedsFormTag = true
-			}
-
-			// Regenerate the Golang struct adding the new form tag.
-			fields := genFieldsFromProperties(bodySchema.Properties, options)
-			bodySchema.GoType = bodySchema.createGoStruct(fields)
-		}
-
-		// The body schema now is a reference to a type
 		bodySchema.RefType = bodyTypeName
 	}
 
