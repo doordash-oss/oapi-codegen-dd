@@ -13,12 +13,44 @@ import (
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Product     *OrderProductOneOf     `json:"product,omitempty"`
-	Description *OrderDescriptionOneOf `json:"description,omitempty"`
-	Images      []OrderImagesOneOf     `json:"images,omitempty"`
+	Product     *Order_Product     `json:"product,omitempty"`
+	Description *Order_Description `json:"description,omitempty"`
+	Images      []Order_Images     `json:"images,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Product struct {
+	Order_Product_OneOf *Order_Product_OneOf `json:",omitempty"`
+}
+
+func (o Order_Product) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Product_OneOf_3_Description struct {
+	Order_Product_OneOf_3_Description_OneOf *Order_Product_OneOf_3_Description_OneOf `json:",omitempty"`
+}
+
+func (o Order_Product_OneOf_3_Description) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Description struct {
+	Order_Description_OneOf *Order_Description_OneOf `json:",omitempty"`
+}
+
+func (o Order_Description) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Images struct {
+	Order_Images_OneOf *Order_Images_OneOf `json:",omitempty"`
+}
+
+func (o Order_Images) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 
@@ -32,8 +64,8 @@ type VersionD = string
 
 type VersionE = string
 
-type OrderProductOneOf3 struct {
-	Description *OrderProductOneOf3DescriptionOneOf `json:"description,omitempty"`
+type Order_Product_OneOf_3 struct {
+	Description *Order_Product_OneOf_3_Description `json:"description,omitempty"`
 }
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {
@@ -59,80 +91,80 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type OrderProductOneOf struct {
+type Order_Product_OneOf struct {
 	union json.RawMessage
 }
 
-// Raw returns the union data inside the OrderProductOneOf as bytes
-func (o *OrderProductOneOf) Raw() json.RawMessage {
+// Raw returns the union data inside the Order_Product_OneOf as bytes
+func (o *Order_Product_OneOf) Raw() json.RawMessage {
 	return o.union
 }
 
-// AsVersionA returns the union data inside the OrderProductOneOf as a VersionA
-func (o *OrderProductOneOf) AsVersionA() (VersionA, error) {
+// AsVersionA returns the union data inside the Order_Product_OneOf as a VersionA
+func (o *Order_Product_OneOf) AsVersionA() (VersionA, error) {
 	return UnmarshalAs[VersionA](o.union)
 }
 
-// FromVersionA overwrites any union data inside the OrderProductOneOf as the provided VersionA
-func (o *OrderProductOneOf) FromVersionA(v VersionA) error {
+// FromVersionA overwrites any union data inside the Order_Product_OneOf as the provided VersionA
+func (o *Order_Product_OneOf) FromVersionA(v VersionA) error {
 	bts, err := json.Marshal(v)
 	o.union = bts
 	return err
 }
 
-// AsVersionB returns the union data inside the OrderProductOneOf as a VersionB
-func (o *OrderProductOneOf) AsVersionB() (VersionB, error) {
+// AsVersionB returns the union data inside the Order_Product_OneOf as a VersionB
+func (o *Order_Product_OneOf) AsVersionB() (VersionB, error) {
 	return UnmarshalAs[VersionB](o.union)
 }
 
-// FromVersionB overwrites any union data inside the OrderProductOneOf as the provided VersionB
-func (o *OrderProductOneOf) FromVersionB(v VersionB) error {
+// FromVersionB overwrites any union data inside the Order_Product_OneOf as the provided VersionB
+func (o *Order_Product_OneOf) FromVersionB(v VersionB) error {
 	bts, err := json.Marshal(v)
 	o.union = bts
 	return err
 }
 
-// AsBool returns the union data inside the OrderProductOneOf as a bool
-func (o *OrderProductOneOf) AsBool() (bool, error) {
+// AsBool returns the union data inside the Order_Product_OneOf as a bool
+func (o *Order_Product_OneOf) AsBool() (bool, error) {
 	return UnmarshalAs[bool](o.union)
 }
 
-// FromBool overwrites any union data inside the OrderProductOneOf as the provided bool
-func (o *OrderProductOneOf) FromBool(v bool) error {
+// FromBool overwrites any union data inside the Order_Product_OneOf as the provided bool
+func (o *Order_Product_OneOf) FromBool(v bool) error {
 	bts, err := json.Marshal(v)
 	o.union = bts
 	return err
 }
 
-// AsOrderProductOneOf3 returns the union data inside the OrderProductOneOf as a OrderProductOneOf3
-func (o *OrderProductOneOf) AsOrderProductOneOf3() (OrderProductOneOf3, error) {
-	return UnmarshalAs[OrderProductOneOf3](o.union)
+// AsOrder_Product_OneOf_3 returns the union data inside the Order_Product_OneOf as a Order_Product_OneOf_3
+func (o *Order_Product_OneOf) AsOrder_Product_OneOf_3() (Order_Product_OneOf_3, error) {
+	return UnmarshalAs[Order_Product_OneOf_3](o.union)
 }
 
-// FromOrderProductOneOf3 overwrites any union data inside the OrderProductOneOf as the provided OrderProductOneOf3
-func (o *OrderProductOneOf) FromOrderProductOneOf3(v OrderProductOneOf3) error {
+// FromOrder_Product_OneOf_3 overwrites any union data inside the Order_Product_OneOf as the provided Order_Product_OneOf_3
+func (o *Order_Product_OneOf) FromOrder_Product_OneOf_3(v Order_Product_OneOf_3) error {
 	bts, err := json.Marshal(v)
 	o.union = bts
 	return err
 }
 
-func (o OrderProductOneOf) MarshalJSON() ([]byte, error) {
+func (o Order_Product_OneOf) MarshalJSON() ([]byte, error) {
 	bts, err := o.union.MarshalJSON()
 
 	return bts, err
 }
 
-func (o *OrderProductOneOf) UnmarshalJSON(bts []byte) error {
+func (o *Order_Product_OneOf) UnmarshalJSON(bts []byte) error {
 	err := o.union.UnmarshalJSON(bts)
 
 	return err
 }
 
-type OrderProductOneOf3DescriptionOneOf struct {
+type Order_Product_OneOf_3_Description_OneOf struct {
 	runtime.Either[VersionC, VersionD]
 }
 
-func (o *OrderProductOneOf3DescriptionOneOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Product_OneOf_3_Description_OneOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -145,15 +177,15 @@ func (o *OrderProductOneOf3DescriptionOneOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderProductOneOf3DescriptionOneOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Product_OneOf_3_Description_OneOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }
 
-type OrderDescriptionOneOf struct {
+type Order_Description_OneOf struct {
 	runtime.Either[bool, string]
 }
 
-func (o *OrderDescriptionOneOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Description_OneOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -166,15 +198,15 @@ func (o *OrderDescriptionOneOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderDescriptionOneOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Description_OneOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }
 
-type OrderImagesOneOf struct {
+type Order_Images_OneOf struct {
 	runtime.Either[string, VersionE]
 }
 
-func (o *OrderImagesOneOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Images_OneOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -187,6 +219,6 @@ func (o *OrderImagesOneOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderImagesOneOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Images_OneOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }

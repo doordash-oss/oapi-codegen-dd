@@ -9,25 +9,37 @@ import (
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Client struct {
-	Name         string `json:"name" validate:"required"`
-	ComplexField *struct {
-		Name        *string `json:"name,omitempty"`
-		AccountName *string `json:"accountName,omitempty"`
-	} `json:"complexField,omitempty"`
+	Name         string               `json:"name" validate:"required"`
+	ComplexField *Client_ComplexField `json:"complexField,omitempty"`
 }
 
 func (c Client) Validate() error {
 	return schemaTypesValidate.Struct(c)
 }
 
+type Client_ComplexField struct {
+	Name        *string `json:"name,omitempty"`
+	AccountName *string `json:"accountName,omitempty"`
+}
+
+func (c Client_ComplexField) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
+
 type ClientWithExtension struct {
-	Name         string `json:"name" validate:"required"`
-	ComplexField *struct {
-		Name        *string `json:"name,omitempty"`
-		AccountName *string `json:"accountName,omitempty"`
-	} `json:"-"`
+	Name         string                            `json:"name" validate:"required"`
+	ComplexField *ClientWithExtension_ComplexField `json:"-"`
 }
 
 func (c ClientWithExtension) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
+
+type ClientWithExtension_ComplexField struct {
+	Name        *string `json:"name,omitempty"`
+	AccountName *string `json:"accountName,omitempty"`
+}
+
+func (c ClientWithExtension_ComplexField) Validate() error {
 	return schemaTypesValidate.Struct(c)
 }

@@ -15,10 +15,19 @@ type GetFooResponse = map[string]any
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Client *OrderClientOneOf `json:"client,omitempty"`
+	Client *Order_Client `json:"client,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Client struct {
+	Order_Client_AnyOf *Order_Client_AnyOf `json:",omitempty"`
+	Order_Client_OneOf *Order_Client_OneOf `json:",omitempty"`
+}
+
+func (o Order_Client) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 
@@ -78,11 +87,11 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type OrderClientAnyOf struct {
+type Order_Client_AnyOf struct {
 	runtime.Either[Identity, Verification]
 }
 
-func (o *OrderClientAnyOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Client_AnyOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -95,15 +104,15 @@ func (o *OrderClientAnyOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderClientAnyOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Client_AnyOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }
 
-type OrderClientOneOf struct {
+type Order_Client_OneOf struct {
 	runtime.Either[Address, Location]
 }
 
-func (o *OrderClientOneOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Client_OneOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -116,6 +125,6 @@ func (o *OrderClientOneOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderClientOneOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Client_OneOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }

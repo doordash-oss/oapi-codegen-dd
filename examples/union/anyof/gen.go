@@ -15,11 +15,27 @@ type GetFooResponse = map[string]any
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Client  *OrderClientAnyOf  `json:"client,omitempty"`
-	Address *OrderAddressAnyOf `json:"address,omitempty"`
+	Client  *Order_Client  `json:"client,omitempty"`
+	Address *Order_Address `json:"address,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Client struct {
+	Order_Client_AnyOf *Order_Client_AnyOf `json:",omitempty"`
+}
+
+func (o Order_Client) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Address struct {
+	Order_Address_AnyOf *Order_Address_AnyOf `json:",omitempty"`
+}
+
+func (o Order_Address) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 
@@ -62,11 +78,11 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type OrderClientAnyOf struct {
+type Order_Client_AnyOf struct {
 	runtime.Either[Identity, Verification]
 }
 
-func (o *OrderClientAnyOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Client_AnyOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -79,38 +95,38 @@ func (o *OrderClientAnyOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderClientAnyOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Client_AnyOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }
 
-type OrderAddressAnyOf struct {
+type Order_Address_AnyOf struct {
 	union json.RawMessage
 }
 
-// Raw returns the union data inside the OrderAddressAnyOf as bytes
-func (o *OrderAddressAnyOf) Raw() json.RawMessage {
+// Raw returns the union data inside the Order_Address_AnyOf as bytes
+func (o *Order_Address_AnyOf) Raw() json.RawMessage {
 	return o.union
 }
 
-// AsString returns the union data inside the OrderAddressAnyOf as a string
-func (o *OrderAddressAnyOf) AsString() (string, error) {
+// AsString returns the union data inside the Order_Address_AnyOf as a string
+func (o *Order_Address_AnyOf) AsString() (string, error) {
 	return UnmarshalAs[string](o.union)
 }
 
-// FromString overwrites any union data inside the OrderAddressAnyOf as the provided string
-func (o *OrderAddressAnyOf) FromString(v string) error {
+// FromString overwrites any union data inside the Order_Address_AnyOf as the provided string
+func (o *Order_Address_AnyOf) FromString(v string) error {
 	bts, err := json.Marshal(v)
 	o.union = bts
 	return err
 }
 
-func (o OrderAddressAnyOf) MarshalJSON() ([]byte, error) {
+func (o Order_Address_AnyOf) MarshalJSON() ([]byte, error) {
 	bts, err := o.union.MarshalJSON()
 
 	return bts, err
 }
 
-func (o *OrderAddressAnyOf) UnmarshalJSON(bts []byte) error {
+func (o *Order_Address_AnyOf) UnmarshalJSON(bts []byte) error {
 	err := o.union.UnmarshalJSON(bts)
 
 	return err

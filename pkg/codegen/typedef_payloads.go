@@ -91,8 +91,9 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 
 	bodyTypeName := operationID + "Body"
 	ref := schemaProxy.GoLow().GetReference()
+	opts := options.WithReference(ref).WithPath([]string{bodyTypeName})
 
-	bodySchema, err := GenerateGoSchema(schemaProxy, ref, []string{bodyTypeName}, options)
+	bodySchema, err := GenerateGoSchema(schemaProxy, opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 	}
@@ -102,6 +103,7 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 		Schema:       bodySchema,
 		SpecLocation: SpecLocationBody,
 	}
+	options.AddType(td)
 
 	// If the request has a body, but it's not a user defined
 	// type under #/components, we'll define a type for it, so

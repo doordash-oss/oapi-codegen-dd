@@ -19,8 +19,9 @@ func (u UnionElement) Method() string {
 	return method
 }
 
-func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, path []string, options ParseOptions) (GoSchema, error) {
+func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, options ParseOptions) (GoSchema, error) {
 	outSchema := GoSchema{}
+	path := options.path
 
 	if discriminator != nil {
 		outSchema.Discriminator = &Discriminator{
@@ -53,20 +54,22 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 		}
 		elementPath := append(path, fmt.Sprint(i))
 		ref := element.GoLow().GetReference()
-		elementSchema, err := GenerateGoSchema(element, ref, elementPath, options)
+		opts := options.WithReference(ref).WithPath(elementPath)
+		elementSchema, err := GenerateGoSchema(element, opts)
 		if err != nil {
 			return GoSchema{}, err
 		}
 
 		// define new types only for non-primitive types
 		if ref == "" && !primitives[elementSchema.GoType] {
-			elementName := schemaNameToTypeName(pathToTypeName(elementPath))
+			elementName := pathToTypeName(elementPath)
 			if elementSchema.TypeDecl() != elementName {
 				td := TypeDefinition{
 					Schema:       elementSchema,
 					Name:         elementName,
 					SpecLocation: SpecLocationUnion,
 				}
+				options.AddType(td)
 				outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, td)
 			}
 			elementSchema.GoType = elementName

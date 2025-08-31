@@ -13,8 +13,8 @@ import (
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type ClientWithExtra struct {
-	ClientWithExtraAnyOf *ClientWithExtraAnyOf                          `json:",omitempty"`
-	AdditionalProperties map[string]ClientWithExtraAdditionalProperties `json:"-"`
+	ClientWithExtra_AnyOf *ClientWithExtra_AnyOf                          `json:",omitempty"`
+	AdditionalProperties  map[string]ClientWithExtra_AdditionalProperties `json:"-"`
 }
 
 func (c ClientWithExtra) Validate() error {
@@ -23,7 +23,7 @@ func (c ClientWithExtra) Validate() error {
 
 // Getter for additional properties for ClientWithExtra. Returns the specified
 // element and whether it was found
-func (c ClientWithExtra) Get(fieldName string) (value ClientWithExtraAdditionalProperties, found bool) {
+func (c ClientWithExtra) Get(fieldName string) (value ClientWithExtra_AdditionalProperties, found bool) {
 	if c.AdditionalProperties != nil {
 		value, found = c.AdditionalProperties[fieldName]
 	}
@@ -31,9 +31,9 @@ func (c ClientWithExtra) Get(fieldName string) (value ClientWithExtraAdditionalP
 }
 
 // Setter for additional properties for ClientWithExtra
-func (c *ClientWithExtra) Set(fieldName string, value ClientWithExtraAdditionalProperties) {
+func (c *ClientWithExtra) Set(fieldName string, value ClientWithExtra_AdditionalProperties) {
 	if c.AdditionalProperties == nil {
-		c.AdditionalProperties = make(map[string]ClientWithExtraAdditionalProperties)
+		c.AdditionalProperties = make(map[string]ClientWithExtra_AdditionalProperties)
 	}
 	c.AdditionalProperties[fieldName] = value
 }
@@ -46,16 +46,16 @@ func (c *ClientWithExtra) UnmarshalJSON(b []byte) error {
 	}
 
 	if raw, found := object[""]; found {
-		if err := json.Unmarshal(raw, &c.ClientWithExtraAnyOf); err != nil {
+		if err := json.Unmarshal(raw, &c.ClientWithExtra_AnyOf); err != nil {
 			return fmt.Errorf("error reading '': %w", err)
 		}
 		delete(object, "")
 	}
 
 	if len(object) != 0 {
-		c.AdditionalProperties = make(map[string]ClientWithExtraAdditionalProperties)
+		c.AdditionalProperties = make(map[string]ClientWithExtra_AdditionalProperties)
 		for fieldName, fieldBuf := range object {
-			var fieldVal ClientWithExtraAdditionalProperties
+			var fieldVal ClientWithExtra_AdditionalProperties
 			if err := json.Unmarshal(fieldBuf, &fieldVal); err != nil {
 				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
 			}
@@ -70,8 +70,8 @@ func (c ClientWithExtra) MarshalJSON() ([]byte, error) {
 	var err error
 	object := make(map[string]json.RawMessage)
 
-	if c.ClientWithExtraAnyOf != nil {
-		object[""], err = json.Marshal(c.ClientWithExtraAnyOf)
+	if c.ClientWithExtra_AnyOf != nil {
+		object[""], err = json.Marshal(c.ClientWithExtra_AnyOf)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling '': %w", err)
 		}
@@ -86,7 +86,7 @@ func (c ClientWithExtra) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-type ClientWithExtraAdditionalProperties struct {
+type ClientWithExtra_AdditionalProperties struct {
 	Extra *string `json:"extra,omitempty"`
 }
 
@@ -113,11 +113,11 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type ClientWithExtraAnyOf struct {
+type ClientWithExtra_AnyOf struct {
 	runtime.Either[string, bool]
 }
 
-func (c *ClientWithExtraAnyOf) MarshalJSON() ([]byte, error) {
+func (c *ClientWithExtra_AnyOf) MarshalJSON() ([]byte, error) {
 	data := c.Value()
 	if data == nil {
 		return nil, nil
@@ -130,6 +130,6 @@ func (c *ClientWithExtraAnyOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (c *ClientWithExtraAnyOf) UnmarshalJSON(data []byte) error {
+func (c *ClientWithExtra_AnyOf) UnmarshalJSON(data []byte) error {
 	return c.Unmarshal(data)
 }

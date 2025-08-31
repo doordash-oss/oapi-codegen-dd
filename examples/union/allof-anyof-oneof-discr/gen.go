@@ -40,17 +40,37 @@ func (i Identity) Validate() error {
 }
 
 type ClientAndMaybeIdentity struct {
-	Entity *ClientAndMaybeIdentityEntityAnyOf `json:"entity,omitempty"`
-	Type   ClientAndMaybeIdentityType         `json:"type" validate:"required"`
+	Entity *ClientAndMaybeIdentity_Entity `json:"entity,omitempty"`
+	Type   ClientAndMaybeIdentityType     `json:"type" validate:"required"`
 }
 
 func (c ClientAndMaybeIdentity) Validate() error {
 	return schemaTypesValidate.Struct(c)
 }
 
-type ClientOrID = ClientOrIDOneOf
+type ClientAndMaybeIdentity_Entity struct {
+	ClientAndMaybeIdentity_Entity_AnyOf *ClientAndMaybeIdentity_Entity_AnyOf `json:",omitempty"`
+}
 
-type ClientOrIdentityWithDiscriminator = ClientOrIdentityWithDiscriminatorOneOf
+func (c ClientAndMaybeIdentity_Entity) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
+
+type ClientOrID struct {
+	ClientOrID_OneOf *ClientOrID_OneOf `json:",omitempty"`
+}
+
+func (c ClientOrID) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
+
+type ClientOrIdentityWithDiscriminator struct {
+	ClientOrIdentityWithDiscriminator_OneOf *ClientOrIdentityWithDiscriminator_OneOf `json:",omitempty"`
+}
+
+func (c ClientOrIdentityWithDiscriminator) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T
@@ -75,11 +95,11 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type ClientAndMaybeIdentityEntityAnyOf struct {
+type ClientAndMaybeIdentity_Entity_AnyOf struct {
 	runtime.Either[Client, Identity]
 }
 
-func (c *ClientAndMaybeIdentityEntityAnyOf) MarshalJSON() ([]byte, error) {
+func (c *ClientAndMaybeIdentity_Entity_AnyOf) MarshalJSON() ([]byte, error) {
 	data := c.Value()
 	if data == nil {
 		return nil, nil
@@ -92,15 +112,15 @@ func (c *ClientAndMaybeIdentityEntityAnyOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (c *ClientAndMaybeIdentityEntityAnyOf) UnmarshalJSON(data []byte) error {
+func (c *ClientAndMaybeIdentity_Entity_AnyOf) UnmarshalJSON(data []byte) error {
 	return c.Unmarshal(data)
 }
 
-type ClientOrIDOneOf struct {
+type ClientOrID_OneOf struct {
 	runtime.Either[Client, string]
 }
 
-func (c *ClientOrIDOneOf) MarshalJSON() ([]byte, error) {
+func (c *ClientOrID_OneOf) MarshalJSON() ([]byte, error) {
 	data := c.Value()
 	if data == nil {
 		return nil, nil
@@ -113,15 +133,15 @@ func (c *ClientOrIDOneOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (c *ClientOrIDOneOf) UnmarshalJSON(data []byte) error {
+func (c *ClientOrID_OneOf) UnmarshalJSON(data []byte) error {
 	return c.Unmarshal(data)
 }
 
-type ClientOrIdentityWithDiscriminatorOneOf struct {
+type ClientOrIdentityWithDiscriminator_OneOf struct {
 	runtime.Either[Client, Identity]
 }
 
-func (c ClientOrIdentityWithDiscriminatorOneOf) discriminator(data []byte) (string, error) {
+func (c ClientOrIdentityWithDiscriminator_OneOf) discriminator(data []byte) (string, error) {
 	var discriminator struct {
 		Value string `json:"type"`
 	}
@@ -131,7 +151,7 @@ func (c ClientOrIdentityWithDiscriminatorOneOf) discriminator(data []byte) (stri
 	return discriminator.Value, nil
 }
 
-func (c *ClientOrIdentityWithDiscriminatorOneOf) MarshalJSON() ([]byte, error) {
+func (c *ClientOrIdentityWithDiscriminator_OneOf) MarshalJSON() ([]byte, error) {
 	data := c.Value()
 	if data == nil {
 		return nil, nil
@@ -148,7 +168,7 @@ func (c *ClientOrIdentityWithDiscriminatorOneOf) MarshalJSON() ([]byte, error) {
 	return marshalJSONWithDiscriminator(obj, "type", disc)
 }
 
-func (c *ClientOrIdentityWithDiscriminatorOneOf) UnmarshalJSON(data []byte) error {
+func (c *ClientOrIdentityWithDiscriminator_OneOf) UnmarshalJSON(data []byte) error {
 	discriminator, err := c.discriminator(data)
 	if err != nil {
 		return err

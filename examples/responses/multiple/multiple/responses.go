@@ -28,3 +28,13 @@ type CreateBookingResponse struct {
 }
 
 type CreateBookingErrorResponse = BadRequest
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON = Unauthorized
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON404 = NotFound
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON409 = Conflict
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON429 = TooManyRequests
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON500 = InternalServerError

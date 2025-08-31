@@ -15,13 +15,19 @@ type GetFooResponse = map[string]any
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Product *struct {
-		OrderProductAllOf0 *OrderProductAllOf0 `json:",omitempty"`
-		Base               Base                `json:""`
-	} `json:"product,omitempty"`
+	Product *Order_Product1 `json:"product,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type Order_Product1 struct {
+	Order_Product_AllOf0 *Order_Product_AllOf0 `json:",omitempty"`
+	Base                 Base                  `json:""`
+}
+
+func (o Order_Product1) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 
@@ -50,11 +56,13 @@ func (v VariantB) Validate() error {
 }
 
 type Order_Product struct {
-	OrderProductAllOf0 *OrderProductAllOf0 `json:",omitempty"`
-	Base               Base                `json:""`
+	Order_Product_AllOf0 *Order_Product_AllOf0 `json:",omitempty"`
+	Base                 Base                  `json:""`
 }
 
-type OrderProductAllOf0 OrderProductAllOf0AnyOf
+type Order_Product_AllOf0 struct {
+	Order_Product_AllOf0_AnyOf *Order_Product_AllOf0_AnyOf `json:",omitempty"`
+}
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T
@@ -79,11 +87,11 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type OrderProductAllOf0AnyOf struct {
+type Order_Product_AllOf0_AnyOf struct {
 	runtime.Either[VariantA, VariantB]
 }
 
-func (o *OrderProductAllOf0AnyOf) MarshalJSON() ([]byte, error) {
+func (o *Order_Product_AllOf0_AnyOf) MarshalJSON() ([]byte, error) {
 	data := o.Value()
 	if data == nil {
 		return nil, nil
@@ -96,6 +104,6 @@ func (o *OrderProductAllOf0AnyOf) MarshalJSON() ([]byte, error) {
 	return obj, nil
 }
 
-func (o *OrderProductAllOf0AnyOf) UnmarshalJSON(data []byte) error {
+func (o *Order_Product_AllOf0_AnyOf) UnmarshalJSON(data []byte) error {
 	return o.Unmarshal(data)
 }

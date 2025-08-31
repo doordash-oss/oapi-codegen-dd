@@ -13,7 +13,9 @@ var bodyTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type ProcessPaymentBody = map[string]any
 
-type ProcessPaymentResponse = ProcessPaymentResponseOneOf
+type ProcessPaymentResponse struct {
+	ProcessPayment_Response_OneOf *ProcessPayment_Response_OneOf `json:",omitempty"`
+}
 
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
@@ -64,58 +66,58 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
 	return json.Marshal(object)
 }
 
-type ProcessPaymentResponseOneOf struct {
+type ProcessPayment_Response_OneOf struct {
 	union json.RawMessage
 }
 
-// Raw returns the union data inside the ProcessPaymentResponseOneOf as bytes
-func (p *ProcessPaymentResponseOneOf) Raw() json.RawMessage {
+// Raw returns the union data inside the ProcessPayment_Response_OneOf as bytes
+func (p *ProcessPayment_Response_OneOf) Raw() json.RawMessage {
 	return p.union
 }
 
-// AsResponseA returns the union data inside the ProcessPaymentResponseOneOf as a ResponseA
-func (p *ProcessPaymentResponseOneOf) AsResponseA() (ResponseA, error) {
+// AsResponseA returns the union data inside the ProcessPayment_Response_OneOf as a ResponseA
+func (p *ProcessPayment_Response_OneOf) AsResponseA() (ResponseA, error) {
 	return UnmarshalAs[ResponseA](p.union)
 }
 
-// FromResponseA overwrites any union data inside the ProcessPaymentResponseOneOf as the provided ResponseA
-func (p *ProcessPaymentResponseOneOf) FromResponseA(v ResponseA) error {
+// FromResponseA overwrites any union data inside the ProcessPayment_Response_OneOf as the provided ResponseA
+func (p *ProcessPayment_Response_OneOf) FromResponseA(v ResponseA) error {
 	bts, err := json.Marshal(v)
 	p.union = bts
 	return err
 }
 
-// AsResponseB returns the union data inside the ProcessPaymentResponseOneOf as a ResponseB
-func (p *ProcessPaymentResponseOneOf) AsResponseB() (ResponseB, error) {
+// AsResponseB returns the union data inside the ProcessPayment_Response_OneOf as a ResponseB
+func (p *ProcessPayment_Response_OneOf) AsResponseB() (ResponseB, error) {
 	return UnmarshalAs[ResponseB](p.union)
 }
 
-// FromResponseB overwrites any union data inside the ProcessPaymentResponseOneOf as the provided ResponseB
-func (p *ProcessPaymentResponseOneOf) FromResponseB(v ResponseB) error {
+// FromResponseB overwrites any union data inside the ProcessPayment_Response_OneOf as the provided ResponseB
+func (p *ProcessPayment_Response_OneOf) FromResponseB(v ResponseB) error {
 	bts, err := json.Marshal(v)
 	p.union = bts
 	return err
 }
 
-// AsResponseC returns the union data inside the ProcessPaymentResponseOneOf as a ResponseC
-func (p *ProcessPaymentResponseOneOf) AsResponseC() (ResponseC, error) {
+// AsResponseC returns the union data inside the ProcessPayment_Response_OneOf as a ResponseC
+func (p *ProcessPayment_Response_OneOf) AsResponseC() (ResponseC, error) {
 	return UnmarshalAs[ResponseC](p.union)
 }
 
-// FromResponseC overwrites any union data inside the ProcessPaymentResponseOneOf as the provided ResponseC
-func (p *ProcessPaymentResponseOneOf) FromResponseC(v ResponseC) error {
+// FromResponseC overwrites any union data inside the ProcessPayment_Response_OneOf as the provided ResponseC
+func (p *ProcessPayment_Response_OneOf) FromResponseC(v ResponseC) error {
 	bts, err := json.Marshal(v)
 	p.union = bts
 	return err
 }
 
-func (p ProcessPaymentResponseOneOf) MarshalJSON() ([]byte, error) {
+func (p ProcessPayment_Response_OneOf) MarshalJSON() ([]byte, error) {
 	bts, err := p.union.MarshalJSON()
 
 	return bts, err
 }
 
-func (p *ProcessPaymentResponseOneOf) UnmarshalJSON(bts []byte) error {
+func (p *ProcessPayment_Response_OneOf) UnmarshalJSON(bts []byte) error {
 	err := p.union.UnmarshalJSON(bts)
 
 	return err

@@ -485,7 +485,7 @@ func renameComponent(schemaName string, schemaRef *base.SchemaProxy) (string, er
 		}
 		return typeName, nil
 	}
-	return schemaNameToTypeName(schemaName), nil
+	return schemaName, nil
 }
 
 // renameParameter generates the name for a parameter, taking x-go-name into account

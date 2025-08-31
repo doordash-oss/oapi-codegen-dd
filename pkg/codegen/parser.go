@@ -8,6 +8,7 @@ import (
 	"go/format"
 	"io/fs"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -38,6 +39,45 @@ type ParseOptions struct {
 	OmitDescription        bool
 	DefaultIntType         string
 	AlwaysPrefixEnumValues bool
+
+	// runtime options
+	currentTypes map[string]TypeDefinition
+	reference    string
+	path         []string
+
+	// naming parameters
+	baseName     string
+	nameSuffixes []string
+}
+
+func (o ParseOptions) WithReference(reference string) ParseOptions {
+	o.reference = reference
+	return o
+}
+
+func (o ParseOptions) WithPath(path []string) ParseOptions {
+	o.path = slices.Clone(path)
+	return o
+}
+
+func (o ParseOptions) WithCurrentTypes(currentTypes map[string]TypeDefinition) ParseOptions {
+	o.currentTypes = currentTypes
+	return o
+}
+
+func (o ParseOptions) AddType(td TypeDefinition) ParseOptions {
+	o.currentTypes[td.Name] = td
+	return o
+}
+
+func (o ParseOptions) WithBaseName(baseName string) ParseOptions {
+	o.baseName = baseName
+	return o
+}
+
+func (o ParseOptions) WithNameSuffixes(suffixes []string) ParseOptions {
+	o.nameSuffixes = slices.Clone(suffixes)
+	return o
 }
 
 type EnumContext struct {

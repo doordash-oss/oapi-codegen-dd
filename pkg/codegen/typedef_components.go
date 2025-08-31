@@ -17,7 +17,8 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 	// We're going to define Go types for every object under components/schemas
 	for schemaName, schemaRef := range schemas.FromOldest() {
 		ref := schemaRef.GoLow().GetReference()
-		goSchema, err := GenerateGoSchema(schemaRef, ref, []string{schemaName}, options)
+		opts := options.WithReference(ref).WithPath([]string{schemaName})
+		goSchema, err := GenerateGoSchema(schemaRef, opts)
 		if err != nil {
 			return nil, fmt.Errorf("error converting GoSchema %s to Go type: %w", schemaName, err)
 		}
@@ -25,17 +26,19 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 			continue
 		}
 
-		goTypeName, err := renameComponent(schemaName, schemaRef)
+		goTypeName, err := renameComponent(schemaNameToTypeName(schemaName), schemaRef)
 		if err != nil {
 			return nil, fmt.Errorf("error making name for components/schemas/%s: %w", schemaName, err)
 		}
 
-		types = append(types, TypeDefinition{
+		td := TypeDefinition{
 			JsonName:     schemaName,
 			Name:         goTypeName,
 			Schema:       goSchema,
 			SpecLocation: SpecLocationSchema,
-		})
+		}
+		types = append(types, td)
+		opts.AddType(td)
 
 		types = append(types, goSchema.AdditionalTypes...)
 	}
@@ -48,7 +51,7 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], options ParseOptions) ([]TypeDefinition, error) {
 	var types []TypeDefinition
 	for paramName, paramOrRef := range params.FromOldest() {
-		goType, err := paramToGoType(paramOrRef, nil, options)
+		goType, err := paramToGoType(paramOrRef, options.WithPath(nil))
 		if err != nil {
 			return nil, fmt.Errorf("error generating Go type for schema in parameter %s: %w", paramName, err)
 		}
@@ -64,6 +67,7 @@ func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], o
 			Name:         goTypeName,
 			SpecLocation: SpecLocation(strings.ToLower(paramOrRef.In)),
 		}
+		options.AddType(typeDef)
 
 		ref := ""
 		if paramOrRef.Schema != nil {
@@ -99,7 +103,8 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 			}
 
 			ref := response.GoLow().GetReference()
-			goType, err := GenerateGoSchema(body.Schema, ref, []string{requestBodyName}, options)
+			opts := options.WithReference(ref).WithPath([]string{requestBodyName})
+			goType, err := GenerateGoSchema(body.Schema, opts)
 			if err != nil {
 				return nil, fmt.Errorf("error generating Go type for schema in body %s: %w", requestBodyName, err)
 			}
@@ -107,7 +112,7 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 				continue
 			}
 
-			goTypeName, err := renameComponent(requestBodyName, body.Schema)
+			goTypeName, err := renameComponent(schemaNameToTypeName(requestBodyName), body.Schema)
 			if err != nil {
 				return nil, fmt.Errorf("error making name for components/schemas/%s: %w", requestBodyName, err)
 			}
@@ -118,6 +123,7 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 				Name:         goTypeName,
 				SpecLocation: SpecLocationBody,
 			}
+			options.AddType(typeDef)
 
 			bodyRef := ""
 			if body.Schema != nil {
@@ -151,12 +157,13 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 			}
 
 			ref := content.GoLow().GetReference()
-			goType, err := GenerateGoSchema(content.Schema, ref, []string{responseName}, options)
+			opts := options.WithReference(ref).WithPath([]string{responseName})
+			goType, err := GenerateGoSchema(content.Schema, opts)
 			if err != nil {
 				return nil, fmt.Errorf("error generating Go type for schema in response %s: %w", responseName, err)
 			}
 
-			goTypeName, err := renameComponent(responseName, content.Schema)
+			goTypeName, err := renameComponent(schemaNameToTypeName(responseName), content.Schema)
 			if err != nil {
 				return nil, fmt.Errorf("error making name for components/responses/%s: %w", responseName, err)
 			}
@@ -167,6 +174,7 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 				Name:         goTypeName,
 				SpecLocation: SpecLocationResponse,
 			}
+			options.AddType(typeDef)
 
 			// TODO: check if same as ref
 			contentRef := ""

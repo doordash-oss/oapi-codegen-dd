@@ -48,14 +48,14 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-1", "get")
 
-		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
+		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
-		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
+		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\",omitempty\"`\n}", res.GoType)
 
 		assert.Nil(t, res.UnionElements)
 		assert.Equal(t, 1, len(res.AdditionalTypes))
-		assert.Equal(t, "UserOneOf", res.AdditionalTypes[0].Name)
+		assert.Equal(t, "User_OneOf", res.AdditionalTypes[0].Name)
 		assert.Equal(t, "struct {\nunion json.RawMessage\n}", res.AdditionalTypes[0].Schema.GoType)
 		assert.Equal(t, 1, len(res.AdditionalTypes[0].Schema.UnionElements))
 		assert.Equal(t, UnionElement("User"), res.AdditionalTypes[0].Schema.UnionElements[0])
@@ -65,12 +65,12 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-2", "get")
 
-		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
+		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
-		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
+		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\",omitempty\"`\n}", res.GoType)
 		assert.Equal(t, 1, len(res.AdditionalTypes))
-		assert.Equal(t, "UserOneOf", res.AdditionalTypes[0].Name)
+		assert.Equal(t, "User_OneOf", res.AdditionalTypes[0].Name)
 		assert.Equal(t, "struct {\nruntime.Either[User, string]\n}", res.AdditionalTypes[0].Schema.GoType)
 	})
 
@@ -78,13 +78,13 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-3", "get")
 
-		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
+		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
-		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
+		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\",omitempty\"`\n}", res.GoType)
 		assert.Nil(t, res.UnionElements)
 		assert.Equal(t, 1, len(res.AdditionalTypes))
-		assert.Equal(t, "UserOneOf", res.AdditionalTypes[0].Name)
+		assert.Equal(t, "User_OneOf", res.AdditionalTypes[0].Name)
 		assert.Equal(t, "struct {\nunion json.RawMessage\n}", res.AdditionalTypes[0].Schema.GoType)
 		assert.Equal(t, []UnionElement{"User", "Error", "string"}, res.AdditionalTypes[0].Schema.UnionElements)
 	})
