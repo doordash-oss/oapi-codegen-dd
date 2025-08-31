@@ -3,8 +3,135 @@
 package conflicting
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/doordash/oapi-codegen/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
 )
+
+// Client is the client for the API implementing the Client interface.
+type Client struct {
+	apiClient runtime.APIClient
+}
+
+// NewClient creates a new instance of the Client client.
+func NewClient(apiClient runtime.APIClient) *Client {
+	return &Client{apiClient: apiClient}
+}
+
+// NewDefaultClient creates a new instance of the Client client with default api client.
+func NewDefaultClient(baseURL string, opts ...runtime.APIClientOption) (*Client, error) {
+	apiClient, err := runtime.NewAPIClient(baseURL, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating API client: %w", err)
+	}
+	return &Client{apiClient: apiClient}, nil
+}
+
+// ClientInterface is the interface for the API client.
+type ClientInterface interface {
+	// CreatePayment Create a payment
+	CreatePayment(ctx context.Context, options *CreatePaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreatePaymentResponse, error)
+}
+
+// CreatePayment Create a payment
+func (c *Client) CreatePayment(ctx context.Context, options *CreatePaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreatePaymentResponse, error) {
+	var err error
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL:  c.apiClient.GetBaseURL() + "/v1/payments",
+		Method:      "POST",
+		Options:     options,
+		ContentType: "application/json",
+	}
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*CreatePaymentResponse, error) {
+		bodyBytes := resp.Content
+		if resp.StatusCode != 201 {
+			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+				runtime.WithStatusCode(resp.StatusCode))
+		}
+		target := new(CreatePaymentResponse)
+		if err = json.Unmarshal(bodyBytes, target); err != nil {
+			err = fmt.Errorf("error decoding response: %w", err)
+			return nil, err
+		}
+		return target, nil
+	}
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/v1/payments")
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+	return responseParser(ctx, resp)
+}
+
+var _ ClientInterface = (*Client)(nil)
+
+var clientOptionsValidate = validator.New(validator.WithRequiredStructEnabled())
+
+// CreatePaymentRequestOptions is the options needed to make a request to CreatePayment.
+type CreatePaymentRequestOptions struct {
+	Body *CreatePaymentBody
+}
+
+// Validate validates all the fields in the options.
+// Use it if fields validation was not run.
+func (o *CreatePaymentRequestOptions) Validate() error {
+	var errors runtime.ValidationErrors
+
+	if err := clientOptionsValidate.Struct(o.Body); err != nil {
+		errors = append(errors, runtime.NewValidationErrorsFromErrors("Body", []error{err})...)
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return errors
+}
+
+// GetPathParams returns the path params as a map.
+func (o *CreatePaymentRequestOptions) GetPathParams() (map[string]any, error) {
+	return nil, nil
+}
+
+// GetQuery returns the query params as a map.
+func (o *CreatePaymentRequestOptions) GetQuery() (map[string]any, error) {
+	return nil, nil
+}
+
+// GetBody returns the payload in any type that can be marshalled to JSON by the client.
+func (o *CreatePaymentRequestOptions) GetBody() any {
+	return o.Body
+}
+
+// GetHeader returns the headers as a map.
+func (o *CreatePaymentRequestOptions) GetHeader() (map[string]string, error) {
+	return nil, nil
+}
+
+func asMap[V any](v any) (map[string]V, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var m map[string]V
+	err = json.Unmarshal(res, &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
 
 var bodyTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
@@ -14,8 +141,6 @@ type CreatePaymentBody = CreatePaymentRequest
 type Payment struct {
 	ResponsePaymentID *string `json:"responsePaymentId,omitempty"`
 }
-
-type CreatePaymentResponseJSON = Payment
 
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 

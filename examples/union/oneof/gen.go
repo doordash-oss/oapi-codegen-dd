@@ -13,12 +13,44 @@ import (
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Product     *OrderProductOneOf     `json:"product,omitempty"`
-	Description *OrderDescriptionOneOf `json:"description,omitempty"`
-	Images      []OrderImagesOneOf     `json:"images,omitempty"`
+	Product     *OrderProduct     `json:"product,omitempty"`
+	Description *OrderDescription `json:"description,omitempty"`
+	Images      []OrderImages     `json:"images,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type OrderProduct struct {
+	OrderProductOneOf *OrderProductOneOf `json:",omitempty"`
+}
+
+func (o OrderProduct) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type OrderProductOneOf3Description struct {
+	OrderProductOneOf3DescriptionOneOf *OrderProductOneOf3DescriptionOneOf `json:",omitempty"`
+}
+
+func (o OrderProductOneOf3Description) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type OrderDescription struct {
+	OrderDescriptionOneOf *OrderDescriptionOneOf `json:",omitempty"`
+}
+
+func (o OrderDescription) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type OrderImages struct {
+	OrderImagesOneOf *OrderImagesOneOf `json:",omitempty"`
+}
+
+func (o OrderImages) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 
@@ -33,7 +65,7 @@ type VersionD = string
 type VersionE = string
 
 type OrderProductOneOf3 struct {
-	Description *OrderProductOneOf3DescriptionOneOf `json:"description,omitempty"`
+	Description *OrderProductOneOf3Description `json:"description,omitempty"`
 }
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {

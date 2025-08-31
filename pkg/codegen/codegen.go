@@ -92,14 +92,8 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		return nil, fmt.Errorf("error collecting component definitions: %s", err)
 	}
 
-	// group current type definitions by name for easy lookup.
-	currentTypes := make(map[string]TypeDefinition)
-	for _, comp := range typeDefs {
-		currentTypes[comp.Name] = comp
-	}
-
 	// collect operations
-	opColl, err := collectOperationDefinitions(model, currentTypes, parseOptions)
+	opColl, err := collectOperationDefinitions(model, parseOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting operation definitions: %w", err)
 	}
@@ -171,7 +165,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	}, nil
 }
 
-func collectOperationDefinitions(model *v3high.Document, currentTypes map[string]TypeDefinition, options ParseOptions) (*operationsCollection, error) {
+func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (*operationsCollection, error) {
 	if model.Paths == nil || model.Paths.PathItems == nil {
 		return nil, nil
 	}
@@ -186,7 +180,7 @@ func collectOperationDefinitions(model *v3high.Document, currentTypes map[string
 	for path, pathItem := range model.Paths.PathItems.FromOldest() {
 		// These are parameters defined for all methods on a given path. They
 		// are shared by all methods.
-		globalParams, err := describeOperationParameters(pathItem.Parameters, nil, options)
+		globalParams, err := describeOperationParameters(pathItem.Parameters, options.WithPath(nil))
 		if err != nil {
 			return nil, fmt.Errorf("error describing global parameters for %s: %s", path, err)
 		}
@@ -204,7 +198,7 @@ func collectOperationDefinitions(model *v3high.Document, currentTypes map[string
 			}
 
 			// These are parameters defined for the specific path method that we're iterating over.
-			localParams, err := describeOperationParameters(operation.Parameters, []string{operationID}, options)
+			localParams, err := describeOperationParameters(operation.Parameters, options.WithPath([]string{operationID}))
 			if err != nil {
 				return nil, fmt.Errorf("error describing local parameters for %s/%s: %s", method, path, err)
 			}
@@ -267,7 +261,7 @@ func collectOperationDefinitions(model *v3high.Document, currentTypes map[string
 
 			// Process Responses
 			response := ResponseDefinition{}
-			responseDef, responseTypes, err := getOperationResponses(operationID, operation.Responses, currentTypes, options)
+			responseDef, responseTypes, err := getOperationResponses(operationID, operation.Responses, options)
 			if err != nil {
 				return nil, fmt.Errorf("error getting operation responses: %w", err)
 			}

@@ -38,11 +38,13 @@ func (e *EnumDefinition) GetValues() map[string]string {
 	return newValues
 }
 
-func createEnumsSchema(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
-	outSchema, err := oapiSchemaToGoType(schema, ref, path, options)
+func createEnumsSchema(schema *base.Schema, options ParseOptions) (GoSchema, error) {
+	outSchema, err := oapiSchemaToGoType(schema, options)
 	if err != nil {
 		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
 	}
+
+	path := options.path
 
 	// Enums need to be typed, so that the values aren't interchangeable,
 	// so no matter what schema conversion thinks, we need to define a
@@ -98,6 +100,7 @@ func createEnumsSchema(schema *base.Schema, ref string, path []string, options P
 		}
 		outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, typeDef)
 		outSchema.RefType = typeName
+		options.AddType(typeDef)
 	}
 
 	return outSchema, nil

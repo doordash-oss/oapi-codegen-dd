@@ -8,8 +8,14 @@ type GetUserSingleResponse struct {
 	Address *string `json:"address,omitempty"`
 }
 
-type GetUserUnion1Response = GetUserUnion1ResponseOneOf
+type GetUserUnion1Response struct {
+	GetUserUnion1ResponseOneOf *GetUserUnion1ResponseOneOf `json:",omitempty"`
+}
 
-type GetUserUnion2Response = GetUserUnion2ResponseOneOf
+type GetUserUnion2Response struct {
+	GetUserUnion2ResponseOneOf *GetUserUnion2ResponseOneOf `json:",omitempty"`
+}
 
-type GetUserUnion3Response = GetUserUnion3ResponseOneOf
+type GetUserUnion3Response struct {
+	GetUserUnion3ResponseOneOf *GetUserUnion3ResponseOneOf `json:",omitempty"`
+}

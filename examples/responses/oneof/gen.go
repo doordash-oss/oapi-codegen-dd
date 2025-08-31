@@ -13,7 +13,9 @@ var bodyTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type ProcessPaymentBody = map[string]any
 
-type ProcessPaymentResponse = ProcessPaymentResponseOneOf
+type ProcessPaymentResponse struct {
+	ProcessPaymentResponseOneOf *ProcessPaymentResponseOneOf `json:",omitempty"`
+}
 
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 

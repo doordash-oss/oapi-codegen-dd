@@ -15,13 +15,19 @@ type GetFooResponse = map[string]any
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Product *struct {
-		OrderProductAllOf0 *OrderProductAllOf0 `json:",omitempty"`
-		Base               Base                `json:""`
-	} `json:"product,omitempty"`
+	Product *OrderProduct `json:"product,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type OrderProduct struct {
+	OrderProductAllOf0 *OrderProductAllOf0 `json:",omitempty"`
+	Base               Base                `json:""`
+}
+
+func (o OrderProduct) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 
@@ -54,7 +60,9 @@ type Order_Product struct {
 	Base               Base                `json:""`
 }
 
-type OrderProductAllOf0 OrderProductAllOf0AnyOf
+type OrderProductAllOf0 struct {
+	OrderProductAllOf0AnyOf *OrderProductAllOf0AnyOf `json:",omitempty"`
+}
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T

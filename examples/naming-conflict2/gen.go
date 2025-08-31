@@ -23,12 +23,18 @@ const (
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Payment struct {
-	Source *struct {
-		Type *PaymentSourceType `json:"type,omitempty"`
-	} `json:"source,omitempty"`
+	Source *PaymentSource `json:"source,omitempty"`
 }
 
 func (p Payment) Validate() error {
+	return schemaTypesValidate.Struct(p)
+}
+
+type PaymentSource struct {
+	Type *PaymentSourceType `json:"type,omitempty"`
+}
+
+func (p PaymentSource) Validate() error {
 	return schemaTypesValidate.Struct(p)
 }
 

@@ -36,33 +36,49 @@ const (
 	FileLinkObjectFileLink FileLinkObject = "file_link"
 )
 
-type GetFilesResponse []GetFilesResponseOneOf
+type GetFilesResponse []struct {
+	GetFilesResponseOneOf *GetFilesResponseOneOf `json:",omitempty"`
+}
 
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type File struct {
-	Filename *string          `json:"filename,omitempty" validate:"omitempty,max=5000"`
-	ID       string           `json:"id" validate:"required,max=5000"`
-	Author   *FileAuthorAnyOf `json:"author,omitempty"`
-	Links    *struct {
-		Data    []FileLink      `json:"data" validate:"required"`
-		HasMore bool            `json:"has_more"`
-		Object  FileLinksObject `json:"object" validate:"required"`
-		URL     string          `json:"url" validate:"required,max=5000"`
-	} `json:"links,omitempty"`
-	Object  FileObject  `json:"object" validate:"required"`
-	Purpose FilePurpose `json:"purpose" validate:"required"`
-	Size    int         `json:"size" validate:"required"`
-	Title   *string     `json:"title,omitempty" validate:"omitempty,max=5000"`
+	Filename *string     `json:"filename,omitempty" validate:"omitempty,max=5000"`
+	ID       string      `json:"id" validate:"required,max=5000"`
+	Author   *FileAuthor `json:"author,omitempty"`
+	Links    *FileLinks  `json:"links,omitempty"`
+	Object   FileObject  `json:"object" validate:"required"`
+	Purpose  FilePurpose `json:"purpose" validate:"required"`
+	Size     int         `json:"size" validate:"required"`
+	Title    *string     `json:"title,omitempty" validate:"omitempty,max=5000"`
 }
 
 func (f File) Validate() error {
 	return schemaTypesValidate.Struct(f)
 }
 
+type FileAuthor struct {
+	FileAuthorAnyOf *FileAuthorAnyOf `json:",omitempty"`
+}
+
+func (f FileAuthor) Validate() error {
+	return schemaTypesValidate.Struct(f)
+}
+
+type FileLinks struct {
+	Data    []FileLink      `json:"data" validate:"required"`
+	HasMore bool            `json:"has_more"`
+	Object  FileLinksObject `json:"object" validate:"required"`
+	URL     string          `json:"url" validate:"required,max=5000"`
+}
+
+func (f FileLinks) Validate() error {
+	return schemaTypesValidate.Struct(f)
+}
+
 type FileLink struct {
 	Created  int               `json:"created" validate:"required"`
-	File     FileLinkFileAnyOf `json:"file" validate:"required"`
+	File     FileLinkFile      `json:"file" validate:"required"`
 	ID       string            `json:"id" validate:"required,max=5000"`
 	Livemode *bool             `json:"livemode,omitempty"`
 	Metadata map[string]string `json:"metadata,omitempty"`
@@ -74,12 +90,28 @@ func (f FileLink) Validate() error {
 	return schemaTypesValidate.Struct(f)
 }
 
+type FileLinkFile struct {
+	FileLinkFileAnyOf *FileLinkFileAnyOf `json:",omitempty"`
+}
+
+func (f FileLinkFile) Validate() error {
+	return schemaTypesValidate.Struct(f)
+}
+
 type User struct {
-	ID     string           `json:"id" validate:"required,max=50"`
-	Avatar *UserAvatarAnyOf `json:"avatar,omitempty"`
+	ID     string      `json:"id" validate:"required,max=50"`
+	Avatar *UserAvatar `json:"avatar,omitempty"`
 }
 
 func (u User) Validate() error {
+	return schemaTypesValidate.Struct(u)
+}
+
+type UserAvatar struct {
+	UserAvatarAnyOf *UserAvatarAnyOf `json:",omitempty"`
+}
+
+func (u UserAvatar) Validate() error {
 	return schemaTypesValidate.Struct(u)
 }
 

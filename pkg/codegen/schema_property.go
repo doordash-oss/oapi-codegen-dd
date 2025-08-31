@@ -35,7 +35,7 @@ func (p Property) GoTypeDef() string {
 		}
 	}
 
-	if strings.HasPrefix(typeDef, "map[") {
+	if strings.HasPrefix(typeDef, "map[") || strings.HasPrefix(typeDef, "[]") {
 		return typeDef
 	}
 
