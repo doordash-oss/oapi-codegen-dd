@@ -110,7 +110,7 @@ func (d *Discriminator) PropertyName() string {
 	return schemaNameToTypeName(d.Property)
 }
 
-func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, options ParseOptions) (GoSchema, error) {
+func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSchema, error) {
 	// Add a fallback value in case the schemaProxy is nil.
 	// i.e. the parent schema defines a type:array, but the array has
 	// no items defined. Therefore, we have at least valid Go-Code.
@@ -119,6 +119,8 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 	}
 
 	schema := schemaProxy.Schema()
+
+	ref := options.reference
 
 	// use the referenced type:
 	// properties will be picked up from the referenced schema later.
@@ -145,7 +147,7 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 		err    error
 	)
 
-	merged, err = createFromCombinator(schema, path, options)
+	merged, err = createFromCombinator(schema, options)
 	if err != nil {
 		return GoSchema{}, err
 	}
@@ -161,7 +163,8 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 		outSchema.GoType = typeName
 		outSchema.DefineViaAlias = true
 
-		return enhanceSchema(outSchema, merged, options), nil
+		enhanced := enhanceSchema(outSchema, merged, options)
+		return enhanced, nil
 	}
 
 	// Check x-go-type-skip-optional-pointer, which will override if the type
@@ -178,27 +181,32 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, ref string, path []string, 
 	t := schema.Type
 	// Handle objects and empty schemas first as a special case
 	if t == nil || slices.Contains(t, "object") {
-		res, err := createObjectSchema(schema, ref, path, options)
+		res, err := createObjectSchema(schema, options)
 		if err != nil {
 			return GoSchema{}, err
 		}
-		return enhanceSchema(res, merged, options), err
+
+		enhanced := enhanceSchema(res, merged, options)
+		return enhanced, nil
 	}
 
 	if len(schema.Enum) > 0 {
-		res, err := createEnumsSchema(schema, ref, path, options)
+		res, err := createEnumsSchema(schema, options)
 		if err != nil {
 			return GoSchema{}, err
 		}
-		return enhanceSchema(res, merged, options), err
+
+		enhanced := enhanceSchema(res, merged, options)
+		return enhanced, nil
 	}
 
-	outSchema, err = oapiSchemaToGoType(schema, ref, path, options)
+	outSchema, err = oapiSchemaToGoType(schema, options)
 	if err != nil {
 		return GoSchema{}, fmt.Errorf("error resolving primitive type: %w", err)
 	}
 
-	return enhanceSchema(outSchema, merged, options), nil
+	enhanced := enhanceSchema(outSchema, merged, options)
+	return enhanced, nil
 }
 
 // SchemaDescriptor describes a GoSchema, a type definition.
@@ -248,6 +256,43 @@ func schemaHasAdditionalProperties(schema *base.Schema) bool {
 	return false
 }
 
+func replaceInlineTypes(src GoSchema, options ParseOptions) (GoSchema, string) {
+	if len(src.Properties) == 0 || src.RefType != "" {
+		return src, ""
+	}
+
+	currentTypes := options.currentTypes
+	baseName := options.baseName
+	name := baseName
+	if baseName == "" {
+		baseName = schemaNameToTypeName(pathToTypeName(options.path))
+		name = baseName
+	}
+	if _, exists := currentTypes[baseName]; exists {
+		name = generateTypeName(currentTypes, baseName, options.nameSuffixes)
+	}
+
+	goType := name
+	if src.ArrayType != nil {
+		goType = "[]" + goType
+		src.GoType = strings.TrimPrefix(src.GoType, "[]")
+		src.ArrayType = nil
+	}
+
+	td := TypeDefinition{
+		Name:         name,
+		Schema:       src,
+		SpecLocation: SpecLocationSchema,
+	}
+	options.AddType(td)
+
+	return GoSchema{
+		GoType:          goType,
+		RefType:         goType,
+		AdditionalTypes: []TypeDefinition{td},
+	}, name
+}
+
 func enhanceSchema(src, other GoSchema, options ParseOptions) GoSchema {
 	if len(other.UnionElements) == 0 && len(other.Properties) == 0 {
 		return src
@@ -267,4 +312,29 @@ func enhanceSchema(src, other GoSchema, options ParseOptions) GoSchema {
 	}
 
 	return src
+}
+
+func generateTypeName(currentTypes map[string]TypeDefinition, baseName string, suffixes []string) string {
+	if currentTypes == nil {
+		return baseName
+	}
+	if _, exists := currentTypes[baseName]; !exists {
+		return baseName
+	}
+
+	if len(suffixes) == 0 {
+		suffixes = []string{""}
+	}
+
+	for i := 0; ; i++ {
+		for _, suffix := range suffixes {
+			name := baseName + suffix
+			if i > 0 {
+				name = fmt.Sprintf("%s%d", name, i)
+			}
+			if _, exists := currentTypes[name]; !exists {
+				return name
+			}
+		}
+	}
 }

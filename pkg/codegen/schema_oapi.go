@@ -10,9 +10,11 @@ import (
 
 // oapiSchemaToGoType converts an OpenApi schema into a Go type definition for
 // all non-object types.
-func oapiSchemaToGoType(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
+func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, error) {
 	f := schema.Format
 	t := schema.Type
+
+	path := options.path
 
 	constraints := newConstraints(schema, ConstraintsContext{
 		name:       "",
@@ -22,13 +24,14 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string, options 
 	if slices.Contains(t, "array") {
 		// For arrays, we'll get the type of the Items and throw a
 		// [] in front of it.
+		opts := options
 		var items *base.SchemaProxy
 		if schema.Items != nil && schema.Items.IsA() {
 			items = schema.Items.A
-			ref = items.GoLow().GetReference()
+			opts = opts.WithReference(items.GoLow().GetReference())
 		}
 
-		arrayType, err := GenerateGoSchema(items, ref, path, options)
+		arrayType, err := GenerateGoSchema(items, opts)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error generating type for array: %w", err)
 		}
@@ -45,6 +48,7 @@ func oapiSchemaToGoType(schema *base.Schema, ref string, path []string, options 
 				JsonName: strings.Join(append(path, "Item"), "."),
 				Schema:   arrayType,
 			}
+			options.AddType(typeDef)
 			arrayType.AdditionalTypes = append(arrayType.AdditionalTypes, typeDef)
 			arrayType.RefType = typeName
 		}

@@ -9,15 +9,16 @@ import (
 	"github.com/pb33f/libopenapi/orderedmap"
 )
 
-func createFromCombinator(schema *base.Schema, path []string, options ParseOptions) (GoSchema, error) {
+func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, error) {
 	if schema == nil {
 		return GoSchema{}, nil
 	}
 
+	path := options.path
+
 	hasAllOf := len(schema.AllOf) > 0
 	hasAnyOf := len(schema.AnyOf) > 0
 	hasOneOf := len(schema.OneOf) > 0
-	hasAdditionalProperties := schemaHasAdditionalProperties(schema)
 
 	if !hasAllOf && !hasAnyOf && !hasOneOf {
 		return GoSchema{}, nil
@@ -25,7 +26,6 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 
 	var (
 		out             GoSchema
-		fieldName       string
 		allOfSchema     GoSchema
 		anyOfSchema     GoSchema
 		oneOfSchema     GoSchema
@@ -34,7 +34,7 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 
 	if hasAllOf {
 		var err error
-		allOfSchema, err = mergeAllOfSchemas(schema.AllOf, path, options)
+		allOfSchema, err = mergeAllOfSchemas(schema.AllOf, options)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error merging allOf: %w", err)
 		}
@@ -45,7 +45,7 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 	if hasAnyOf {
 		anyOfPath := append(path, "anyOf")
 		var err error
-		anyOfSchema, err = generateUnion(schema.AnyOf, nil, anyOfPath, options)
+		anyOfSchema, err = generateUnion(schema.AnyOf, nil, options.WithPath(anyOfPath))
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error resolving anyOf: %w", err)
 		}
@@ -53,12 +53,13 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 		anyOfSchema.GoType = anyOfSchema.createGoStruct(anyOfFields)
 
 		anyOfName := schemaNameToTypeName(pathToTypeName(anyOfPath))
-		fieldName = anyOfName
-		additionalTypes = append(additionalTypes, TypeDefinition{
+		td := TypeDefinition{
 			Name:         anyOfName,
 			Schema:       anyOfSchema,
 			SpecLocation: SpecLocationUnion,
-		})
+		}
+		additionalTypes = append(additionalTypes, td)
+		options.AddType(td)
 
 		out.Properties = append(out.Properties, Property{
 			GoName:      anyOfName,
@@ -70,7 +71,7 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 	if hasOneOf {
 		oneOfPath := append(path, "oneOf")
 		var err error
-		oneOfSchema, err = generateUnion(schema.OneOf, schema.Discriminator, oneOfPath, options)
+		oneOfSchema, err = generateUnion(schema.OneOf, schema.Discriminator, options.WithPath(oneOfPath))
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error resolving oneOf: %w", err)
 		}
@@ -78,7 +79,6 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 		oneOfSchema.GoType = oneOfSchema.createGoStruct(oneOfFields)
 
 		oneOfName := schemaNameToTypeName(pathToTypeName(oneOfPath))
-		fieldName = oneOfName
 		additionalTypes = append(additionalTypes, TypeDefinition{
 			Name:         oneOfName,
 			Schema:       oneOfSchema,
@@ -95,10 +95,6 @@ func createFromCombinator(schema *base.Schema, path []string, options ParseOptio
 	fields := genFieldsFromProperties(out.Properties, options)
 	out.GoType = out.createGoStruct(fields)
 	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
-
-	if fieldName != "" && !hasAdditionalProperties {
-		out.RefType = fieldName
-	}
 
 	return out, nil
 }
@@ -122,10 +118,12 @@ func containsUnion(schema *base.Schema) bool {
 
 // mergeAllOfSchemas merges all the fields in the schemas supplied into one giant schema.
 // The idea is that we merge all fields into one schema.
-func mergeAllOfSchemas(allOf []*base.SchemaProxy, path []string, options ParseOptions) (GoSchema, error) {
+func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchema, error) {
 	if len(allOf) == 0 {
 		return GoSchema{}, nil
 	}
+
+	path := options.path
 
 	allMergeable := true
 	for _, s := range allOf {
@@ -148,11 +146,11 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, path []string, options ParseOp
 		}
 
 		schemaProxy := base.CreateSchemaProxy(merged)
-		ref := ""
+		opts := options
 		if low := schemaProxy.GoLow(); low != nil {
-			ref = low.GetReference()
+			opts = options.WithReference(low.GetReference())
 		}
-		return GenerateGoSchema(schemaProxy, ref, path, options)
+		return GenerateGoSchema(schemaProxy, opts)
 	}
 
 	var (
@@ -162,6 +160,7 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, path []string, options ParseOp
 
 	for i, schemaProxy := range allOf {
 		subPath := append(path, fmt.Sprintf("allOf_%d", i))
+		options = options.WithPath(subPath)
 
 		// check if this is a $ref
 		if ref := schemaProxy.GoLow().GetReference(); ref != "" {
@@ -176,7 +175,7 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, path []string, options ParseOp
 
 		// not a $ref - resolve as usual
 		schema := schemaProxy.Schema()
-		resolved, err := createFromCombinator(schema, subPath, options)
+		resolved, err := createFromCombinator(schema, options)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error resolving allOf[%d]: %w", i, err)
 		}
@@ -204,6 +203,7 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, path []string, options ParseOp
 		Schema:       out,
 		SpecLocation: SpecLocationUnion,
 	}
+	options.AddType(td)
 	out.AdditionalTypes = append(out.AdditionalTypes, td)
 	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
 

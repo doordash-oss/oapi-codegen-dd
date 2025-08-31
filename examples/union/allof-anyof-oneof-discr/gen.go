@@ -40,17 +40,37 @@ func (i Identity) Validate() error {
 }
 
 type ClientAndMaybeIdentity struct {
-	Entity *ClientAndMaybeIdentityEntityAnyOf `json:"entity,omitempty"`
-	Type   ClientAndMaybeIdentityType         `json:"type" validate:"required"`
+	Entity *ClientAndMaybeIdentityEntity `json:"entity,omitempty"`
+	Type   ClientAndMaybeIdentityType    `json:"type" validate:"required"`
 }
 
 func (c ClientAndMaybeIdentity) Validate() error {
 	return schemaTypesValidate.Struct(c)
 }
 
-type ClientOrID = ClientOrIDOneOf
+type ClientAndMaybeIdentityEntity struct {
+	ClientAndMaybeIdentityEntityAnyOf *ClientAndMaybeIdentityEntityAnyOf `json:",omitempty"`
+}
 
-type ClientOrIdentityWithDiscriminator = ClientOrIdentityWithDiscriminatorOneOf
+func (c ClientAndMaybeIdentityEntity) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
+
+type ClientOrID struct {
+	ClientOrIDOneOf *ClientOrIDOneOf `json:",omitempty"`
+}
+
+func (c ClientOrID) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
+
+type ClientOrIdentityWithDiscriminator struct {
+	ClientOrIdentityWithDiscriminatorOneOf *ClientOrIdentityWithDiscriminatorOneOf `json:",omitempty"`
+}
+
+func (c ClientOrIdentityWithDiscriminator) Validate() error {
+	return schemaTypesValidate.Struct(c)
+}
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T

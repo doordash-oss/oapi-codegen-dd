@@ -11,7 +11,13 @@ import (
 
 var bodyTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
-type ProcessPaymentBody = ProcessPaymentBodyOneOf
+type ProcessPaymentBody struct {
+	ProcessPaymentBodyOneOf *ProcessPaymentBodyOneOf `json:",omitempty"`
+}
+
+func (p ProcessPaymentBody) Validate() error {
+	return bodyTypesValidate.Struct(p)
+}
 
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 

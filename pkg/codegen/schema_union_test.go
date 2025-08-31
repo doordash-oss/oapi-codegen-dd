@@ -48,7 +48,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-1", "get")
 
-		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
+		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
@@ -65,7 +65,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-2", "get")
 
-		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
+		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)
@@ -78,7 +78,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-3", "get")
 
-		res, err := GenerateGoSchema(getUser, "", []string{"User"}, ParseOptions{})
+		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    UserOneOf *UserOneOf`json:\",omitempty\"`\n}", res.GoType)

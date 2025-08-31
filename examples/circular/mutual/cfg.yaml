@@ -1,2 +1,4 @@
 # yaml-language-server: $schema=../../../configuration-schema.json
-package: circularmutual
+package: gen
+generate:
+  client: true

@@ -40,16 +40,19 @@ func main() {
 	}
 
 	// Read the config file
-	cfgContents, err := os.ReadFile(flagConfigFile)
-	if err != nil {
-		errExit("Error reading config file: %v", err)
+	cfg := codegen.Configuration{}
+	if flagConfigFile != "" {
+		cfgContents, err := os.ReadFile(flagConfigFile)
+		if err != nil {
+			errExit("Error reading config file: %v", err)
+		}
+
+		err = yaml.Unmarshal(cfgContents, &cfg)
+		if err != nil {
+			errExit("Error parsing config file: %v", err)
+		}
 	}
 
-	cfg := codegen.Configuration{}
-	err = yaml.Unmarshal(cfgContents, &cfg)
-	if err != nil {
-		errExit("Error parsing config file: %v", err)
-	}
 	cfg = cfg.Merge(codegen.NewDefaultConfiguration())
 
 	code, err := codegen.Generate(specContents, cfg)

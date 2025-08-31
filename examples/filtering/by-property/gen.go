@@ -176,15 +176,9 @@ type GetClientResponse struct {
 }
 
 type UpdateClientErrorResponse struct {
-	Code    string  `json:"code" validate:"required"`
-	Details *string `json:"details,omitempty"`
-	Data    *struct {
-		// Code Error code
-		Code *string `json:"code,omitempty"`
-
-		// Message Error message
-		Message *string `json:"message,omitempty"`
-	} `json:"data,omitempty"`
+	Code    string                         `json:"code" validate:"required"`
+	Details *string                        `json:"details,omitempty"`
+	Data    *UpdateClientErrorResponseData `json:"data,omitempty"`
 }
 
 func (r UpdateClientErrorResponse) Error() string {
@@ -210,4 +204,16 @@ type Job struct {
 
 func (j Job) Validate() error {
 	return schemaTypesValidate.Struct(j)
+}
+
+type UpdateClientErrorResponseData struct {
+	// Code Error code
+	Code *string `json:"code,omitempty"`
+
+	// Message Error message
+	Message *string `json:"message,omitempty"`
+}
+
+func (u UpdateClientErrorResponseData) Validate() error {
+	return schemaTypesValidate.Struct(u)
 }

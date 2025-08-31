@@ -15,10 +15,21 @@ type GetFooResponse = map[string]any
 var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 
 type Order struct {
-	Client *OrderClientOneOf `json:"client,omitempty"`
+	Client *OrderClient `json:"client,omitempty"`
 }
 
 func (o Order) Validate() error {
+	return schemaTypesValidate.Struct(o)
+}
+
+type OrderClient struct {
+	Name             string            `json:"name" validate:"required"`
+	ID               int               `json:"id" validate:"required"`
+	OrderClientAnyOf *OrderClientAnyOf `json:",omitempty"`
+	OrderClientOneOf *OrderClientOneOf `json:",omitempty"`
+}
+
+func (o OrderClient) Validate() error {
 	return schemaTypesValidate.Struct(o)
 }
 

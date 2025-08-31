@@ -1,0 +1,37 @@
+openapi: 3.0.0
+info:
+  title: API
+  description: An example of inline request body
+  version: 1.0.0
+
+paths:
+  /service/gateway:
+    post:
+      summary: Process payment operations
+      operationId: processPayment
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                a:
+                  type: string
+                b:
+                  type: string
+                c:
+                  oneOf:
+                    - type: string
+                    - type: boolean
+                d:
+                  allOf:
+                    - anyOf:
+                      - type: integer
+                      - type: string
+                    - anyOf:
+                      - type: boolean
+                      - type: number
+      responses:
+        '200':
+          description: Successful operation

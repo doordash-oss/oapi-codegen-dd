@@ -8,7 +8,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 )
 
-func createObjectSchema(schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
+func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, error) {
 	var (
 		outType     string
 		description string
@@ -31,6 +31,8 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 	if schema != nil {
 		schemaExtensions = extractExtensions(schema.Extensions)
 	}
+
+	path := options.path
 
 	if schema != nil &&
 		(schema.Properties == nil || schema.Properties.Len() == 0) &&
@@ -58,7 +60,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 		outSchema.DefineViaAlias = false
 		var err error
 
-		outSchema, err = enhanceSchemaWithAdditionalProperties(outSchema, schema, ref, path, options)
+		outSchema, err = enhanceSchemaWithAdditionalProperties(outSchema, schema, options)
 		if err != nil {
 			return GoSchema{}, err
 		}
@@ -83,7 +85,8 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 		for pName, p := range schema.Properties.FromOldest() {
 			propertyPath := append(path, pName)
 			pRef := p.GoLow().GetReference()
-			pSchema, err := GenerateGoSchema(p, pRef, propertyPath, options)
+			opts := options.WithReference(pRef).WithPath(propertyPath)
+			pSchema, err := GenerateGoSchema(p, opts)
 			if err != nil {
 				return GoSchema{}, fmt.Errorf("error generating Go schema for property '%s': %w", pName, err)
 			}
@@ -118,6 +121,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 					Schema:       pSchema,
 					SpecLocation: specLocation,
 				}
+				options.AddType(typeDef)
 				pSchema.AdditionalTypes = append(pSchema.AdditionalTypes, typeDef)
 			}
 
@@ -133,6 +137,8 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 					deprecated = *s.Deprecated
 				}
 			}
+
+			pSchema, _ = replaceInlineTypes(pSchema, opts)
 
 			prop := Property{
 				GoName:        createPropertyGoFieldName(pName, extensions),
@@ -166,6 +172,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 			Name:   typeName,
 			Schema: outSchema,
 		}
+		options.AddType(newTypeDef)
 		outSchema = GoSchema{
 			Description:     newTypeDef.Schema.Description,
 			GoType:          typeName,
@@ -177,7 +184,7 @@ func createObjectSchema(schema *base.Schema, ref string, path []string, options 
 	return outSchema, nil
 }
 
-func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, ref string, path []string, options ParseOptions) (GoSchema, error) {
+func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, options ParseOptions) (GoSchema, error) {
 	if schema == nil {
 		return out, nil
 	}
@@ -185,6 +192,8 @@ func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, re
 	if !schemaHasAdditionalProperties(schema) {
 		return out, nil
 	}
+
+	path := options.path
 
 	// If the schema has additional properties, we need to special case
 	// a lot of behaviors.
@@ -199,7 +208,7 @@ func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, re
 	// If additional properties are defined, we will override the default
 	// above with the specific definition.
 	if schema.AdditionalProperties != nil && schema.AdditionalProperties.IsA() {
-		additionalSchema, err := GenerateGoSchema(schema.AdditionalProperties.A, ref, path, options)
+		additionalSchema, err := GenerateGoSchema(schema.AdditionalProperties.A, options)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error generating type for additional properties: %w", err)
 		}
@@ -223,6 +232,7 @@ func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, re
 				Schema:       additionalSchema,
 				SpecLocation: SpecLocationUnion,
 			}
+			options.AddType(typeDef)
 			additionalSchema.RefType = typeName
 			additionalSchema.AdditionalTypes = append(additionalSchema.AdditionalTypes, typeDef)
 		}

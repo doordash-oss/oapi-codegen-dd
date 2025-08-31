@@ -38,7 +38,7 @@ type ResponseContentDefinition struct {
 	Headers      map[string]GoSchema
 }
 
-func getOperationResponses(operationID string, responses *v3high.Responses, currentTypes map[string]TypeDefinition, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
+func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
 	if responses == nil {
 		return nil, nil, nil
 	}
@@ -137,7 +137,10 @@ func getOperationResponses(operationID string, responses *v3high.Responses, curr
 			typeSuffix = "ErrorResponse"
 		}
 
-		contentSchema, err := GenerateGoSchema(content.Schema, ref, []string{operationID, typeSuffix}, options)
+		options = options.
+			WithReference(ref).
+			WithPath([]string{operationID, typeSuffix})
+		contentSchema, err := GenerateGoSchema(content.Schema, options)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 		}
@@ -172,13 +175,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, curr
 		codeName := strconv.Itoa(status)
 		baseName := operationID + typeSuffix
 		nameSuffixes := []string{tag, tag + codeName}
-		responseName := getResponseTypeName(currentTypes, baseName, nameSuffixes)
+		responseName := generateTypeName(options.currentTypes, baseName, nameSuffixes)
 
 		td := TypeDefinition{
 			Name:         responseName,
 			Schema:       contentSchema,
 			SpecLocation: SpecLocationResponse,
 		}
+		options.AddType(td)
 		typeDefinitions = append(typeDefinitions, td)
 		typeDefinitions = append(typeDefinitions, contentSchema.AdditionalTypes...)
 
@@ -227,7 +231,8 @@ func getOperationResponses(operationID string, responses *v3high.Responses, curr
 			contentType, contentVal = content.Key(), content.Value()
 			ref = contentVal.Schema.GetReference()
 
-			contentSchema, err = GenerateGoSchema(contentVal.Schema, ref, []string{operationID, typeSuffix}, options)
+			opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
+			contentSchema, err = GenerateGoSchema(contentVal.Schema, opts)
 			if err != nil {
 				return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 			}
@@ -250,6 +255,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, curr
 				Schema:       contentSchema,
 				SpecLocation: SpecLocationResponse,
 			}
+			options.AddType(td)
 			typeDefinitions = append(typeDefinitions, td)
 			typeDefinitions = append(typeDefinitions, contentSchema.AdditionalTypes...)
 
@@ -284,30 +290,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, curr
 
 func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], operationID string, options ParseOptions) (map[string]GoSchema, error) {
 	res := make(map[string]GoSchema)
+	opts := options.WithReference("").WithPath([]string{operationID, "Header"})
+
 	for hName, hdrs := range headers {
-		hSchema, err := GenerateGoSchema(hdrs.Schema, "", []string{operationID, "Header"}, options)
+		hSchema, err := GenerateGoSchema(hdrs.Schema, opts)
 		if err != nil {
 			return nil, err
 		}
 		res[hName] = hSchema
 	}
 	return res, nil
-}
-
-func getResponseTypeName(currentTypes map[string]TypeDefinition, baseName string, suffixes []string) string {
-	if _, exists := currentTypes[baseName]; !exists {
-		return baseName
-	}
-
-	for i := 0; ; i++ {
-		for _, suffix := range suffixes {
-			name := fmt.Sprintf("%s%s", baseName, suffix)
-			if i > 0 {
-				name = fmt.Sprintf("%s%d", name, i)
-			}
-			if _, exists := currentTypes[name]; !exists {
-				return name
-			}
-		}
-	}
 }

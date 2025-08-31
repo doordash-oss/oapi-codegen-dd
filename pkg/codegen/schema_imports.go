@@ -102,6 +102,10 @@ func getOpenAPISchemaImports(schema *base.Schema) (map[string]goImport, error) {
 }
 
 func parseGoImportExtension(v *base.Schema) (*goImport, error) {
+	if v == nil || v.Extensions == nil {
+		return nil, nil
+	}
+
 	if v.Extensions.Value(extPropGoImport) == nil || v.Extensions.Value(extPropGoType) == nil {
 		return nil, nil
 	}
