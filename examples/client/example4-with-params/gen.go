@@ -37,6 +37,7 @@ type ClientInterface interface {
 
 func (c *Client) GetOrder(ctx context.Context, options *GetOrderRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetOrderResponse, error) {
 	var err error
+
 	queryEncoding := make(map[string]runtime.QueryEncoding)
 	queryEncoding["client_secret"] = runtime.QueryEncoding{
 		Style: "form",
