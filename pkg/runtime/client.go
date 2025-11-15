@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -203,19 +204,21 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 		reqURL = fmt.Sprintf("%s?%s", reqURL, queryValue)
 	}
 
-	contentType := "application/json"
+	var contentType string
 	if params.ContentType != "" {
 		contentType = params.ContentType
 	}
 
-	if len(headers) == 0 {
-		headers = map[string]string{
-			"Content-Type": contentType,
-		}
+	if headers == nil {
+		headers = map[string]string{}
+	}
+
+	// if header exists, prefer that value as contentType for encoding decision
+	if _, ok := headers["Content-Type"]; ok {
+		contentType = headers["Content-Type"]
 	}
 
 	httpHeaders := http.Header{}
-
 	keys := make([]string, 0, len(headers))
 	for k := range headers {
 		keys = append(keys, k)
@@ -226,26 +229,47 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 	}
 
 	var (
-		body       []byte
+		bodyBytes  []byte
 		bodyReader io.Reader
 	)
 
+	// - If params.BodyEncoding is non-nil and non-empty, we treat the payload as form-encodable
+	// - Otherwise fall back to the contentType hint (application/x-www-form-urlencoded)
+	isForm := false
+	if len(params.BodyEncoding) > 0 {
+		// we have per-field encoding hints -> treat as form payload
+		isForm = true
+	} else if strings.HasPrefix(strings.ToLower(contentType), "application/x-www-form-urlencoded") {
+		isForm = true
+	}
+
 	if payload != nil {
-		// Check if the request should be form-encoded
-		if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
+		if isForm {
+			// Encode using EncodeFormFields which can use params.BodyEncoding map for rules
 			encodedPayload, err := EncodeFormFields(payload, params.BodyEncoding)
 			if err != nil {
 				return nil, fmt.Errorf("error encoding form values: %w", err)
 			}
-			bodyReader = strings.NewReader(encodedPayload)
+			bodyBytes = []byte(encodedPayload)
+			bodyReader = bytes.NewReader(bodyBytes)
+			if contentType == "" {
+				contentType = "application/x-www-form-urlencoded"
+			}
 		} else {
 			// Default to JSON encoding
-			body, err = json.Marshal(payload)
+			bodyBytes, err = json.Marshal(payload)
 			if err != nil {
 				return nil, err
 			}
-			bodyReader = bytes.NewBuffer(body)
+			bodyReader = bytes.NewBuffer(bodyBytes)
+			if contentType == "" {
+				contentType = "application/json"
+			}
 		}
+	}
+
+	if bodyBytes != nil {
+		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, params.Method, reqURL, bodyReader)
@@ -253,7 +277,19 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 		return nil, err
 	}
 
+	httpHeaders.Set("Content-Type", contentType)
 	req.Header = httpHeaders
+
+	if bodyBytes != nil {
+		req.ContentLength = int64(len(bodyBytes))
+		req.Header.Set("Content-Length", strconv.Itoa(len(bodyBytes)))
+
+		// NewRequest already wrapped the reader into a ReadCloser, but set GetBody
+		// so transports can recreate a fresh reader when needed.
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+		}
+	}
 
 	return req, nil
 }

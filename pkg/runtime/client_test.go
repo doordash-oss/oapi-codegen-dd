@@ -44,11 +44,12 @@ func TestClient_GetBaseURL(t *testing.T) {
 
 func TestClient_CreateRequest(t *testing.T) {
 	tests := []struct {
-		name           string
-		params         RequestOptionsParameters
-		expectedMethod string
-		expectedURL    string
-		expectedError  bool
+		name                string
+		params              RequestOptionsParameters
+		expectedMethod      string
+		expectedURL         string
+		expectedError       bool
+		expectedContentType string
 	}{
 		{
 			name: "creates GET request successfully",
@@ -64,9 +65,10 @@ func TestClient_CreateRequest(t *testing.T) {
 					"tags": {Style: "deepObject", Explode: ptr(true)},
 				},
 			},
-			expectedMethod: "GET",
-			expectedURL:    "https://api.example.com/users/123?filter=active&tags%5B%5D=a&tags%5B%5D=b",
-			expectedError:  false,
+			expectedMethod:      "GET",
+			expectedURL:         "https://api.example.com/users/123?filter=active&tags%5B%5D=a&tags%5B%5D=b",
+			expectedError:       false,
+			expectedContentType: "application/json",
 		},
 		{
 			name: "creates POST request with body",
@@ -79,9 +81,10 @@ func TestClient_CreateRequest(t *testing.T) {
 				Method:      "POST",
 				ContentType: "application/json",
 			},
-			expectedMethod: "POST",
-			expectedURL:    "https://api.example.com/users?foo=bar&tags=a&tags=b",
-			expectedError:  false,
+			expectedMethod:      "POST",
+			expectedURL:         "https://api.example.com/users?foo=bar&tags=a&tags=b",
+			expectedError:       false,
+			expectedContentType: "application/json",
 		},
 		{
 			name: "creates POST request without body",
@@ -91,9 +94,42 @@ func TestClient_CreateRequest(t *testing.T) {
 				Method:      "POST",
 				ContentType: "application/json",
 			},
-			expectedMethod: "POST",
-			expectedURL:    "https://api.example.com/users",
-			expectedError:  false,
+			expectedMethod:      "POST",
+			expectedURL:         "https://api.example.com/users",
+			expectedError:       false,
+			expectedContentType: "application/json",
+		},
+		{
+			name: "creates POST request with body and sets Content-Type header from body encoding",
+			params: RequestOptionsParameters{
+				Options: mockRequestOptions{
+					body: map[string]string{"name": "test"},
+				},
+				RequestURL: "https://api.example.com/users",
+				Method:     "POST",
+				BodyEncoding: map[string]FieldEncoding{
+					"name": {Style: "form"},
+				},
+			},
+			expectedMethod:      "POST",
+			expectedURL:         "https://api.example.com/users",
+			expectedError:       false,
+			expectedContentType: "application/x-www-form-urlencoded",
+		},
+		{
+			name: "creates POST request with body and uses header Content-Type",
+			params: RequestOptionsParameters{
+				Options: mockRequestOptions{
+					body:   map[string]string{"name": "test"},
+					header: map[string]string{"Content-Type": "application/x-www-form-urlencoded+foo"},
+				},
+				RequestURL: "https://api.example.com/users",
+				Method:     "POST",
+			},
+			expectedMethod:      "POST",
+			expectedURL:         "https://api.example.com/users",
+			expectedError:       false,
+			expectedContentType: "application/x-www-form-urlencoded+foo",
 		},
 	}
 
@@ -110,6 +146,7 @@ func TestClient_CreateRequest(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedMethod, req.Method)
 			assert.Equal(t, tt.expectedURL, req.URL.String())
+			assert.Equal(t, tt.expectedContentType, req.Header.Get("Content-Type"))
 		})
 	}
 }
