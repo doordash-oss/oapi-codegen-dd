@@ -209,13 +209,20 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 		contentType = params.ContentType
 	}
 
-	if headers == nil {
-		headers = map[string]string{}
-	}
-
 	// if header exists, prefer that value as contentType for encoding decision
 	if _, ok := headers["Content-Type"]; ok {
 		contentType = headers["Content-Type"]
+	}
+
+	if contentType == "" {
+		contentType = "application/json"
+		if len(params.BodyEncoding) > 0 {
+			contentType = "application/x-www-form-urlencoded"
+		}
+	}
+
+	if headers == nil {
+		headers = map[string]string{}
 	}
 
 	httpHeaders := http.Header{}
@@ -233,37 +240,21 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 		bodyReader io.Reader
 	)
 
-	// - If params.BodyEncoding is non-nil and non-empty, we treat the payload as form-encodable
-	// - Otherwise fall back to the contentType hint (application/x-www-form-urlencoded)
-	isForm := false
-	if len(params.BodyEncoding) > 0 {
-		// we have per-field encoding hints -> treat as form payload
-		isForm = true
-	} else if strings.HasPrefix(strings.ToLower(contentType), "application/x-www-form-urlencoded") {
-		isForm = true
-	}
-
+	// Encode payload according to decided contentType
 	if payload != nil {
-		if isForm {
-			// Encode using EncodeFormFields which can use params.BodyEncoding map for rules
+		ctLower := strings.ToLower(strings.TrimSpace(contentType))
+		switch {
+		case strings.HasPrefix(ctLower, "application/x-www-form-urlencoded"):
 			encodedPayload, err := EncodeFormFields(payload, params.BodyEncoding)
 			if err != nil {
 				return nil, fmt.Errorf("error encoding form values: %w", err)
 			}
 			bodyBytes = []byte(encodedPayload)
-			bodyReader = bytes.NewReader(bodyBytes)
-			if contentType == "" {
-				contentType = "application/x-www-form-urlencoded"
-			}
-		} else {
-			// Default to JSON encoding
+		default:
+			// Default: treat as JSON
 			bodyBytes, err = json.Marshal(payload)
 			if err != nil {
 				return nil, err
-			}
-			bodyReader = bytes.NewBuffer(bodyBytes)
-			if contentType == "" {
-				contentType = "application/json"
 			}
 		}
 	}
