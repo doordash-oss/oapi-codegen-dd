@@ -1433,3 +1433,14 @@ filter:
   exclude:
     operation-ids: []
 ```
+
+## License
+This project is licensed under the Apache License 2.0.  
+See [LICENSE.txt](LICENSE.txt) for details.
+
+## Notices
+See [NOTICE.txt](NOTICE.txt) for third-party components and attributions.
+
+## Contributor License Agreement (CLA)
+Contributions to this project require agreeing to the DoorDash Contributor License Agreement.  
+See [CONTRIBUTOR_LICENSE_AGREEMENT.txt](CONTRIBUTOR_LICENSE_AGREEMENT.txt).

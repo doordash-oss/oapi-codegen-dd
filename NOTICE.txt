@@ -1,0 +1,85 @@
+This product includes software developed by DoorDash, Inc.
+Copyright 2025 DoorDash, Inc.
+
+Bundled third-party components and their licenses:
+--------------------------------------------------
+
+1) github.com/bahlo/generic-list-go
+   Source: https://github.com/bahlo/generic-list-go/blob/v0.2.0/LICENSE
+   License: BSD-3-Clause
+
+2) github.com/buger/jsonparser
+   Source: https://github.com/buger/jsonparser/blob/v1.1.1/LICENSE
+   License: MIT
+
+3) github.com/doordash/oapi-codegen/v3
+   Source: https://github.com/doordash/oapi-codegen/blob/HEAD/LICENSE.txt
+   License: Apache-2.0
+
+4) github.com/gabriel-vasile/mimetype
+   Source: https://github.com/gabriel-vasile/mimetype/blob/v1.4.8/LICENSE
+   License: MIT
+
+5) github.com/go-playground/locales
+   Source: https://github.com/go-playground/locales/blob/v0.14.1/LICENSE
+   License: MIT
+
+6) github.com/go-playground/universal-translator
+   Source: https://github.com/go-playground/universal-translator/blob/v0.18.1/LICENSE
+   License: MIT
+
+7) github.com/go-playground/validator/v10
+   Source: https://github.com/go-playground/validator/blob/v10.26.0/LICENSE
+   License: MIT
+
+8) github.com/iancoleman/strcase
+   Source: https://github.com/iancoleman/strcase/blob/v0.3.0/LICENSE
+   License: MIT
+
+9) github.com/leodido/go-urn
+   Source: https://github.com/leodido/go-urn/blob/v1.4.0/LICENSE
+   License: MIT
+
+10) github.com/pb33f/libopenapi
+    Source: https://github.com/pb33f/libopenapi/blob/v0.25.3/LICENSE
+    License: MIT
+
+11) github.com/pb33f/ordered-map/v2
+    Source: https://github.com/pb33f/ordered-map/blob/v2.2.0/LICENSE
+    License: Apache-2.0
+
+12) github.com/speakeasy-api/jsonpath/pkg/jsonpath
+    Source: https://github.com/speakeasy-api/jsonpath/blob/v0.6.2/LICENSE
+    License: Apache-2.0
+
+13) golang.org/x/crypto/sha3
+    Source: https://cs.opensource.google/go/x/crypto/+/v0.36.0:LICENSE
+    License: BSD-3-Clause
+
+14) golang.org/x/mod
+    Source: https://cs.opensource.google/go/x/mod/+/v0.17.0:LICENSE
+    License: BSD-3-Clause
+
+15) golang.org/x/net/html
+    Source: https://cs.opensource.google/go/x/net/+/v0.38.0:LICENSE
+    License: BSD-3-Clause
+
+16) golang.org/x/sys/cpu
+    Source: https://cs.opensource.google/go/x/sys/+/v0.31.0:LICENSE
+    License: BSD-3-Clause
+
+17) golang.org/x/text
+    Source: https://cs.opensource.google/go/x/text/+/v0.23.0:LICENSE
+    License: BSD-3-Clause
+
+18) golang.org/x/tools
+    Source: https://cs.opensource.google/go/x/tools/+/e35e4ccd:LICENSE
+    License: BSD-3-Clause
+
+19) gopkg.in/yaml.v3
+    Source: https://github.com/go-yaml/yaml/blob/v3.0.1/LICENSE
+    License: MIT
+
+--------------------------------------------------
+This NOTICE file must be updated whenever this project adds,
+vendors, or bundles additional third-party components.
