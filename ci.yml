@@ -44,9 +44,6 @@ pipeline:
                       echo "Installing gosec..."
                       go install github.com/securego/gosec/v2/cmd/gosec@latest
                       
-                      echo "Installing tidied..."
-                      go install github.com/doordash/tidied@latest
-                      
                       # Download dependencies
                       echo "Downloading Go modules..."
                       go mod download
