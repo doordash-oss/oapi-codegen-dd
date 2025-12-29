@@ -98,6 +98,11 @@ type FilterConfig struct {
 	Exclude FilterParamsConfig `yaml:"exclude"`
 }
 
+// IsEmpty returns true if the filter is empty.
+func (o FilterConfig) IsEmpty() bool {
+	return o.Include.IsEmpty() && o.Exclude.IsEmpty()
+}
+
 // FilterParamsConfig is the configuration for filtering the paths to be parsed.
 type FilterParamsConfig struct {
 	Paths            []string            `yaml:"paths"`
@@ -105,6 +110,15 @@ type FilterParamsConfig struct {
 	OperationIDs     []string            `yaml:"operation-ids"`
 	SchemaProperties map[string][]string `yaml:"schema-properties"`
 	Extensions       []string            `yaml:"extensions"`
+}
+
+// IsEmpty returns true if the filter is empty.
+func (o FilterParamsConfig) IsEmpty() bool {
+	return len(o.Paths) == 0 &&
+		len(o.Tags) == 0 &&
+		len(o.OperationIDs) == 0 &&
+		len(o.SchemaProperties) == 0 &&
+		len(o.Extensions) == 0
 }
 
 type GenerateOptions struct {

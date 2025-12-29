@@ -20,6 +20,14 @@ paths:
               $ref: '#/components/schemas/PaySessionRequest'
       parameters:
         - $ref: '#/components/parameters/Idempotency-Key'
+        - name: inline-param
+          in: query
+          schema:
+            type: string
+          example: inline-param-example
+          examples:
+            inline-example:
+              value: inline-param-value
       responses:
         '200':
           content:
@@ -33,11 +41,24 @@ paths:
           headers:
             Idempotency-Key:
               $ref: '#/components/headers/Idempotency-Key'
+            Inline-Header:
+              schema:
+                type: string
+              example: inline-header-example
+              examples:
+                inline-header-ex:
+                  value: inline-header-value
 
 components:
   schemas:
     PaySessionRequest:
       type: object
+      example:
+        foo: schema-level-example
+      examples:
+        schema-example:
+          value:
+            foo: schema-level-examples
       properties:
         foo:
           type: string
@@ -64,6 +85,9 @@ components:
             $ref: '#/components/examples/bar-example'
     Amount:
       type: object
+      example:
+        value: 1000
+        currency: USD
       properties:
         value:
           type: integer
@@ -78,6 +102,51 @@ components:
     extra-b:
       type: string
 
+  requestBodies:
+    PaySessionRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaySessionRequest'
+          examples:
+            basic:
+              $ref: '#/components/examples/post-sessions-basic'
+        application/xml:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+                example: xml-property-example
+          example: xml-content-example
+          examples:
+            xml-example:
+              value: xml-content-examples-value
+
+  responses:
+    SuccessResponse:
+      description: Success response with examples
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: success
+          examples:
+            success-example:
+              value:
+                status: ok
+      headers:
+        X-Response-Header:
+          schema:
+            type: string
+          example: response-header-example
+          examples:
+            response-header-ex:
+              value: response-header-value
+
   headers:
     Idempotency-Key:
       description: The idempotency key
@@ -88,6 +157,9 @@ components:
             type: string
             description: The idempotency key
             example: 1234567890
+          examples:
+            content-example:
+              value: content-example-value
       example: 1234567890
       examples:
         $ref: '#/components/examples/idempotency-key'
@@ -102,8 +174,10 @@ components:
         type: string
         description: The idempotency key
         example: 1234567890
-        examples:
-          $ref: '#/components/examples/idempotency-key'
+      example: param-level-example
+      examples:
+        param-example:
+          value: param-example-value
 
   examples:
     post-sessions-basic:
