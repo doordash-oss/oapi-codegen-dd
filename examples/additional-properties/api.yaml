@@ -1,0 +1,58 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: additional-properties
+components:
+  schemas:
+    items:
+      type: array
+      additionalProperties: true
+
+    location:
+      type: object
+      additionalProperties: true
+      nullable: true
+
+    users:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/user'
+
+    user:
+      type: object
+      properties:
+        address:
+          type: object
+
+    pick-1:
+      type: object
+      nullable: true
+      maximum: 5
+      additionalProperties:
+        oneOf:
+          - type: string
+          - type: number
+
+    referenceWithRequiredExtra:
+      type: object
+      properties:
+        index:
+          $ref: '#/components/schemas/reference'
+      additionalProperties:
+        $ref: '#/components/schemas/reference'
+
+    routeWithOptionalExtra:
+      type: object
+      properties:
+        index:
+          $ref: '#/components/schemas/route'
+      additionalProperties:
+        $ref: '#/components/schemas/route'
+
+    route:
+      type: string
+      nullable: true
+
+    reference:
+      type: string
+      nullable: false

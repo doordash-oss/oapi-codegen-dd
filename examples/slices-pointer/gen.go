@@ -11,7 +11,7 @@ var schemaTypesValidate = validator.New(validator.WithRequiredStructEnabled())
 type Payments []string
 
 func (p Payments) Validate() error {
-	return schemaTypesValidate.Struct(p)
+	return nil
 }
 
 type Data map[string]any

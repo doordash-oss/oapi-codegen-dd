@@ -37,7 +37,18 @@ var {{.SpecLocation}}TypesValidate = validator.New(validator.WithRequiredStructE
     {{ if $isParam }}
     {{ if not $td.IsAlias }}
     func ({{$alias}} {{$td.Name}}) Validate() error {
-    return {{$loc}}TypesValidate.Struct({{$alias}})
+        {{- if $td.Schema.ArrayType}}
+		{{- if and $td.Schema.ArrayType.RefType (not $td.Schema.ArrayType.IsExternalRef) }}
+        for i, item := range {{$alias}} {
+            if err := item.Validate(); err != nil {
+                return fmt.Errorf("invalid item at index %d: %w", i, err)
+            }
+        }
+		{{ end }}
+        return nil
+        {{- else}}
+        return {{$loc}}TypesValidate.Struct({{$alias}})
+        {{- end}}
     }
     {{ end }}
     {{ end -}}

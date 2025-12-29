@@ -240,14 +240,6 @@ func additionalPropertiesType(schema GoSchema) string {
 		addPropsType = schema.AdditionalPropertiesType.RefType
 	}
 
-	// TODO: use Constraints property
-	if schema.AdditionalPropertiesType.OpenAPISchema != nil {
-		nullablePtr := schema.AdditionalPropertiesType.OpenAPISchema.Nullable
-		if nullablePtr != nil && *nullablePtr {
-			addPropsType = "*" + addPropsType
-		}
-	}
-
 	return addPropsType
 }
 
