@@ -1,0 +1,51 @@
+openapi: 3.0.0
+info:
+  title: Duplicate Parameters - Same Type
+  version: 1.0.0
+  description: |
+    Test duplicate parameters with the same type but different constraints.
+    Both are strings, but with different required/optional settings.
+
+paths:
+  /search:
+    get:
+      operationId: search
+      summary: Search with duplicate query parameters (same type)
+      parameters:
+        # First definition - optional string
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+          description: Filter results (first definition - optional, minLength 1)
+        
+        # Duplicate definition - required string with different constraints
+        - name: filter
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+          description: Filter results (second definition - required, maxLength 100)
+        
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: string

@@ -1,0 +1,75 @@
+openapi: 3.0.0
+info:
+  title: Duplicate Parameters - Schema References
+  version: 1.0.0
+  description: |
+    Test duplicate parameters that reference different schemas.
+    This simulates the real-world establishments/headquarters scenario from Sinao API
+    where both parameter definitions have the same name but different types.
+
+paths:
+  /organization:
+    post:
+      operationId: updateOrganization
+      summary: Update organization with duplicate establishments parameter
+      parameters:
+        - name: company_name
+          in: query
+          schema:
+            type: string
+
+        # First reference - headquarters (object type)
+        - $ref: '#/components/parameters/headquarters'
+
+        # Duplicate reference - establishments (array type)
+        # Both have name: establishments but different schemas
+        - $ref: '#/components/parameters/establishments'
+
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+components:
+  parameters:
+    # Parameter key: headquarters, but name: establishments (object type)
+    headquarters:
+      name: establishments
+      description: "Updates main establishment information (first establishment)"
+      in: query
+      schema:
+        type: object
+        properties:
+          name:
+            type: string
+          phone:
+            type: string
+          email:
+            type: string
+          address:
+            type: string
+
+    # Parameter key: establishments, also name: establishments (array type)
+    establishments:
+      name: establishments
+      description: "Update of a contact card containing the billing address"
+      in: query
+      schema:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            phone:
+              type: string
+            email:
+              type: string
+            address:
+              type: string

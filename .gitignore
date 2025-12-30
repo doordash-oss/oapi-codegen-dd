@@ -6,3 +6,4 @@ bin/
 *.iml
 .go-version
 gosec-report*.json
+pkg/codegen/integration/testdata/specs*/**/*

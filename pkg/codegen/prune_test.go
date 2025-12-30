@@ -11,6 +11,7 @@
 package codegen
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -554,3 +555,56 @@ components:
       type: string
       description: This schema is not referenced and should be pruned
 `
+
+func TestPruneInlineParameterSchemaRefs(t *testing.T) {
+	t.Run("schemas referenced in inline path parameters should not be pruned", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-param-schema-refs.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// Before filtering: should have 4 schemas (UserId, User, ItemId, Item)
+		assert.Equal(t, 4, model.Model.Components.Schemas.Len())
+
+		// Filter to only include "users" tag
+		cfg := FilterConfig{
+			Include: FilterParamsConfig{
+				Tags: []string{"users"},
+			},
+		}
+
+		filterOperations(&model.Model, cfg)
+
+		_, doc2, _, err := doc.RenderAndReload()
+		assert.NoError(t, err)
+
+		// Prune unused schemas
+		doc3, err := pruneSchema(doc2)
+		assert.NoError(t, err)
+
+		model3, err := doc3.BuildV3Model()
+		assert.NoError(t, err)
+
+		// After pruning: should have 2 schemas (UserId, User)
+		// UserId should NOT be pruned even though it's only referenced in path parameter
+		assert.Equal(t, 2, model3.Model.Components.Schemas.Len())
+
+		// Verify UserId and User exist
+		_, hasUserId := model3.Model.Components.Schemas.Get("UserId")
+		assert.True(t, hasUserId, "UserId should not be pruned - it's referenced in path parameter")
+
+		_, hasUser := model3.Model.Components.Schemas.Get("User")
+		assert.True(t, hasUser, "User should not be pruned - it's referenced in response")
+
+		// Verify ItemId and Item were pruned
+		_, hasItemId := model3.Model.Components.Schemas.Get("ItemId")
+		assert.False(t, hasItemId, "ItemId should be pruned - items tag was filtered out")
+
+		_, hasItem := model3.Model.Components.Schemas.Get("Item")
+		assert.False(t, hasItem, "Item should be pruned - items tag was filtered out")
+	})
+}

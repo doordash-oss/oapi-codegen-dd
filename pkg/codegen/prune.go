@@ -118,6 +118,10 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 func findOperationRefs(model *v3high.Document) []string {
 	refSet := make(map[string]bool)
 
+	if model.Paths == nil || model.Paths.PathItems == nil {
+		return []string{}
+	}
+
 	for _, pathItem := range model.Paths.PathItems.FromOldest() {
 		for _, op := range pathItem.GetOperations().FromOldest() {
 			if op.RequestBody != nil {
@@ -149,10 +153,18 @@ func findOperationRefs(model *v3high.Document) []string {
 				}
 				// Collect schema refs from param.Schema
 				if param.Schema != nil {
+					// Collect the $ref from the SchemaProxy itself
+					if schemaRef := param.Schema.GoLow().GetReference(); schemaRef != "" {
+						refSet[schemaRef] = true
+					}
 					collectSchemaRefs(param.Schema.Schema(), refSet)
 				}
 				for _, mediaType := range param.Content.FromOldest() {
 					if mediaType.Schema != nil {
+						// Collect the $ref from the SchemaProxy itself
+						if schemaRef := mediaType.Schema.GoLow().GetReference(); schemaRef != "" {
+							refSet[schemaRef] = true
+						}
 						collectSchemaRefs(mediaType.Schema.Schema(), refSet)
 					}
 				}

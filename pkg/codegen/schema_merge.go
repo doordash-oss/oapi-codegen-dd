@@ -258,20 +258,21 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 		return s2, nil
 	}
 
-	if !slices.Equal(t1, t2) {
-		log.Printf("DEBUG: ===== MERGE FAILURE =====")
-		log.Printf("DEBUG: Schema 1 - type=%v, hasProps=%v, hasItems=%v, title=%s", t1, s1.Properties != nil, s1.Items != nil, s1.Title)
-		log.Printf("DEBUG: Schema 2 - type=%v, hasProps=%v, hasItems=%v, title=%s", t2, s2.Properties != nil, s2.Items != nil, s2.Title)
-		log.Printf("DEBUG: =========================")
-		return nil, fmt.Errorf("can not merge incompatible types: %v, %v", t1, t2)
-	}
-
+	// Handle nil types first before comparing
 	if t1 == nil && t2 == nil {
 		return nil, nil
 	} else if t1 == nil {
 		return s2, nil
 	} else if t2 == nil {
 		return s1, nil
+	}
+
+	if !slices.Equal(t1, t2) {
+		log.Printf("DEBUG: ===== MERGE FAILURE =====")
+		log.Printf("DEBUG: Schema 1 - type=%v, hasProps=%v, hasItems=%v, title=%s", t1, s1.Properties != nil, s1.Items != nil, s1.Title)
+		log.Printf("DEBUG: Schema 2 - type=%v, hasProps=%v, hasItems=%v, title=%s", t2, s2.Properties != nil, s2.Items != nil, s2.Title)
+		log.Printf("DEBUG: =========================")
+		return nil, fmt.Errorf("can not merge incompatible types: %v, %v", t1, t2)
 	}
 
 	for k, v := range s2.Extensions.FromOldest() {

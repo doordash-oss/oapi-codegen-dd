@@ -1,0 +1,4 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: globalparams
+skip-prune: true
+

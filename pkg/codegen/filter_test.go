@@ -173,4 +173,35 @@ func TestFilterOperationsByOperationID(t *testing.T) {
 		jsonRespContent := response.Content.GetOrZero("application/json")
 		assert.Equal(t, 0, jsonRespContent.Examples.Len())
 	})
+
+	t.Run("examples removed from webhooks", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+		require.NoError(t, err)
+
+		opts := Configuration{
+			PackageName: packageName,
+			Output: &Output{
+				UseSingleFile: true,
+			},
+		}
+
+		// Run our code generation - should not error
+		code, err := Generate(contents, opts)
+		require.NoError(t, err)
+		assert.NotEmpty(t, code)
+
+		// Load the document to verify examples are removed
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		// Apply filtering (which includes example removal)
+		filteredDoc, err := filterOutDocument(doc, opts.Filter)
+		require.NoError(t, err)
+
+		model, err := filteredDoc.BuildV3Model()
+		require.NoError(t, err)
+
+		// components/examples should be empty
+		assert.Equal(t, 0, model.Model.Components.Examples.Len())
+	})
 }

@@ -1,0 +1,36 @@
+openapi: 3.0.0
+info:
+  title: Duplicate Local Parameters Test
+  version: 1.0.0
+  description: Test handling of duplicate local parameters
+
+paths:
+  /test:
+    get:
+      operationId: getTest
+      parameters:
+        # First definition of 'filter' query param
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+          description: First filter parameter
+        # Duplicate definition of 'filter' query param
+        - name: filter
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Second filter parameter (duplicate)
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+

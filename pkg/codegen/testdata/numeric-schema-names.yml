@@ -1,0 +1,57 @@
+openapi: 3.0.0
+info:
+  title: Numeric Schema Names Test
+  version: 1.0.0
+  description: Test that schema names starting with numbers are handled correctly
+
+paths:
+  /test:
+    get:
+      operationId: getTest
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/400'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/401'
+
+components:
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    '400':
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+
+    '401':
+      type: object
+      properties:
+        error:
+          type: string
+

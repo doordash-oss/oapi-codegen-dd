@@ -91,6 +91,69 @@ func TestExtPropGoTypeSkipOptionalPointer(t *testing.T) {
 	assert.Contains(t, code, "RequiredField          string  `json:\"requiredField\" validate:\"required\"`")
 }
 
+func TestNumericSchemaNames(t *testing.T) {
+	packageName := "api"
+	cfg := Configuration{
+		PackageName: packageName,
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+	spec := "testdata/numeric-schema-names.yml"
+	docContents, err := os.ReadFile(spec)
+	require.NoError(t, err)
+
+	// Run our code generation:
+	codes, err := Generate(docContents, cfg)
+	require.NoError(t, err)
+	assert.NotEmpty(t, codes)
+
+	code := codes.GetCombined()
+
+	// Check that we have valid (formattable) code:
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
+
+	// Check that numeric schema names are prefixed with "N"
+	assert.Contains(t, code, "type N400 struct")
+	assert.Contains(t, code, "type N401 struct")
+
+	// Check that nested types with numeric parent schemas are also prefixed
+	assert.Contains(t, code, "type N400_Issues struct")
+	assert.NotContains(t, code, "type 400_Issues struct") // Should NOT have unprefixed version
+	assert.NotContains(t, code, "[]400_Issues")           // Should NOT have unprefixed array type
+}
+
+func TestDuplicateLocalParameters(t *testing.T) {
+	packageName := "api"
+	cfg := Configuration{
+		PackageName: packageName,
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+	spec := "testdata/duplicate-local-params.yml"
+	docContents, err := os.ReadFile(spec)
+	require.NoError(t, err)
+
+	// Currently, duplicate local parameters are silently ignored (first one wins)
+	// This test documents the current behavior
+	codes, err := Generate(docContents, cfg)
+	require.NoError(t, err)
+	assert.NotEmpty(t, codes)
+
+	code := codes.GetCombined()
+
+	// Check that we have valid (formattable) code:
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
+
+	// The first parameter definition should be used (string, not required)
+	// The duplicate (integer, required) should be silently ignored
+	assert.Contains(t, code, "Filter *string")
+	assert.NotContains(t, code, "Filter *int")
+}
+
 func TestGoTypeImport(t *testing.T) {
 	packageName := "api"
 	cfg := Configuration{

@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  version: '1'
+  title: Examples with $ref test
+webhooks:
+  balancePlatform.payment.created:
+    post:
+      summary: Payment created
+      operationId: post-balancePlatform.payment.created
+      requestBody:
+        content:
+          application/json:
+            examples:
+              payment-created-authorized:
+                $ref: '#/components/examples/post-balancePlatform.payment.created-authorized'
+              payment-created-rejected:
+                $ref: '#/components/examples/post-balancePlatform.payment.created-rejected'
+            schema:
+              $ref: '#/components/schemas/PaymentNotificationRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                payment-created-authorized:
+                  $ref: '#/components/examples/WebhookAck'
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+          description: OK
+components:
+  schemas:
+    PaymentNotificationRequest:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/PaymentData'
+        type:
+          type: string
+    PaymentData:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          $ref: '#/components/schemas/Amount'
+    Amount:
+      type: object
+      properties:
+        value:
+          type: integer
+        currency:
+          type: string
+    NotificationResponse:
+      type: object
+      properties:
+        notificationResponse:
+          type: string
+  examples:
+    WebhookAck:
+      summary: Acknowledge Webhook
+      value:
+        notificationResponse: '[accepted]'
+    post-balancePlatform.payment.created-authorized:
+      summary: Payment authorized
+      value:
+        data:
+          id: '1W1UG35QDNNE694X'
+          amount:
+            currency: EUR
+            value: -2000
+        type: balancePlatform.payment.created
+    post-balancePlatform.payment.created-rejected:
+      summary: Payment declined
+      value:
+        data:
+          id: '2L470J5Q6VVUAWGT'
+          amount:
+            currency: EUR
+            value: -1000
+        type: balancePlatform.payment.created
+

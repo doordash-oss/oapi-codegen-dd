@@ -202,8 +202,6 @@ func combineOperationParameters(globalParams []ParameterDefinition, localParams 
 		if _, exist := dupCheck[p.In][p.ParamName]; !exist {
 			dupCheck[p.In][p.ParamName] = "local"
 			allParams = append(allParams, p)
-		} else {
-			return nil, fmt.Errorf("duplicate local parameter %s/%s", p.In, p.ParamName)
 		}
 	}
 
@@ -211,12 +209,12 @@ func combineOperationParameters(globalParams []ParameterDefinition, localParams 
 		if dupCheck[p.In] == nil {
 			dupCheck[p.In] = make(map[string]string)
 		}
-		if t, exist := dupCheck[p.In][p.ParamName]; !exist {
+		if _, exist := dupCheck[p.In][p.ParamName]; !exist {
 			dupCheck[p.In][p.ParamName] = "global"
 			allParams = append(allParams, p)
-		} else if t == "global" {
-			return nil, fmt.Errorf("duplicate global parameter %s/%s", p.In, p.ParamName)
 		}
+		// Duplicate global parameter - skip (first wins)
+		// Consistent with duplicate local parameter handling
 	}
 
 	return allParams, nil

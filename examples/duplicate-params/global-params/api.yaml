@@ -1,0 +1,51 @@
+openapi: 3.0.0
+info:
+  title: Duplicate Global Parameters
+  version: 1.0.0
+  description: |
+    Test duplicate global parameters (defined at path level).
+    Global parameters apply to all operations on a path.
+
+paths:
+  /items:
+    # Global parameters - apply to all operations on this path
+    parameters:
+      # First definition of 'filter' - this one will be used
+      - name: filter
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Filter items (first definition - string)
+      
+      # Duplicate definition of 'filter' - this will be ignored
+      - name: filter
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: Filter items (second definition - integer, IGNORED)
+    
+    get:
+      operationId: getItems
+      summary: Get items
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: string
+    
+    post:
+      operationId: createItem
+      summary: Create item
+      responses:
+        '201':
+          description: Created
+

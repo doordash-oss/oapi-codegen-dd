@@ -1,0 +1,21 @@
+openapi: 3.0.0
+info:
+  title: Merge empty schemas test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergedObject'
+components:
+  schemas:
+    MergedObject:
+      allOf:
+        - {}  # Empty schema
+        - {}  # Empty schema
+

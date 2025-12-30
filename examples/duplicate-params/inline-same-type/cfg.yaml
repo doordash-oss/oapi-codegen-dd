@@ -1,0 +1,4 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: inlinesametype
+skip-prune: true
+

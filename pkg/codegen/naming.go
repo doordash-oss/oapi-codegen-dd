@@ -409,7 +409,7 @@ func schemaNameToTypeName(name string) string {
 // type name.
 func pathToTypeName(path []string) string {
 	for i, p := range path {
-		path[i] = nameNormalizer(p)
+		path[i] = typeNamePrefix(p) + nameNormalizer(p)
 	}
 	return strings.Join(path, "_")
 }

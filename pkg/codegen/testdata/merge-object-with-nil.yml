@@ -1,0 +1,24 @@
+openapi: 3.0.0
+info:
+  title: Merge object with nil test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergedObject'
+components:
+  schemas:
+    MergedObject:
+      allOf:
+        - type: object
+          properties:
+            name:
+              type: string
+        - {}  # Empty schema (no type) - will result in nil type
+

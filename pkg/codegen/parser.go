@@ -288,6 +288,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 
 		formatted, err := FormatCode(res)
 		if err != nil {
+			println(res)
 			return nil, err
 		}
 		typesOut = map[string]string{"all": formatted}

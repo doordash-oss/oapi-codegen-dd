@@ -14,10 +14,13 @@
 package integration
 
 import (
+	"embed"
 	"fmt"
 	"io"
-	"net/http"
+	"io/fs"
+	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/doordash/oapi-codegen-dd/v3/pkg/codegen"
@@ -25,19 +28,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIntegration_fromURLs(t *testing.T) {
-	urls := map[string]string{
-		"adyen":  "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/CheckoutService-v71.yaml",
-		"stripe": "https://raw.githubusercontent.com/stripe/openapi/refs/heads/master/openapi/spec3.yaml",
-	}
-	cfg := codegen.NewDefaultConfiguration()
+//go:embed testdata/specs
+var specsFS embed.FS
 
-	for name, url := range urls {
+func TestIntegration(t *testing.T) {
+	specPath := os.Getenv("SPEC")
+
+	// Collect specs to process
+	specs := collectSpecs(t, specPath)
+	if len(specs) == 0 {
+		log.Println("No specs to process, skipping integration test")
+		return
+	}
+
+	log.Printf("Found %d spec(s) to process\n", len(specs))
+
+	cfg := codegen.Configuration{
+		PackageName: "integration",
+		Generate: &codegen.GenerateOptions{
+			Client: true,
+		},
+		Client: &codegen.Client{
+			Name: "IntegrationClient",
+		},
+	}
+	cfg = cfg.Merge(codegen.NewDefaultConfiguration())
+
+	for _, name := range specs {
 		t.Run(fmt.Sprintf("test-%s", name), func(t *testing.T) {
 			t.Parallel()
 
-			fmt.Printf("[%s] Downloading file from %s\n", name, url)
-			contents, err := downloadFile(url)
+			contents, err := getFileContents(name)
 			if err != nil {
 				t.Fatalf("failed to download file: %s", err)
 			}
@@ -47,51 +68,11 @@ func TestIntegration_fromURLs(t *testing.T) {
 			require.NoError(t, err, "failed to generate code")
 			require.NotNil(t, res, "result should not be nil")
 
-			assert.NotNil(t, res["client"])
-			assert.NotNil(t, res["client_options"])
-			assert.NotNil(t, res["types"])
-
+			assert.NotNil(t, res["package integration"])
+			assert.NotNil(t, res["type IntegrationClient struct {"])
+			assert.NotNil(t, res["RequestOptions struct {"])
 		})
 	}
-
-	files := map[string]string{
-		"train-travel-api": "../testdata/train-travel-api.yml",
-	}
-	for name, filePath := range files {
-		t.Run(fmt.Sprintf("test-%s", name), func(t *testing.T) {
-			t.Parallel()
-
-			fmt.Printf("[%s] Opening file from %s\n", name, filePath)
-			contents, err := getFileContents(filePath)
-			if err != nil {
-				t.Fatalf("failed to download file: %s", err)
-			}
-
-			fmt.Printf("[%s] Generating code\n", name)
-			res, err := codegen.Generate(contents, cfg)
-			require.NoError(t, err, "failed to generate code")
-			require.NotNil(t, res, "result should not be nil")
-
-			assert.NotNil(t, res["client"])
-			assert.NotNil(t, res["client_options"])
-			assert.NotNil(t, res["types"])
-
-		})
-	}
-}
-
-func downloadFile(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to download file: %s (status code: %d)", url, resp.StatusCode)
-	}
-
-	return io.ReadAll(resp.Body)
 }
 
 func getFileContents(filePath string) ([]byte, error) {
@@ -99,7 +80,7 @@ func getFileContents(filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contents, err := io.ReadAll(file)
 	if err != nil {
@@ -107,4 +88,39 @@ func getFileContents(filePath string) ([]byte, error) {
 	}
 
 	return contents, nil
+}
+
+func collectSpecs(t *testing.T, specPath string) []string {
+	var specs []string
+
+	if specPath != "" {
+		specs = append(specs, specPath)
+		return specs
+	}
+
+	// Walk through testdata/specs
+	err := fs.WalkDir(specsFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		fileName := d.Name()
+		if fileName[0] == '-' || strings.Contains(path, "/stash/") {
+			return nil
+		}
+
+		if strings.HasSuffix(fileName, ".yml") || strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".json") {
+			specs = append(specs, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to walk specs directory: %v", err)
+	}
+
+	return specs
 }

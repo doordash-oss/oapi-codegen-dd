@@ -1,0 +1,59 @@
+openapi: 3.0.0
+info:
+  title: Duplicate Parameters Example
+  version: 1.0.0
+  description: |
+    This example demonstrates how the code generator handles duplicate parameters.
+    
+    According to OpenAPI spec, duplicate parameters (same name and location) are invalid.
+    However, this generator currently silently ignores duplicates and uses the first definition.
+
+paths:
+  /search:
+    get:
+      operationId: search
+      summary: Search with duplicate query parameters
+      description: |
+        This endpoint has duplicate 'filter' query parameters.
+        The first definition (string, optional) will be used.
+        The second definition (integer, required) will be silently ignored.
+      parameters:
+        # First definition - this one will be used
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter results (first definition - string, optional)
+        
+        # Duplicate definition - this will be silently ignored
+        - name: filter
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Filter results (second definition - integer, required) - IGNORED
+        
+        # Non-duplicate parameter
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+          description: Maximum number of results
+      
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: string
+                  count:
+                    type: integer

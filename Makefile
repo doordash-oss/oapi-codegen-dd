@@ -61,7 +61,13 @@ tidy-ci:
 	# then, for all child modules, use a module-managed `Makefile`
 	git ls-files '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && make tidy-ci'
 
-test-integration:
+.PHONY: fetch-specs
+fetch-specs:
+	rm -rf ./pkg/codegen/integration/testdata/specs
+	git clone https://github.com/cubahno/specs.git ./pkg/codegen/integration/testdata/specs
+	find ./pkg/codegen/integration/testdata/specs -mindepth 1 -name ".*" -exec rm -rf {} +
+
+test-integration: fetch-specs
 	go test -v -tags=integration ./pkg/codegen/integration/...
 
 check-all: generate lint test test-integration

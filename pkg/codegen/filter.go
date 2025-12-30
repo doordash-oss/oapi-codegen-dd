@@ -28,6 +28,9 @@ func filterOutDocument(doc libopenapi.Document, cfg FilterConfig) (libopenapi.Do
 		return nil, fmt.Errorf("error building model: %w", err)
 	}
 
+	// Remove webhooks - we don't generate code for them
+	model.Model.Webhooks = nil
+
 	removeAllExamples(&model.Model)
 	filterOperations(&model.Model, cfg)
 	filterComponentSchemaProperties(&model.Model, cfg)

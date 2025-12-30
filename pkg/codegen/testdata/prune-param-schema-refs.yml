@@ -1,0 +1,68 @@
+openapi: 3.0.0
+info:
+  title: Prune parameter schema refs test
+  version: 1.0.0
+paths:
+  /users/{userId}:
+    get:
+      summary: Get user by ID
+      operationId: getUser
+      tags:
+        - users
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UserId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /items/{itemId}:
+    get:
+      summary: Get item by ID
+      operationId: getItem
+      tags:
+        - items
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ItemId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+components:
+  schemas:
+    UserId:
+      type: string
+      pattern: '^[0-9]+$'
+      description: User ID
+    User:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UserId'
+        name:
+          type: string
+    ItemId:
+      type: string
+      pattern: '^[A-Z0-9]+$'
+      description: Item ID
+    Item:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ItemId'
+        title:
+          type: string
+

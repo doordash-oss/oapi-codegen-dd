@@ -1,0 +1,55 @@
+openapi: 3.1.0
+info:
+  version: '1'
+  title: Webhooks with examples test
+webhooks:
+  payment.created:
+    post:
+      summary: Payment created
+      operationId: paymentCreated
+      requestBody:
+        content:
+          application/json:
+            examples:
+              payment-authorized:
+                $ref: '#/components/examples/PaymentAuthorized'
+              payment-rejected:
+                $ref: '#/components/examples/PaymentRejected'
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                success:
+                  $ref: '#/components/examples/SuccessResponse'
+              schema:
+                $ref: '#/components/schemas/Response'
+          description: OK
+components:
+  schemas:
+    PaymentRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+    Response:
+      type: object
+      properties:
+        status:
+          type: string
+  examples:
+    PaymentAuthorized:
+      summary: Payment authorized
+      value:
+        amount: 2000
+    PaymentRejected:
+      summary: Payment rejected
+      value:
+        amount: 1000
+    SuccessResponse:
+      summary: Success
+      value:
+        status: ok
+

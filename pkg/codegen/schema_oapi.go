@@ -144,7 +144,7 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 		}, nil
 	}
 
-	if slices.Contains(t, "boolean") {
+	if slices.Contains(t, "boolean") || slices.Contains(t, "bool") {
 		if f != "" {
 			return GoSchema{}, fmt.Errorf("invalid format (%s) for boolean", f)
 		}

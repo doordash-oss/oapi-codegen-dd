@@ -390,6 +390,59 @@ func Test_replaceInitialism(t *testing.T) {
 	}
 }
 
+func TestPathToTypeName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path []string
+		want string
+	}{
+		{
+			name: "simple path",
+			path: []string{"User", "Address"},
+			want: "User_Address",
+		},
+		{
+			name: "path with numeric component",
+			path: []string{"Response", "400"},
+			want: "Response_N400",
+		},
+		{
+			name: "path with multiple numeric components",
+			path: []string{"Error", "400", "Issues"},
+			want: "Error_N400_Issues",
+		},
+		{
+			name: "path starting with number",
+			path: []string{"400", "Issues"},
+			want: "N400_Issues",
+		},
+		{
+			name: "path with special characters",
+			path: []string{"Response", "$ref"},
+			want: "Response_Ref",
+		},
+		{
+			name: "path with underscore prefix",
+			path: []string{"Object", "_field"},
+			want: "Object_UnderscoreField",
+		},
+		{
+			name: "path with dash prefix",
+			path: []string{"Object", "-1"},
+			want: "Object_Minus1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pathToTypeName(tt.path)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestIsMediaTypeJson(t *testing.T) {
 	type test struct {
 		name      string
