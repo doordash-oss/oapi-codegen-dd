@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: Sensitive Data Example
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+          x-sensitive-data:
+            mask: full
+        ssn:
+          type: string
+          x-sensitive-data:
+            mask: regex
+            pattern: '\d{3}-\d{2}-\d{4}'
+        creditCard:
+          type: string
+          x-sensitive-data:
+            mask: partial
+            keepSuffix: 4
+        apiKey:
+          type: string
+          x-sensitive-data:
+            mask: hash
+            algorithm: sha256

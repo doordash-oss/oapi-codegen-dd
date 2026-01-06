@@ -1,0 +1,6 @@
+package: xsensitivedata
+skip-prune: true
+generate:
+  models: true
+output:
+  use-single-file: true

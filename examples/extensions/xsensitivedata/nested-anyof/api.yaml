@@ -1,0 +1,192 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Nested AnyOf with Sensitive Data Example
+  description: |
+    Example demonstrating nested anyOf structures with sensitive data
+    in deeply nested objects.
+
+components:
+  schemas:
+    # Base payment method
+    PaymentMethod:
+      anyOf:
+        - $ref: '#/components/schemas/CreditCardPayment'
+        - $ref: '#/components/schemas/BankTransferPayment'
+        - $ref: '#/components/schemas/DigitalWalletPayment'
+
+    # Credit card payment with nested billing address
+    CreditCardPayment:
+      type: object
+      required:
+        - type
+        - cardNumber
+      properties:
+        type:
+          type: string
+          enum: [credit_card]
+        cardNumber:
+          type: string
+          x-sensitive-data:
+            mask: partial
+            keepSuffix: 4
+        cvv:
+          type: string
+          x-sensitive-data:
+            mask: full
+        billingAddress:
+          $ref: '#/components/schemas/Address'
+
+    # Bank transfer with nested account details
+    BankTransferPayment:
+      type: object
+      required:
+        - type
+        - accountDetails
+      properties:
+        type:
+          type: string
+          enum: [bank_transfer]
+        accountDetails:
+          anyOf:
+            - $ref: '#/components/schemas/DomesticAccount'
+            - $ref: '#/components/schemas/InternationalAccount'
+
+    # Domestic bank account
+    DomesticAccount:
+      type: object
+      required:
+        - accountType
+        - routingNumber
+        - accountNumber
+      properties:
+        accountType:
+          type: string
+          enum: [domestic]
+        routingNumber:
+          type: string
+          x-sensitive-data:
+            mask: partial
+            keepPrefix: 2
+            keepSuffix: 2
+        accountNumber:
+          type: string
+          x-sensitive-data:
+            mask: partial
+            keepSuffix: 4
+        accountHolder:
+          $ref: '#/components/schemas/AccountHolder'
+
+    # International bank account with deeply nested sensitive data
+    InternationalAccount:
+      type: object
+      required:
+        - accountType
+        - iban
+        - swiftCode
+      properties:
+        accountType:
+          type: string
+          enum: [international]
+        iban:
+          type: string
+          x-sensitive-data:
+            mask: partial
+            keepPrefix: 4
+            keepSuffix: 4
+        swiftCode:
+          type: string
+          x-sensitive-data:
+            mask: full
+        accountHolder:
+          $ref: '#/components/schemas/AccountHolder'
+        beneficiaryDetails:
+          anyOf:
+            - $ref: '#/components/schemas/PersonalBeneficiary'
+            - $ref: '#/components/schemas/BusinessBeneficiary'
+
+    # Personal beneficiary - deeply nested with sensitive data
+    PersonalBeneficiary:
+      type: object
+      required:
+        - beneficiaryType
+        - fullName
+      properties:
+        beneficiaryType:
+          type: string
+          enum: [personal]
+        fullName:
+          type: string
+        ssn:
+          type: string
+          x-sensitive-data:
+            mask: regex
+            pattern: '\d'
+        dateOfBirth:
+          type: string
+          format: date
+        email:
+          type: string
+          x-sensitive-data:
+            mask: full
+        phone:
+          type: string
+          x-sensitive-data:
+            mask: partial
+            keepPrefix: 3
+            keepSuffix: 4
+
+    # Business beneficiary
+    BusinessBeneficiary:
+      type: object
+      required:
+        - beneficiaryType
+        - companyName
+      properties:
+        beneficiaryType:
+          type: string
+          enum: [business]
+        companyName:
+          type: string
+        taxId:
+          type: string
+          x-sensitive-data:
+            mask: hash
+            algorithm: sha256
+
+    # Digital wallet payment
+    DigitalWalletPayment:
+      type: object
+      required:
+        - type
+        - walletId
+      properties:
+        type:
+          type: string
+          enum: [digital_wallet]
+        walletId:
+          type: string
+          x-sensitive-data:
+            mask: hash
+            algorithm: sha256
+
+    # Supporting schemas
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        zipCode:
+          type: string
+
+    AccountHolder:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          x-sensitive-data:
+            mask: full

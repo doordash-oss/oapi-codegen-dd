@@ -55,11 +55,12 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 			typeName := pathToTypeName(append(path, "Item"))
 
 			typeDef := TypeDefinition{
-				Name:           typeName,
-				JsonName:       strings.Join(append(path, "Item"), "."),
-				Schema:         arrayType,
-				SpecLocation:   SpecLocationSchema,
-				NeedsMarshaler: needsMarshaler(arrayType),
+				Name:             typeName,
+				JsonName:         strings.Join(append(path, "Item"), "."),
+				Schema:           arrayType,
+				SpecLocation:     SpecLocationSchema,
+				NeedsMarshaler:   needsMarshaler(arrayType),
+				HasSensitiveData: hasSensitiveData(arrayType),
 			}
 			options.AddType(typeDef)
 			arrayType.AdditionalTypes = append(arrayType.AdditionalTypes, typeDef)

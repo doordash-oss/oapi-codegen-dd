@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"go.yaml.in/yaml/v4"
 )
@@ -46,6 +47,9 @@ const (
 	// extOapiCodegenOnlyHonourGoName explicitly enforces the generation of a
 	// field as the `x-go-name` extension describes it.
 	extOapiCodegenOnlyHonourGoName = "x-oapi-codegen-only-honour-go-name"
+
+	// extSensitiveData marks a field as containing sensitive data that should be masked
+	extSensitiveData = "x-sensitive-data"
 )
 
 func extExtraTags(extPropValue any) (map[string]string, error) {
@@ -126,7 +130,11 @@ func extractExtensions(schemaExtensions *orderedmap.Map[string, *yaml.Node]) map
 				if k == "" {
 					continue
 				}
-				v := n.Value
+				// Decode the value based on its type
+				var v any
+				if err := n.Decode(&v); err != nil {
+					v = n.Value // fallback to string value
+				}
 				inner[k] = v
 				k = ""
 			}
@@ -156,4 +164,13 @@ func parseBooleanValue(value any) (bool, error) {
 		return b, nil
 	}
 	return false, fmt.Errorf("failed to convert type: %T", value)
+}
+
+// extParseSensitiveData parses the x-sensitive-data extension value into runtime.SensitiveDataConfig
+func extParseSensitiveData(extPropValue any) (*runtime.SensitiveDataConfig, error) {
+	config := runtime.NewDefaultSensitiveDataConfig()
+	if err := config.Unmarshal(extPropValue); err != nil {
+		return nil, err
+	}
+	return config, nil
 }

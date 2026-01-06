@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
 )
 
 type Property struct {
@@ -24,6 +26,7 @@ type Property struct {
 	Extensions    map[string]any
 	Deprecated    bool
 	Constraints   Constraints
+	SensitiveData *runtime.SensitiveDataConfig
 }
 
 func (p Property) IsEqual(other Property) bool {
@@ -210,6 +213,13 @@ func genFieldsFromProperties(props []Property, options ParseOptions) []string {
 				}
 			}
 		}
+
+		// Support x-sensitive-data - add a simple marker tag
+		// The actual masking is handled via custom MarshalJSON generation
+		if _, ok := p.Extensions[extSensitiveData]; ok {
+			fieldTags["sensitive"] = ""
+		}
+
 		// Convert the fieldTags map into Go field annotations.
 		keys := sortedMapKeys(fieldTags)
 		tags := make([]string, len(keys))

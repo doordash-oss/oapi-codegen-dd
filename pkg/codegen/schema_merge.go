@@ -77,11 +77,12 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 
 		anyOfName := pathToTypeName(anyOfPath)
 		td := TypeDefinition{
-			Name:           anyOfName,
-			Schema:         anyOfSchema,
-			SpecLocation:   SpecLocationUnion,
-			JsonName:       "-",
-			NeedsMarshaler: needsMarshaler(anyOfSchema),
+			Name:             anyOfName,
+			Schema:           anyOfSchema,
+			SpecLocation:     SpecLocationUnion,
+			JsonName:         "-",
+			NeedsMarshaler:   needsMarshaler(anyOfSchema),
+			HasSensitiveData: hasSensitiveData(anyOfSchema),
 		}
 		additionalTypes = append(additionalTypes, td)
 		options.AddType(td)
@@ -112,11 +113,12 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 
 		oneOfName := pathToTypeName(oneOfPath)
 		additionalTypes = append(additionalTypes, TypeDefinition{
-			Name:           oneOfName,
-			Schema:         oneOfSchema,
-			SpecLocation:   SpecLocationUnion,
-			JsonName:       "-",
-			NeedsMarshaler: needsMarshaler(oneOfSchema),
+			Name:             oneOfName,
+			Schema:           oneOfSchema,
+			SpecLocation:     SpecLocationUnion,
+			JsonName:         "-",
+			NeedsMarshaler:   needsMarshaler(oneOfSchema),
+			HasSensitiveData: hasSensitiveData(oneOfSchema),
 		})
 
 		out.Properties = append(out.Properties, Property{
@@ -236,10 +238,11 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		})
 
 		additionalTypes = append(additionalTypes, TypeDefinition{
-			Name:           fieldName,
-			Schema:         resolved,
-			SpecLocation:   SpecLocationUnion,
-			NeedsMarshaler: needsMarshaler(resolved),
+			Name:             fieldName,
+			Schema:           resolved,
+			SpecLocation:     SpecLocationUnion,
+			NeedsMarshaler:   needsMarshaler(resolved),
+			HasSensitiveData: hasSensitiveData(resolved),
 		})
 		additionalTypes = append(additionalTypes, resolved.AdditionalTypes...)
 	}
@@ -247,10 +250,11 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 	out.GoType = out.createGoStruct(genFieldsFromProperties(out.Properties, options))
 
 	td := TypeDefinition{
-		Name:           pathToTypeName(path),
-		Schema:         out,
-		SpecLocation:   SpecLocationUnion,
-		NeedsMarshaler: needsMarshaler(out),
+		Name:             pathToTypeName(path),
+		Schema:           out,
+		SpecLocation:     SpecLocationUnion,
+		NeedsMarshaler:   needsMarshaler(out),
+		HasSensitiveData: hasSensitiveData(out),
 	}
 	options.AddType(td)
 	out.AdditionalTypes = append(out.AdditionalTypes, td)

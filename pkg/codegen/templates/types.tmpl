@@ -73,12 +73,53 @@ func init() {
     {{ end }}
 
     {{ if and $td.NeedsMarshaler (not $td.IsAlias) (not $td.Schema.HasAdditionalProperties) (not $td.Schema.ArrayType) }}
+    {{- $hasNamed := false }}
+    {{- range $td.Schema.Properties }}{{ if ne .JsonFieldName "" }}{{ $hasNamed = true }}{{ end }}{{ end }}
     func ({{$alias}} {{$td.Name}}) MarshalJSON() ([]byte, error) {
+        {{- if $td.HasSensitiveData }}
+        // Create a copy for masking sensitive fields
+        type _Alias_{{$td.Name}} {{$td.Name}}
+        masked := _Alias_{{$td.Name}}({{$alias}})
+
+        {{- range $td.Schema.Properties }}
+            {{- if .SensitiveData }}
+            // Mask sensitive field: {{ .GoName }}
+            {{- if .IsPointerType }}
+            if masked.{{ .GoName }} != nil {
+                maskedVal := runtime.MaskSensitivePointer(masked.{{ .GoName }}, runtime.SensitiveDataConfig{
+                    Type: runtime.MaskType{{ .SensitiveData.Mask | ucFirst }},
+                    Pattern: "{{ .SensitiveData.EscapedPattern }}",
+                    Algorithm: "{{ .SensitiveData.Algorithm }}",
+                    KeepPrefix: {{ .SensitiveData.KeepPrefix }},
+                    KeepSuffix: {{ .SensitiveData.KeepSuffix }},
+                })
+                if maskedVal == nil {
+                    masked.{{ .GoName }} = nil
+                } else {
+                    val := maskedVal.({{ .Schema.TypeDecl }})
+                    masked.{{ .GoName }} = &val
+                }
+            }
+            {{- else }}
+            {
+                maskedVal := runtime.MaskSensitiveValue(masked.{{ .GoName }}, runtime.SensitiveDataConfig{
+                    Type: runtime.MaskType{{ .SensitiveData.Mask | ucFirst }},
+                    Pattern: "{{ .SensitiveData.EscapedPattern }}",
+                    Algorithm: "{{ .SensitiveData.Algorithm }}",
+                    KeepPrefix: {{ .SensitiveData.KeepPrefix }},
+                    KeepSuffix: {{ .SensitiveData.KeepSuffix }},
+                })
+                masked.{{ .GoName }} = maskedVal.({{ .Schema.TypeDecl }})
+            }
+            {{- end }}
+            {{- end }}
+        {{- end }}
+
+        return json.Marshal(masked)
+        {{- else }}
         var parts []json.RawMessage
 
         {{/*1. Marshal the full struct via type alias (avoids recursion)*/}}
-        {{- $hasNamed := false }}
-        {{- range $td.Schema.Properties }}{{ if ne .JsonFieldName "" }}{{ $hasNamed = true }}{{ end }}{{ end }}
         {{ if $hasNamed }}
             type _Alias_{{$td.Name}} {{$td.Name}}
             baseJSON, err := json.Marshal((_Alias_{{$td.Name}})({{$alias}}))
@@ -102,6 +143,7 @@ func init() {
         {{- end }}
 
         return runtime.CoalesceOrMerge(parts...)
+        {{- end }}
     }
 
     func ({{$alias}} *{{$td.Name}}) UnmarshalJSON(data []byte) error {

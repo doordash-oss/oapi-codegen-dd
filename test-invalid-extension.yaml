@@ -1,0 +1,43 @@
+openapi: 3.0.0
+info:
+  title: Test Invalid Extension
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    TestInvalidArray:
+      type: object
+      properties:
+        field1:
+          type: string
+          x-sensitive-data: [1, 2, 3]  # Invalid: array
+    
+    TestInvalidNumber:
+      type: object
+      properties:
+        field2:
+          type: string
+          x-sensitive-data: 123  # Invalid: number
+    
+    TestInvalidObject:
+      type: object
+      properties:
+        field3:
+          type: string
+          x-sensitive-data:
+            wrongField: "value"  # Valid object but missing 'mask' field
+    
+    TestValidBoolean:
+      type: object
+      properties:
+        field4:
+          type: string
+          x-sensitive-data: true  # Valid: boolean
+    
+    TestValidString:
+      type: object
+      properties:
+        field5:
+          type: string
+          x-sensitive-data: "full"  # Valid: string
+

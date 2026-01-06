@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 )
 
@@ -139,10 +140,11 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 					}
 
 					typeDef := TypeDefinition{
-						Name:         typeName,
-						JsonName:     strings.Join(propertyPath, "."),
-						Schema:       pSchema,
-						SpecLocation: specLocation,
+						Name:             typeName,
+						JsonName:         strings.Join(propertyPath, "."),
+						Schema:           pSchema,
+						SpecLocation:     specLocation,
+						HasSensitiveData: hasSensitiveData(pSchema),
 					}
 					options.AddType(typeDef)
 					pSchema.AdditionalTypes = append(pSchema.AdditionalTypes, typeDef)
@@ -151,6 +153,7 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 				description := ""
 				extensions := make(map[string]any)
 				deprecated := false
+				var sensitiveData *runtime.SensitiveDataConfig
 
 				if p.Schema() != nil {
 					s := p.Schema()
@@ -158,6 +161,13 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 					extensions = extractExtensions(s.Extensions)
 					if s.Deprecated != nil {
 						deprecated = *s.Deprecated
+					}
+
+					// Parse x-sensitive-data extension
+					if extension, ok := extensions[extSensitiveData]; ok {
+						if config, err := extParseSensitiveData(extension); err == nil {
+							sensitiveData = config
+						}
 					}
 				}
 
@@ -171,6 +181,7 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 					Extensions:    extensions,
 					Deprecated:    deprecated,
 					Constraints:   constraints,
+					SensitiveData: sensitiveData,
 				}
 				outSchema.Properties = append(outSchema.Properties, prop)
 				if len(pSchema.AdditionalTypes) > 0 {
@@ -192,9 +203,10 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 			}
 
 			newTypeDef := TypeDefinition{
-				Name:         typeName,
-				Schema:       outSchema,
-				SpecLocation: SpecLocationSchema,
+				Name:             typeName,
+				Schema:           outSchema,
+				SpecLocation:     SpecLocationSchema,
+				HasSensitiveData: hasSensitiveData(outSchema),
 			}
 			options.AddType(newTypeDef)
 			outSchema = GoSchema{

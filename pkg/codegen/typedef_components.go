@@ -42,11 +42,12 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 		}
 
 		td := TypeDefinition{
-			JsonName:       schemaName,
-			Name:           goTypeName,
-			Schema:         goSchema,
-			SpecLocation:   SpecLocationSchema,
-			NeedsMarshaler: needsMarshaler(goSchema),
+			JsonName:         schemaName,
+			Name:             goTypeName,
+			Schema:           goSchema,
+			SpecLocation:     SpecLocationSchema,
+			NeedsMarshaler:   needsMarshaler(goSchema),
+			HasSensitiveData: hasSensitiveData(goSchema),
 		}
 		types = append(types, td)
 		opts.AddType(td)
@@ -73,11 +74,12 @@ func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], o
 		}
 
 		typeDef := TypeDefinition{
-			JsonName:       paramName,
-			Schema:         goType,
-			Name:           goTypeName,
-			SpecLocation:   SpecLocation(strings.ToLower(paramOrRef.In)),
-			NeedsMarshaler: needsMarshaler(goType),
+			JsonName:         paramName,
+			Schema:           goType,
+			Name:             goTypeName,
+			SpecLocation:     SpecLocation(strings.ToLower(paramOrRef.In)),
+			NeedsMarshaler:   needsMarshaler(goType),
+			HasSensitiveData: hasSensitiveData(goType),
 		}
 		options.AddType(typeDef)
 

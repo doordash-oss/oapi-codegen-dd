@@ -541,6 +541,11 @@ func generateTypeName(currentTypes map[string]TypeDefinition, baseName string, s
 }
 
 func needsMarshaler(schema GoSchema) bool {
+	// Check if any property has sensitive data
+	if hasSensitiveData(schema) {
+		return true
+	}
+
 	res := false
 	for _, p := range schema.Properties {
 		if p.JsonFieldName == "" {
@@ -555,4 +560,14 @@ func needsMarshaler(schema GoSchema) bool {
 
 	// union types handled separately and they have marshaler.
 	return len(schema.UnionElements) == 0
+}
+
+// hasSensitiveData checks if a schema has any properties marked as sensitive
+func hasSensitiveData(schema GoSchema) bool {
+	for _, p := range schema.Properties {
+		if p.SensitiveData != nil {
+			return true
+		}
+	}
+	return false
 }

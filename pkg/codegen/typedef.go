@@ -34,12 +34,14 @@ const (
 // Schema is the GoSchema object used to populate the type description.
 // SpecLocation indicates where in the OpenAPI spec this type was defined.
 // NeedsMarshaler indicates whether this type needs a custom marshaler/unmarshaler.
+// HasSensitiveData indicates whether this type has any properties marked as sensitive.
 type TypeDefinition struct {
-	Name           string
-	JsonName       string
-	Schema         GoSchema
-	SpecLocation   SpecLocation
-	NeedsMarshaler bool
+	Name             string
+	JsonName         string
+	Schema           GoSchema
+	SpecLocation     SpecLocation
+	NeedsMarshaler   bool
+	HasSensitiveData bool
 }
 
 func (t TypeDefinition) IsAlias() bool {
