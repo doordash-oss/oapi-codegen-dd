@@ -52,6 +52,24 @@ const (
 	extSensitiveData = "x-sensitive-data"
 )
 
+// oapiCodegenExtensions is the set of extensions that oapi-codegen uses for code generation.
+// Extensions not in this list will be removed during filtering to prevent validation errors
+// when pruning removes schemas referenced only in custom extensions.
+var oapiCodegenExtensions = map[string]bool{
+	extPropGoType:                    true,
+	extPropGoTypeSkipOptionalPointer: true,
+	extPropGoImport:                  true,
+	extGoName:                        true,
+	extGoTypeName:                    true,
+	extPropGoJsonIgnore:              true,
+	extPropOmitEmpty:                 true,
+	extPropExtraTags:                 true,
+	extOapiCodegenOnlyHonourGoName:   true,
+	extEnumNames:                     true,
+	extDeprecationReason:             true,
+	extSensitiveData:                 true,
+}
+
 func extExtraTags(extPropValue any) (map[string]string, error) {
 	tagsI, ok := extPropValue.(map[string]any)
 	if !ok {

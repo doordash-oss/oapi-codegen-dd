@@ -27,6 +27,7 @@ type Property struct {
 	Deprecated    bool
 	Constraints   Constraints
 	SensitiveData *runtime.SensitiveDataConfig
+	ParentType    string // Name of the parent type (for detecting recursive references)
 }
 
 func (p Property) IsEqual(other Property) bool {
@@ -47,6 +48,16 @@ func (p Property) GoTypeDef() string {
 // IsPointerType returns true if this property's Go type is a pointer.
 func (p Property) IsPointerType() bool {
 	typeDef := p.Schema.TypeDecl()
+
+	// Check for recursive references FIRST: if this property's type is the same as its parent type,
+	// it MUST be a pointer to avoid infinite size structs, even if it has additional properties
+	if p.ParentType != "" {
+		// Check both RefType and GoType for matches
+		if (p.Schema.RefType != "" && p.Schema.RefType == p.ParentType) ||
+			(p.Schema.GoType != "" && p.Schema.GoType == p.ParentType) {
+			return true
+		}
+	}
 
 	// Arrays, maps, and objects with additional properties are not pointers
 	if p.Schema.OpenAPISchema != nil && slices.Contains(p.Schema.OpenAPISchema.Type, "array") {
@@ -121,16 +132,52 @@ func createPropertyGoFieldName(jsonName string, extensions map[string]any) strin
 	}
 
 	// convert some special names needed for interfaces
-	if goFieldName == "error" {
+	// "error" (lowercase) conflicts with the error interface
+	// "Error" (capitalized) conflicts with the Error() method that we generate for error response types
+	if goFieldName == "error" || goFieldName == "Error" {
 		goFieldName = "ErrorData"
 	}
 
-	return schemaNameToTypeName(goFieldName)
+	// "Validate" conflicts with the Validate() method that we generate for validation
+	typeName := schemaNameToTypeName(goFieldName)
+	if typeName == "Validate" {
+		return "ValidateData"
+	}
+
+	return typeName
+}
+
+// deduplicateProperties removes duplicate properties based on GoName,
+// keeping the last occurrence (which takes precedence in allOf merging)
+func deduplicateProperties(props []Property) []Property {
+	if len(props) == 0 {
+		return props
+	}
+
+	// Use a map to track the last occurrence of each GoName
+	seen := make(map[string]int)
+	for i, p := range props {
+		seen[p.GoName] = i
+	}
+
+	// Build result with only the last occurrence of each GoName
+	result := make([]Property, 0, len(seen))
+	for i, p := range props {
+		if seen[p.GoName] == i {
+			result = append(result, p)
+		}
+	}
+
+	return result
 }
 
 // genFieldsFromProperties produce corresponding field names with JSON annotations,
 // given a list of schema descriptors
 func genFieldsFromProperties(props []Property, options ParseOptions) []string {
+	// Deduplicate properties to avoid generating duplicate struct fields
+	// This handles cases where allOf merging results in duplicate property names
+	props = deduplicateProperties(props)
+
 	var fields []string
 
 	for i, p := range props {

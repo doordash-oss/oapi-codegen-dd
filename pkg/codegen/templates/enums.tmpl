@@ -26,7 +26,7 @@ limitations under the License.
       {{- range $name, $value := $Enum.GetValues}}
       {{- $safeName := $root.TypeRegistry.GetName $name}}
       {{- $safeNames = append $safeNames $safeName }}
-        {{$safeName}} {{$Enum.Name}} = {{$Enum.ValueWrapper}}{{$value}}{{$Enum.ValueWrapper}}
+        {{$safeName}} {{$Enum.Name}} = {{$Enum.ValueWrapper}}{{escapeGoString $value}}{{$Enum.ValueWrapper}}
       {{- end}}
     )
 

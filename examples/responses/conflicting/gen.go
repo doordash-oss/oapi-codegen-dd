@@ -147,10 +147,14 @@ type Payment struct {
 	ResponsePaymentID *string `json:"responsePaymentId,omitempty"`
 }
 
-type CreatePaymentResponseJSON = Payment
+type CreatePaymentResponseJSON struct {
+	ResponsePaymentID *string `json:"responsePaymentId,omitempty"`
+}
 
 // CreatePaymentResponseJSON201 Schema for The `CreatePaymentResponse` object.
-type CreatePaymentResponseJSON201 = CreatePaymentResponse
+type CreatePaymentResponseJSON201 struct {
+	RedirectURL *string `json:"redirectUrl,omitempty"`
+}
 
 var schemaTypesValidate *validator.Validate
 

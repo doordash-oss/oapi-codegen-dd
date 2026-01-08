@@ -39,7 +39,11 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 		var items *base.SchemaProxy
 		if schema.Items != nil && schema.Items.IsA() {
 			items = schema.Items.A
-			opts = opts.WithReference(items.GoLow().GetReference())
+			ref := items.GoLow().GetReference()
+			opts = opts.WithReference(ref)
+			// For inline items (no reference), we don't append to the path here.
+			// The path will be used for naming if needed (e.g., for unions or complex types).
+			// We rely on the tracking logic to only track schemas with references or single-element paths.
 		}
 
 		arrayType, err := GenerateGoSchema(items, opts)
@@ -118,14 +122,18 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 		// We default to float for "number"
 		// Some specs incorrectly use type: number with format: integer
 		// We handle this for compatibility with lenient validators
-		var goType string
 		switch f {
 		case "double":
 			goType = "float64"
 		case "float":
 			goType = "float32"
-		case "integer":
-			// Treat type: number, format: integer as integer type
+		case "decimal":
+			// Non-standard format used by some specs to indicate arbitrary precision decimal
+			// Treat as float64 for compatibility
+			goType = "float64"
+		case "integer", "int":
+			// Treat type: number, format: integer or format: int as integer type
+			// format: int is non-standard but used by some specs
 			goType = options.DefaultIntType
 			if goType == "" {
 				goType = "int"
@@ -136,7 +144,9 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 		case "":
 			goType = "float32"
 		default:
-			return GoSchema{}, fmt.Errorf("invalid number format: %s", f)
+			// For unrecognized formats, default to float32 for compatibility
+			// This handles invalid formats like "integer 0-100" gracefully
+			goType = "float32"
 		}
 
 		return GoSchema{
@@ -149,9 +159,8 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 	}
 
 	if slices.Contains(t, "boolean") || slices.Contains(t, "bool") {
-		if f != "" {
-			return GoSchema{}, fmt.Errorf("invalid format (%s) for boolean", f)
-		}
+		// Ignore format for boolean types - OpenAPI spec doesn't define any valid formats.
+		// Some specs incorrectly specify format for booleans, so we ignore it for compatibility.
 		return GoSchema{
 			GoType:         "bool",
 			DefineViaAlias: true,
@@ -174,7 +183,13 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 		case "date":
 			goType = "runtime.Date"
 		case "date-time":
-			goType = "time.Time"
+			// If the schema has enum values, treat it as a string instead of time.Time
+			// because enum values are string literals and time.Time cannot be used as constants
+			if len(schema.Enum) > 0 {
+				goType = "string"
+			} else {
+				goType = "time.Time"
+			}
 		case "json":
 			goType = "runtime.RawMessage"
 			skipOptionalPointer = true

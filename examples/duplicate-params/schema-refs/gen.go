@@ -27,7 +27,7 @@ func (h Headquarters) Validate() error {
 	return queryTypesValidate.Struct(h)
 }
 
-type Establishments []Item
+type Establishments []Establishments_Item
 
 func (e Establishments) Validate() error {
 	for i, item := range e {
@@ -40,7 +40,7 @@ func (e Establishments) Validate() error {
 	return nil
 }
 
-type Arrangements []Item
+type Arrangements []Arrangements_Item
 
 func (a Arrangements) Validate() error {
 	for i, item := range a {
@@ -82,13 +82,21 @@ func init() {
 	runtime.RegisterCustomTypeFunc(schemaTypesValidate)
 }
 
-type Item struct {
+type Establishments_Item struct {
 	Name    *string `json:"name,omitempty"`
 	Phone   *string `json:"phone,omitempty"`
 	Email   *string `json:"email,omitempty"`
 	Address *string `json:"address,omitempty"`
 }
 
-func (i Item) Validate() error {
-	return schemaTypesValidate.Struct(i)
+func (e Establishments_Item) Validate() error {
+	return schemaTypesValidate.Struct(e)
+}
+
+type Arrangements_Item struct {
+	Name *string `json:"name,omitempty"`
+}
+
+func (a Arrangements_Item) Validate() error {
+	return schemaTypesValidate.Struct(a)
 }

@@ -168,8 +168,21 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 // in request body schemas. ReadOnly properties should only be required in responses,
 // not in requests. Returns true if any readOnly required fields were found and filtered.
 func filterReadOnlyFromRequired(schemaProxy *base.SchemaProxy) bool {
+	return filterReadOnlyFromRequiredWithVisited(schemaProxy, make(map[string]bool))
+}
+
+func filterReadOnlyFromRequiredWithVisited(schemaProxy *base.SchemaProxy, visited map[string]bool) bool {
 	if schemaProxy == nil {
 		return false
+	}
+
+	// Check for circular references
+	ref := schemaProxy.GetReference()
+	if ref != "" {
+		if visited[ref] {
+			return false
+		}
+		visited[ref] = true
 	}
 
 	schema := schemaProxy.Schema()
@@ -182,7 +195,7 @@ func filterReadOnlyFromRequired(schemaProxy *base.SchemaProxy) bool {
 	// Handle allOf, anyOf, oneOf schemas
 	if schema.AllOf != nil {
 		for _, subSchemaProxy := range schema.AllOf {
-			if filterReadOnlyFromRequired(subSchemaProxy) {
+			if filterReadOnlyFromRequiredWithVisited(subSchemaProxy, visited) {
 				hasReadOnlyRequired = true
 			}
 		}
@@ -190,7 +203,7 @@ func filterReadOnlyFromRequired(schemaProxy *base.SchemaProxy) bool {
 
 	if schema.AnyOf != nil {
 		for _, subSchemaProxy := range schema.AnyOf {
-			if filterReadOnlyFromRequired(subSchemaProxy) {
+			if filterReadOnlyFromRequiredWithVisited(subSchemaProxy, visited) {
 				hasReadOnlyRequired = true
 			}
 		}
@@ -198,7 +211,7 @@ func filterReadOnlyFromRequired(schemaProxy *base.SchemaProxy) bool {
 
 	if schema.OneOf != nil {
 		for _, subSchemaProxy := range schema.OneOf {
-			if filterReadOnlyFromRequired(subSchemaProxy) {
+			if filterReadOnlyFromRequiredWithVisited(subSchemaProxy, visited) {
 				hasReadOnlyRequired = true
 			}
 		}
@@ -233,7 +246,7 @@ func filterReadOnlyFromRequired(schemaProxy *base.SchemaProxy) bool {
 
 		// Recursively filter nested object properties
 		for _, propProxy := range schema.Properties.FromOldest() {
-			if filterReadOnlyFromRequired(propProxy) {
+			if filterReadOnlyFromRequiredWithVisited(propProxy, visited) {
 				hasReadOnlyRequired = true
 			}
 		}

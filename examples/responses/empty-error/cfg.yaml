@@ -1,0 +1,5 @@
+package: emptyerror
+skip-prune: true
+generate:
+  client: true
+  models: true

@@ -1,0 +1,78 @@
+openapi: 3.0.0
+info:
+  title: Component Request Body Refs Test
+  version: 1.0.0
+paths:
+  /api/v1/auditevents:
+    post:
+      operationId: getAuditEvents
+      requestBody:
+        $ref: "#/components/requestBodies/AuditEventsRequest"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/itemusages:
+    post:
+      operationId: getItemUsages
+      requestBody:
+        $ref: "#/components/requestBodies/ItemUsagesRequest"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  requestBodies:
+    # Base request body that other component request bodies reference
+    CursorRequest:
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/Cursor"
+              - $ref: "#/components/schemas/ResetCursor"
+    
+    # Component request body that is just a $ref to another component request body
+    AuditEventsRequest:
+      $ref: "#/components/requestBodies/CursorRequest"
+    
+    # Component request body that is just a $ref to another component request body
+    ItemUsagesRequest:
+      $ref: "#/components/requestBodies/CursorRequest"
+    
+    # Unused request body that should be pruned
+    UnusedRequest:
+      content:
+        application/json:
+          schema:
+            type: object
+  
+  schemas:
+    Cursor:
+      type: object
+      properties:
+        cursor:
+          type: string
+    
+    ResetCursor:
+      type: object
+      properties:
+        limit:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+    
+    # Unused schema that should be pruned
+    UnusedSchema:
+      type: object
+      properties:
+        unused:
+          type: string
+

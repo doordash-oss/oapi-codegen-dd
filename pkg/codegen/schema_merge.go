@@ -16,6 +16,7 @@ import (
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
+	"go.yaml.in/yaml/v4"
 )
 
 func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, error) {
@@ -152,6 +153,37 @@ func containsUnion(schema *base.Schema) bool {
 	return false
 }
 
+// isMetadataOnlySchema checks if a schema contains only metadata fields
+// (description, title, examples, etc.) and no actual type/property definitions
+func isMetadataOnlySchema(schema *base.Schema) bool {
+	if schema == nil {
+		return true
+	}
+
+	// If it has any of these, it's not metadata-only
+	if len(schema.Type) > 0 {
+		return false
+	}
+	if schema.Properties != nil && schema.Properties.Len() > 0 {
+		return false
+	}
+	if schema.Items != nil {
+		return false
+	}
+	if schema.AdditionalProperties != nil {
+		return false
+	}
+	if len(schema.AllOf) > 0 || len(schema.AnyOf) > 0 || len(schema.OneOf) > 0 {
+		return false
+	}
+	if schema.Not != nil {
+		return false
+	}
+
+	// It only has metadata fields like description, title, examples, etc.
+	return true
+}
+
 // mergeAllOfSchemas merges all the fields in the schemas supplied into one giant schema.
 // The idea is that we merge all fields into one schema.
 func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchema, error) {
@@ -170,6 +202,30 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 	}
 
 	if allMergeable {
+		// Check if allOf contains only a single $ref with metadata (description, title, etc.)
+		// If so, use the reference directly to avoid infinite recursion
+		var refSchema *base.SchemaProxy
+		var refCount int
+		var metadataOnlyCount int
+
+		for _, schemaProxy := range allOf {
+			s := schemaProxy.Schema()
+			ref := schemaProxy.GetReference()
+
+			if ref != "" {
+				refSchema = schemaProxy
+				refCount++
+			} else if isMetadataOnlySchema(s) {
+				metadataOnlyCount++
+			}
+		}
+
+		// If we have exactly one $ref and the rest are metadata-only schemas,
+		// use the reference directly
+		if refCount == 1 && refCount+metadataOnlyCount == len(allOf) {
+			return GenerateGoSchema(refSchema, options.WithReference(refSchema.GetReference()))
+		}
+
 		var merged *base.Schema
 		var lastRef string
 		for _, schemaProxy := range allOf {
@@ -200,6 +256,13 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		if lastRef != "" && merged.Properties == nil {
 			opts = options.WithReference(lastRef)
 		}
+
+		// If the merged schema doesn't have a reference, we need to use a different path
+		// to avoid circular reference detection issues with the parent schema
+		if opts.reference == "" {
+			opts = opts.WithPath(append(options.path, "$merged"))
+		}
+
 		return GenerateGoSchema(schemaProxy, opts)
 	}
 
@@ -210,11 +273,53 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 
 	for i, schemaProxy := range allOf {
 		subPath := append(path, fmt.Sprintf("allOf_%d", i))
-		options = options.WithPath(subPath)
+		ref := schemaProxy.GoLow().GetReference()
+		if ref != "" {
+			typeName, err := refPathToGoType(ref)
+			if err != nil {
+				return GoSchema{}, fmt.Errorf("error converting reference to type name: %w", err)
+			}
 
-		// check if this is a $ref
-		if ref := schemaProxy.GoLow().GetReference(); ref != "" {
-			typeName, _ := refPathToGoType(ref)
+			// For path-based references (not component refs), we need to ensure the type is generated
+			if !isStandardComponentReference(ref) {
+				// Generate the schema to create type definitions for path-based references
+				opts := options.WithReference(ref).WithPath(subPath)
+				resolved, err := GenerateGoSchema(schemaProxy, opts)
+				if err != nil {
+					return GoSchema{}, fmt.Errorf("error resolving allOf[%d] path reference %s: %w", i, ref, err)
+				}
+
+				// Check if the type definition for the schema itself exists in additionalTypes
+				typeExists := false
+				for _, at := range resolved.AdditionalTypes {
+					if at.Name == typeName {
+						typeExists = true
+						break
+					}
+				}
+
+				// If the type doesn't exist, we need to create it
+				if !typeExists && resolved.TypeDecl() != typeName {
+					// The resolved schema has a different type name, so we need to create an alias or copy
+					// For now, let's create a type definition with the expected name
+					td := TypeDefinition{
+						Name:             typeName,
+						Schema:           resolved,
+						SpecLocation:     SpecLocationUnion,
+						NeedsMarshaler:   needsMarshaler(resolved),
+						HasSensitiveData: hasSensitiveData(resolved),
+					}
+					// Add to currentTypes map if it's not nil
+					if options.currentTypes != nil {
+						options.AddType(td)
+					}
+					additionalTypes = append(additionalTypes, td)
+				}
+
+				// Add the additional types from the resolved schema
+				additionalTypes = append(additionalTypes, resolved.AdditionalTypes...)
+			}
+
 			out.Properties = append(out.Properties, Property{
 				GoName:      typeName,
 				Schema:      GoSchema{RefType: typeName},
@@ -225,9 +330,14 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 
 		// not a $ref - resolve as usual
 		schema := schemaProxy.Schema()
-		resolved, err := createFromCombinator(schema, options)
+		resolved, err := createFromCombinator(schema, options.WithPath(subPath))
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error resolving allOf[%d]: %w", i, err)
+		}
+
+		// Skip empty/zero schemas (e.g., schemas with properties but no type)
+		if resolved.IsZero() {
+			continue
 		}
 
 		fieldName := pathToTypeName(subPath)
@@ -300,9 +410,12 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 		return nil, fmt.Errorf("can not merge incompatible types: %v, %v", t1, t2)
 	}
 
-	for k, v := range s2.Extensions.FromOldest() {
-		// TODO: Check for collisions
-		result.Extensions.Set(k, v)
+	if s2.Extensions != nil && s2.Extensions.Len() > 0 {
+		result.Extensions = orderedmap.New[string, *yaml.Node]()
+		for k, v := range s2.Extensions.FromOldest() {
+			// TODO: Check for collisions
+			result.Extensions.Set(k, v)
+		}
 	}
 
 	result.OneOf = append(s1.OneOf, s2.OneOf...)
@@ -363,10 +476,11 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	}
 	result.ExclusiveMaximum = s1.ExclusiveMaximum
 
-	if !ptrEqual(s1.Nullable, s2.Nullable) {
-		return nil, ErrMergingSchemasWithDifferentNullable
-	}
-	result.Nullable = s1.Nullable
+	// For Nullable, we take the union (more permissive) approach:
+	// - If either is true, result is true
+	// - If both are false (or nil, which defaults to false), result is false
+	// This allows merging schemas where one specifies nullable and another doesn't
+	result.Nullable = mergeNullable(s1.Nullable, s2.Nullable)
 
 	if !ptrEqual(s1.ReadOnly, s2.ReadOnly) {
 		return nil, ErrMergingSchemasWithDifferentReadOnly
@@ -456,5 +570,17 @@ func getSchemaType(schema *base.Schema) []string {
 		return []string{"array"}
 	}
 
+	return nil
+}
+
+// mergeNullable merges two nullable pointers using a union (more permissive) approach.
+// If either is true, the result is true. If both are false or nil, the result is nil.
+// This allows merging schemas where one specifies nullable and another doesn't.
+func mergeNullable(a, b *bool) *bool {
+	// If either is explicitly true, result is true
+	if (a != nil && *a) || (b != nil && *b) {
+		return ptr(true)
+	}
+	// If both are nil or false, return nil (default behavior)
 	return nil
 }

@@ -1,0 +1,4 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: collision
+generate:
+  client: true

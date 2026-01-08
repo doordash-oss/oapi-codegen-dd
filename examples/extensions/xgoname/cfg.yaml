@@ -3,6 +3,8 @@ package: xgoname
 # to make sure that all types are generated, even if they're unreferenced
 skip-prune: true
 generate:
-  client: false
+  client: true
+client:
+  name: CustomClientName
 output:
   use-single-file: true

@@ -148,8 +148,33 @@ func TestRefPathToGoType(t *testing.T) {
 			goType: "Wibble",
 		},
 		{
-			name: "local-too-deep",
-			path: "#/components/parameters/foo/components/bar",
+			name:   "deep-path-reference-to-property",
+			path:   "#/paths/~1api~1v1~1company~1announcement~1%7Bid%7D/get/responses/200/content/application~1json/schema/items/properties/time",
+			goType: "V1_Company_Announcement_Get_Response200_JSON_Items_Properties_Time",
+		},
+		{
+			name:   "deep-path-reference-to-response-schema",
+			path:   "#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema",
+			goType: "Users_Get_Response200_JSON",
+		},
+		{
+			name:   "deep-path-reference-with-default-response",
+			path:   "#/paths/~1api~1v1~1system~1countries/get/responses/default",
+			goType: "V1_System_Countries_Get_DefaultResponse",
+		},
+		{
+			name:   "deep-path-reference-to-nested-property",
+			path:   "#/paths/~1api~1v1~1company~1deepsearch~1lei~1%7Bnumber%7D/get/responses/200/content/application~1json/schema/properties/company",
+			goType: "V1_Company_Deepsearch_Lei_Get_Response200_JSON_Properties_Company",
+		},
+		{
+			name:   "deep-path-reference-to-components",
+			path:   "#/components",
+			goType: "Components",
+		},
+		{
+			name: "invalid-reference-just-hash",
+			path: "#",
 		},
 	}
 
@@ -308,7 +333,7 @@ func TestSchemaNameToTypeName(t *testing.T) {
 		"123":          "N123",
 		"-1":           "Minus1",
 		"+1":           "Plus1",
-		"@timestamp,":  "Timestamp",
+		"@timestamp,":  "AtTimestamp",
 		"&now":         "AndNow",
 		"~":            "Tilde",
 		"_foo":         "UnderscoreFoo",
@@ -500,6 +525,57 @@ func TestIsMediaTypeJson(t *testing.T) {
 			if got != test.want {
 				t.Fatalf("IsJson validation failed. Want [%v] Got [%v]", test.want, got)
 			}
+		})
+	}
+}
+
+func TestGenerateTypeNameFromPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		pathParts []string
+		want      string
+	}{
+		{
+			name:      "simple property path",
+			pathParts: []string{"#", "paths", "~1users~1{id}", "get", "responses", "200", "content", "application~1json", "schema", "properties", "time"},
+			want:      "Users_Get_Response200_JSON_Properties_Time",
+		},
+		{
+			name:      "response schema path",
+			pathParts: []string{"#", "paths", "~1api~1v1~1company", "get", "responses", "200", "content", "application~1json", "schema"},
+			want:      "V1_Company_Get_Response200_JSON",
+		},
+		{
+			name:      "default response path",
+			pathParts: []string{"#", "paths", "~1api~1v1~1users", "get", "responses", "default"},
+			want:      "V1_Users_Get_DefaultResponse",
+		},
+		{
+			name:      "nested property path",
+			pathParts: []string{"#", "paths", "~1api~1v1~1data", "post", "responses", "201", "content", "application~1json", "schema", "properties", "metadata", "properties", "tags"},
+			want:      "V1_Data_Post_Response201_JSON_Properties_Metadata_Properties_Tags",
+		},
+		{
+			name:      "path with URL encoded characters",
+			pathParts: []string{"#", "paths", "~1api~1v1~1item~1%7Bid%7D", "get", "responses", "200", "content", "application~1json", "schema"},
+			want:      "V1_Item_Get_Response200_JSON",
+		},
+		{
+			name:      "empty path parts",
+			pathParts: []string{},
+			want:      "Schema",
+		},
+		{
+			name:      "just hash",
+			pathParts: []string{"#"},
+			want:      "Schema",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := generateTypeNameFromPath(tt.pathParts)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

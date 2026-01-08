@@ -59,13 +59,17 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 			// We have an object with no properties. This is a generic object
 			// expressed as a map.
 			outType = "map[string]any"
+			outSchema.GoType = outType
+			outSchema.DefineViaAlias = true
 		} else { // t == ""
-			// If we don't even have the object designator, we're a completely
-			// generic type.
-			outType = "any"
+			// If we don't even have the object designator, we have an empty schema.
+			// Use struct{} instead of any so we can define methods on it.
+			// This is important for error responses and any other types that might need
+			// to implement interfaces like error.
+			outType = "struct{}"
+			outSchema.GoType = outType
+			outSchema.DefineViaAlias = false
 		}
-		outSchema.GoType = outType
-		outSchema.DefineViaAlias = true
 	} else {
 		// When we define an object, we want it to be a type definition,
 		// not a type alias, eg, "type Foo struct {...}"
@@ -101,6 +105,9 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 		if schema != nil {
 			required = schema.Required
 		}
+
+		// Track Go field names to detect conflicts
+		goFieldNames := make(map[string]int)
 		if schema != nil && schema.Properties != nil {
 			for pName, p := range schema.Properties.FromOldest() {
 				propertyPath := append(path, pName)
@@ -109,6 +116,12 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 				pSchema, err := GenerateGoSchema(p, opts)
 				if err != nil {
 					return GoSchema{}, fmt.Errorf("error generating Go schema for property '%s': %w", pName, err)
+				}
+
+				// Skip properties that have null-only type (type: "null")
+				// These properties can only ever be null and cannot be represented in Go
+				if pSchema.IsZero() {
+					continue
 				}
 
 				hasNilTyp := false
@@ -173,8 +186,27 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 
 				pSchema, _ = replaceInlineTypes(pSchema, opts)
 
+				// Generate the Go field name and handle conflicts
+				baseGoName := createPropertyGoFieldName(pName, extensions)
+				goName := baseGoName
+				if count, exists := goFieldNames[baseGoName]; exists {
+					// Conflict detected - append a number
+					count++
+					goFieldNames[baseGoName] = count
+					goName = fmt.Sprintf("%s%d", baseGoName, count)
+				} else {
+					goFieldNames[baseGoName] = 0
+				}
+
+				// Determine parent type name for recursive reference detection
+				// Use the first element of the path as the parent type name
+				parentType := ""
+				if len(path) > 0 {
+					parentType = pathToTypeName(path[:1])
+				}
+
 				prop := Property{
-					GoName:        createPropertyGoFieldName(pName, extensions),
+					GoName:        goName,
 					JsonFieldName: pName,
 					Schema:        pSchema,
 					Description:   description,
@@ -182,6 +214,7 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 					Deprecated:    deprecated,
 					Constraints:   constraints,
 					SensitiveData: sensitiveData,
+					ParentType:    parentType,
 				}
 				outSchema.Properties = append(outSchema.Properties, prop)
 				if len(pSchema.AdditionalTypes) > 0 {
@@ -257,13 +290,8 @@ func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, op
 			// to get to the type.
 			typeName := pathToTypeName(append(path, "AdditionalProperties"))
 
-			goTypeName, err := renameComponent(typeName, schema.ParentProxy)
-			if err != nil {
-				return GoSchema{}, fmt.Errorf("error making name for additional properties %s: %w", typeName, err)
-			}
-
 			typeDef := TypeDefinition{
-				Name:         goTypeName,
+				Name:         typeName,
 				JsonName:     strings.Join(append(path, "AdditionalProperties"), "."),
 				Schema:       additionalSchema,
 				SpecLocation: SpecLocationUnion,

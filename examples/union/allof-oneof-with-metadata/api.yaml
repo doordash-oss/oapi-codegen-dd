@@ -1,0 +1,88 @@
+openapi: 3.0.0
+info:
+  title: AllOf with OneOf and Metadata-Only Element
+  version: 1.0.0
+  description: |
+    This example demonstrates a pattern found in the Box API where an allOf
+    contains a oneOf union and a metadata-only element (just description).
+    The metadata-only element should be skipped during code generation.
+
+paths:
+  /collaboration:
+    get:
+      operationId: getCollaboration
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collaboration'
+
+components:
+  schemas:
+    File:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [file]
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - type
+        - id
+
+    Folder:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [folder]
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - type
+        - id
+
+    WebLink:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [web_link]
+        id:
+          type: string
+        url:
+          type: string
+      required:
+        - type
+        - id
+
+    Collaboration:
+      type: object
+      properties:
+        id:
+          type: string
+        item:
+          allOf:
+            # First element: oneOf union of different item types
+            - oneOf:
+                - $ref: "#/components/schemas/File"
+                - $ref: "#/components/schemas/Folder"
+                - $ref: "#/components/schemas/WebLink"
+            # Second element: metadata-only (just description)
+            # This should NOT generate a separate type
+            - description: |-
+                The file, folder, or web link that this collaboration is for.
+                This field is null when the collaboration status is pending.
+          nullable: true
+        role:
+          type: string
+          enum: [editor, viewer, owner]
+      required:
+        - id

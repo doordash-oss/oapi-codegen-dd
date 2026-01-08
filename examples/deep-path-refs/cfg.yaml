@@ -1,0 +1,7 @@
+package: deeppathref
+generate:
+  models: true
+  client: true
+output:
+  use-single-file: true
+

@@ -49,10 +49,6 @@ type ResponseContentDefinition struct {
 }
 
 func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
-	if responses == nil {
-		return nil, nil, nil
-	}
-
 	var (
 		successCode     int
 		errorCode       int
@@ -62,6 +58,26 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	)
 
 	all := make(map[int]*ResponseContentDefinition)
+
+	// If responses is nil, create a default 204 No Content response
+	if responses == nil {
+		successCode = 204
+		successDefinition := &ResponseContentDefinition{
+			IsSuccess:    true,
+			Description:  "No Content",
+			ResponseName: "struct{}",
+			StatusCode:   successCode,
+		}
+		all[successCode] = successDefinition
+
+		return &ResponseDefinition{
+			SuccessStatusCode: successCode,
+			Success:           successDefinition,
+			Error:             nil,
+			All:               all,
+		}, nil, nil
+	}
+
 	defaultResponse := responses.Default
 
 	// we just need success and error responses
@@ -126,7 +142,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			}
 		}
 
-		if content == nil {
+		if content == nil || content.Schema == nil {
 			if isSuccess {
 				successDefinition := &ResponseContentDefinition{
 					IsSuccess:    isSuccess,
@@ -140,15 +156,15 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			continue
 		}
 
-		ref := response.GoLow().GetReference()
-
 		typeSuffix := "Response"
 		if !isSuccess {
 			typeSuffix = "ErrorResponse"
 		}
 
+		// Don't pass reference for responses - we want actual types, not aliases
+		// This allows Error() methods to be generated on error response types
 		options = options.
-			WithReference(ref).
+			WithReference("").
 			WithPath([]string{operationID, typeSuffix})
 		contentSchema, err := GenerateGoSchema(content.Schema, options)
 		if err != nil {
@@ -156,16 +172,6 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 		if contentSchema.IsZero() {
 			continue
-		}
-
-		if ref != "" {
-			// Convert the reference path to Go type
-			refType, err = refPathToGoType(ref)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error turning reference (%s) into a Go type: %w", ref, err)
-			}
-			contentSchema.RefType = refType
-			contentSchema.DefineViaAlias = true
 		}
 
 		tag := ""
@@ -244,12 +250,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 
 		if content != nil {
 			contentType, contentVal = content.Key(), content.Value()
-			ref = contentVal.Schema.GetReference()
+			if contentVal.Schema != nil {
+				ref = contentVal.Schema.GetReference()
 
-			opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
-			contentSchema, err = GenerateGoSchema(contentVal.Schema, opts)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
+				opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
+				contentSchema, err = GenerateGoSchema(contentVal.Schema, opts)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
+				}
 			}
 		}
 

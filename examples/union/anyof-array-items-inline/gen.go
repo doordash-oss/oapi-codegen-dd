@@ -125,116 +125,116 @@ func (s SpecificErrorIssuesAnyOf2Description) Validate() error {
 	return nil
 }
 
-type CombinedErrorIssuesAnyOf0Issue string
+type CombinedErrorMergedIssuesAnyOf0Issue string
 
 const (
-	CombinedErrorIssuesAnyOf0IssueERRORA CombinedErrorIssuesAnyOf0Issue = "ERROR_A"
+	CombinedErrorMergedIssuesAnyOf0IssueERRORA CombinedErrorMergedIssuesAnyOf0Issue = "ERROR_A"
 )
 
-// validCombinedErrorIssuesAnyOf0IssueValues is a map of valid values for CombinedErrorIssuesAnyOf0Issue
-var validCombinedErrorIssuesAnyOf0IssueValues = map[CombinedErrorIssuesAnyOf0Issue]bool{
-	CombinedErrorIssuesAnyOf0IssueERRORA: true,
+// validCombinedErrorMergedIssuesAnyOf0IssueValues is a map of valid values for CombinedErrorMergedIssuesAnyOf0Issue
+var validCombinedErrorMergedIssuesAnyOf0IssueValues = map[CombinedErrorMergedIssuesAnyOf0Issue]bool{
+	CombinedErrorMergedIssuesAnyOf0IssueERRORA: true,
 }
 
-// Validate checks if the CombinedErrorIssuesAnyOf0Issue value is valid
-func (c CombinedErrorIssuesAnyOf0Issue) Validate() error {
-	if !validCombinedErrorIssuesAnyOf0IssueValues[c] {
-		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorIssuesAnyOf0Issue value: %v", c))
+// Validate checks if the CombinedErrorMergedIssuesAnyOf0Issue value is valid
+func (c CombinedErrorMergedIssuesAnyOf0Issue) Validate() error {
+	if !validCombinedErrorMergedIssuesAnyOf0IssueValues[c] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorMergedIssuesAnyOf0Issue value: %v", c))
 	}
 	return nil
 }
 
-type CombinedErrorIssuesAnyOf0Description string
+type CombinedErrorMergedIssuesAnyOf0Description string
 
 const (
-	CombinedErrorIssuesAnyOf0DescriptionThisIsErrorTypeA CombinedErrorIssuesAnyOf0Description = "This is error type A"
+	CombinedErrorMergedIssuesAnyOf0DescriptionThisIsErrorTypeA CombinedErrorMergedIssuesAnyOf0Description = "This is error type A"
 )
 
-// validCombinedErrorIssuesAnyOf0DescriptionValues is a map of valid values for CombinedErrorIssuesAnyOf0Description
-var validCombinedErrorIssuesAnyOf0DescriptionValues = map[CombinedErrorIssuesAnyOf0Description]bool{
-	CombinedErrorIssuesAnyOf0DescriptionThisIsErrorTypeA: true,
+// validCombinedErrorMergedIssuesAnyOf0DescriptionValues is a map of valid values for CombinedErrorMergedIssuesAnyOf0Description
+var validCombinedErrorMergedIssuesAnyOf0DescriptionValues = map[CombinedErrorMergedIssuesAnyOf0Description]bool{
+	CombinedErrorMergedIssuesAnyOf0DescriptionThisIsErrorTypeA: true,
 }
 
-// Validate checks if the CombinedErrorIssuesAnyOf0Description value is valid
-func (c CombinedErrorIssuesAnyOf0Description) Validate() error {
-	if !validCombinedErrorIssuesAnyOf0DescriptionValues[c] {
-		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorIssuesAnyOf0Description value: %v", c))
+// Validate checks if the CombinedErrorMergedIssuesAnyOf0Description value is valid
+func (c CombinedErrorMergedIssuesAnyOf0Description) Validate() error {
+	if !validCombinedErrorMergedIssuesAnyOf0DescriptionValues[c] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorMergedIssuesAnyOf0Description value: %v", c))
 	}
 	return nil
 }
 
-type CombinedErrorIssuesAnyOf1Issue string
+type CombinedErrorMergedIssuesAnyOf1Issue string
 
 const (
-	CombinedErrorIssuesAnyOf1IssueERRORB CombinedErrorIssuesAnyOf1Issue = "ERROR_B"
+	CombinedErrorMergedIssuesAnyOf1IssueERRORB CombinedErrorMergedIssuesAnyOf1Issue = "ERROR_B"
 )
 
-// validCombinedErrorIssuesAnyOf1IssueValues is a map of valid values for CombinedErrorIssuesAnyOf1Issue
-var validCombinedErrorIssuesAnyOf1IssueValues = map[CombinedErrorIssuesAnyOf1Issue]bool{
-	CombinedErrorIssuesAnyOf1IssueERRORB: true,
+// validCombinedErrorMergedIssuesAnyOf1IssueValues is a map of valid values for CombinedErrorMergedIssuesAnyOf1Issue
+var validCombinedErrorMergedIssuesAnyOf1IssueValues = map[CombinedErrorMergedIssuesAnyOf1Issue]bool{
+	CombinedErrorMergedIssuesAnyOf1IssueERRORB: true,
 }
 
-// Validate checks if the CombinedErrorIssuesAnyOf1Issue value is valid
-func (c CombinedErrorIssuesAnyOf1Issue) Validate() error {
-	if !validCombinedErrorIssuesAnyOf1IssueValues[c] {
-		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorIssuesAnyOf1Issue value: %v", c))
+// Validate checks if the CombinedErrorMergedIssuesAnyOf1Issue value is valid
+func (c CombinedErrorMergedIssuesAnyOf1Issue) Validate() error {
+	if !validCombinedErrorMergedIssuesAnyOf1IssueValues[c] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorMergedIssuesAnyOf1Issue value: %v", c))
 	}
 	return nil
 }
 
-type CombinedErrorIssuesAnyOf1Description string
+type CombinedErrorMergedIssuesAnyOf1Description string
 
 const (
-	CombinedErrorIssuesAnyOf1DescriptionThisIsErrorTypeB CombinedErrorIssuesAnyOf1Description = "This is error type B"
+	CombinedErrorMergedIssuesAnyOf1DescriptionThisIsErrorTypeB CombinedErrorMergedIssuesAnyOf1Description = "This is error type B"
 )
 
-// validCombinedErrorIssuesAnyOf1DescriptionValues is a map of valid values for CombinedErrorIssuesAnyOf1Description
-var validCombinedErrorIssuesAnyOf1DescriptionValues = map[CombinedErrorIssuesAnyOf1Description]bool{
-	CombinedErrorIssuesAnyOf1DescriptionThisIsErrorTypeB: true,
+// validCombinedErrorMergedIssuesAnyOf1DescriptionValues is a map of valid values for CombinedErrorMergedIssuesAnyOf1Description
+var validCombinedErrorMergedIssuesAnyOf1DescriptionValues = map[CombinedErrorMergedIssuesAnyOf1Description]bool{
+	CombinedErrorMergedIssuesAnyOf1DescriptionThisIsErrorTypeB: true,
 }
 
-// Validate checks if the CombinedErrorIssuesAnyOf1Description value is valid
-func (c CombinedErrorIssuesAnyOf1Description) Validate() error {
-	if !validCombinedErrorIssuesAnyOf1DescriptionValues[c] {
-		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorIssuesAnyOf1Description value: %v", c))
+// Validate checks if the CombinedErrorMergedIssuesAnyOf1Description value is valid
+func (c CombinedErrorMergedIssuesAnyOf1Description) Validate() error {
+	if !validCombinedErrorMergedIssuesAnyOf1DescriptionValues[c] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorMergedIssuesAnyOf1Description value: %v", c))
 	}
 	return nil
 }
 
-type CombinedErrorIssuesAnyOf2Issue string
+type CombinedErrorMergedIssuesAnyOf2Issue string
 
 const (
-	CombinedErrorIssuesAnyOf2IssueERRORC CombinedErrorIssuesAnyOf2Issue = "ERROR_C"
+	CombinedErrorMergedIssuesAnyOf2IssueERRORC CombinedErrorMergedIssuesAnyOf2Issue = "ERROR_C"
 )
 
-// validCombinedErrorIssuesAnyOf2IssueValues is a map of valid values for CombinedErrorIssuesAnyOf2Issue
-var validCombinedErrorIssuesAnyOf2IssueValues = map[CombinedErrorIssuesAnyOf2Issue]bool{
-	CombinedErrorIssuesAnyOf2IssueERRORC: true,
+// validCombinedErrorMergedIssuesAnyOf2IssueValues is a map of valid values for CombinedErrorMergedIssuesAnyOf2Issue
+var validCombinedErrorMergedIssuesAnyOf2IssueValues = map[CombinedErrorMergedIssuesAnyOf2Issue]bool{
+	CombinedErrorMergedIssuesAnyOf2IssueERRORC: true,
 }
 
-// Validate checks if the CombinedErrorIssuesAnyOf2Issue value is valid
-func (c CombinedErrorIssuesAnyOf2Issue) Validate() error {
-	if !validCombinedErrorIssuesAnyOf2IssueValues[c] {
-		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorIssuesAnyOf2Issue value: %v", c))
+// Validate checks if the CombinedErrorMergedIssuesAnyOf2Issue value is valid
+func (c CombinedErrorMergedIssuesAnyOf2Issue) Validate() error {
+	if !validCombinedErrorMergedIssuesAnyOf2IssueValues[c] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorMergedIssuesAnyOf2Issue value: %v", c))
 	}
 	return nil
 }
 
-type CombinedErrorIssuesAnyOf2Description string
+type CombinedErrorMergedIssuesAnyOf2Description string
 
 const (
-	CombinedErrorIssuesAnyOf2DescriptionThisIsErrorTypeC CombinedErrorIssuesAnyOf2Description = "This is error type C"
+	CombinedErrorMergedIssuesAnyOf2DescriptionThisIsErrorTypeC CombinedErrorMergedIssuesAnyOf2Description = "This is error type C"
 )
 
-// validCombinedErrorIssuesAnyOf2DescriptionValues is a map of valid values for CombinedErrorIssuesAnyOf2Description
-var validCombinedErrorIssuesAnyOf2DescriptionValues = map[CombinedErrorIssuesAnyOf2Description]bool{
-	CombinedErrorIssuesAnyOf2DescriptionThisIsErrorTypeC: true,
+// validCombinedErrorMergedIssuesAnyOf2DescriptionValues is a map of valid values for CombinedErrorMergedIssuesAnyOf2Description
+var validCombinedErrorMergedIssuesAnyOf2DescriptionValues = map[CombinedErrorMergedIssuesAnyOf2Description]bool{
+	CombinedErrorMergedIssuesAnyOf2DescriptionThisIsErrorTypeC: true,
 }
 
-// Validate checks if the CombinedErrorIssuesAnyOf2Description value is valid
-func (c CombinedErrorIssuesAnyOf2Description) Validate() error {
-	if !validCombinedErrorIssuesAnyOf2DescriptionValues[c] {
-		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorIssuesAnyOf2Description value: %v", c))
+// Validate checks if the CombinedErrorMergedIssuesAnyOf2Description value is valid
+func (c CombinedErrorMergedIssuesAnyOf2Description) Validate() error {
+	if !validCombinedErrorMergedIssuesAnyOf2DescriptionValues[c] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid CombinedErrorMergedIssuesAnyOf2Description value: %v", c))
 	}
 	return nil
 }
@@ -372,9 +372,9 @@ func (s *SpecificError_Issues_Item) UnmarshalJSON(data []byte) error {
 }
 
 type CombinedError struct {
-	Name    *string               `json:"name,omitempty"`
-	Message *string               `json:"message,omitempty"`
-	Issues  *CombinedError_Issues `json:"issues,omitempty"`
+	Name    *string                      `json:"name,omitempty"`
+	Message *string                      `json:"message,omitempty"`
+	Issues  *CombinedError_Merged_Issues `json:"issues,omitempty"`
 }
 
 func (c CombinedError) Validate() error {
@@ -388,9 +388,9 @@ func (c CombinedError) Validate() error {
 	return nil
 }
 
-type CombinedError_Issues []CombinedError_Issues_Item
+type CombinedError_Merged_Issues []CombinedError_Merged_Issues_Item
 
-func (c CombinedError_Issues) Validate() error {
+func (c CombinedError_Merged_Issues) Validate() error {
 	for i, item := range c {
 		if v, ok := any(item).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
@@ -401,28 +401,28 @@ func (c CombinedError_Issues) Validate() error {
 	return nil
 }
 
-type CombinedError_Issues_Item struct {
-	CombinedError_Issues_AnyOf *CombinedError_Issues_AnyOf `json:"-"`
+type CombinedError_Merged_Issues_Item struct {
+	CombinedError_Merged_Issues_AnyOf *CombinedError_Merged_Issues_AnyOf `json:"-"`
 }
 
-func (c CombinedError_Issues_Item) Validate() error {
-	if c.CombinedError_Issues_AnyOf != nil {
-		if v, ok := any(c.CombinedError_Issues_AnyOf).(runtime.Validator); ok {
+func (c CombinedError_Merged_Issues_Item) Validate() error {
+	if c.CombinedError_Merged_Issues_AnyOf != nil {
+		if v, ok := any(c.CombinedError_Merged_Issues_AnyOf).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
-				return runtime.NewValidationErrorFromError("CombinedError_Issues_AnyOf", err)
+				return runtime.NewValidationErrorFromError("CombinedError_Merged_Issues_AnyOf", err)
 			}
 		}
 	}
 	return nil
 }
 
-func (c CombinedError_Issues_Item) MarshalJSON() ([]byte, error) {
+func (c CombinedError_Merged_Issues_Item) MarshalJSON() ([]byte, error) {
 	var parts []json.RawMessage
 
 	{
-		b, err := runtime.MarshalJSON(c.CombinedError_Issues_AnyOf)
+		b, err := runtime.MarshalJSON(c.CombinedError_Merged_Issues_AnyOf)
 		if err != nil {
-			return nil, fmt.Errorf("CombinedError_Issues_AnyOf marshal: %w", err)
+			return nil, fmt.Errorf("CombinedError_Merged_Issues_AnyOf marshal: %w", err)
 		}
 		parts = append(parts, b)
 	}
@@ -430,7 +430,7 @@ func (c CombinedError_Issues_Item) MarshalJSON() ([]byte, error) {
 	return runtime.CoalesceOrMerge(parts...)
 }
 
-func (c *CombinedError_Issues_Item) UnmarshalJSON(data []byte) error {
+func (c *CombinedError_Merged_Issues_Item) UnmarshalJSON(data []byte) error {
 	trim := bytes.TrimSpace(data)
 	if bytes.Equal(trim, []byte("null")) {
 		return nil
@@ -439,12 +439,12 @@ func (c *CombinedError_Issues_Item) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("empty JSON input")
 	}
 
-	if c.CombinedError_Issues_AnyOf == nil {
-		c.CombinedError_Issues_AnyOf = &CombinedError_Issues_AnyOf{}
+	if c.CombinedError_Merged_Issues_AnyOf == nil {
+		c.CombinedError_Merged_Issues_AnyOf = &CombinedError_Merged_Issues_AnyOf{}
 	}
 
-	if err := runtime.UnmarshalJSON(data, c.CombinedError_Issues_AnyOf); err != nil {
-		return fmt.Errorf("CombinedError_Issues_AnyOf unmarshal: %w", err)
+	if err := runtime.UnmarshalJSON(data, c.CombinedError_Merged_Issues_AnyOf); err != nil {
+		return fmt.Errorf("CombinedError_Merged_Issues_AnyOf unmarshal: %w", err)
 	}
 
 	return nil
@@ -526,12 +526,12 @@ func (s SpecificError_Issues_AnyOf_2) Validate() error {
 	return nil
 }
 
-type CombinedError_Issues_AnyOf_0 struct {
-	Issue       *CombinedErrorIssuesAnyOf0Issue       `json:"issue,omitempty"`
-	Description *CombinedErrorIssuesAnyOf0Description `json:"description,omitempty"`
+type CombinedError_Merged_Issues_AnyOf_0 struct {
+	Issue       *CombinedErrorMergedIssuesAnyOf0Issue       `json:"issue,omitempty"`
+	Description *CombinedErrorMergedIssuesAnyOf0Description `json:"description,omitempty"`
 }
 
-func (c CombinedError_Issues_AnyOf_0) Validate() error {
+func (c CombinedError_Merged_Issues_AnyOf_0) Validate() error {
 	if c.Issue != nil {
 		if v, ok := any(c.Issue).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
@@ -549,12 +549,12 @@ func (c CombinedError_Issues_AnyOf_0) Validate() error {
 	return nil
 }
 
-type CombinedError_Issues_AnyOf_1 struct {
-	Issue       *CombinedErrorIssuesAnyOf1Issue       `json:"issue,omitempty"`
-	Description *CombinedErrorIssuesAnyOf1Description `json:"description,omitempty"`
+type CombinedError_Merged_Issues_AnyOf_1 struct {
+	Issue       *CombinedErrorMergedIssuesAnyOf1Issue       `json:"issue,omitempty"`
+	Description *CombinedErrorMergedIssuesAnyOf1Description `json:"description,omitempty"`
 }
 
-func (c CombinedError_Issues_AnyOf_1) Validate() error {
+func (c CombinedError_Merged_Issues_AnyOf_1) Validate() error {
 	if c.Issue != nil {
 		if v, ok := any(c.Issue).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
@@ -572,12 +572,12 @@ func (c CombinedError_Issues_AnyOf_1) Validate() error {
 	return nil
 }
 
-type CombinedError_Issues_AnyOf_2 struct {
-	Issue       *CombinedErrorIssuesAnyOf2Issue       `json:"issue,omitempty"`
-	Description *CombinedErrorIssuesAnyOf2Description `json:"description,omitempty"`
+type CombinedError_Merged_Issues_AnyOf_2 struct {
+	Issue       *CombinedErrorMergedIssuesAnyOf2Issue       `json:"issue,omitempty"`
+	Description *CombinedErrorMergedIssuesAnyOf2Description `json:"description,omitempty"`
 }
 
-func (c CombinedError_Issues_AnyOf_2) Validate() error {
+func (c CombinedError_Merged_Issues_AnyOf_2) Validate() error {
 	if c.Issue != nil {
 		if v, ok := any(c.Issue).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
@@ -679,62 +679,62 @@ func (s *SpecificError_Issues_AnyOf) UnmarshalJSON(bts []byte) error {
 	return err
 }
 
-type CombinedError_Issues_AnyOf struct {
+type CombinedError_Merged_Issues_AnyOf struct {
 	union json.RawMessage
 }
 
-func (c *CombinedError_Issues_AnyOf) Validate() error {
+func (c *CombinedError_Merged_Issues_AnyOf) Validate() error {
 	return nil
 }
 
-// Raw returns the union data inside the CombinedError_Issues_AnyOf as bytes
-func (c *CombinedError_Issues_AnyOf) Raw() json.RawMessage {
+// Raw returns the union data inside the CombinedError_Merged_Issues_AnyOf as bytes
+func (c *CombinedError_Merged_Issues_AnyOf) Raw() json.RawMessage {
 	return c.union
 }
 
-// AsCombinedError_Issues_AnyOf_0 returns the union data inside the CombinedError_Issues_AnyOf as a CombinedError_Issues_AnyOf_0
-func (c *CombinedError_Issues_AnyOf) AsCombinedError_Issues_AnyOf_0() (CombinedError_Issues_AnyOf_0, error) {
-	return UnmarshalAs[CombinedError_Issues_AnyOf_0](c.union)
+// AsCombinedError_Merged_Issues_AnyOf_0 returns the union data inside the CombinedError_Merged_Issues_AnyOf as a CombinedError_Merged_Issues_AnyOf_0
+func (c *CombinedError_Merged_Issues_AnyOf) AsCombinedError_Merged_Issues_AnyOf_0() (CombinedError_Merged_Issues_AnyOf_0, error) {
+	return UnmarshalAs[CombinedError_Merged_Issues_AnyOf_0](c.union)
 }
 
-// FromCombinedError_Issues_AnyOf_0 overwrites any union data inside the CombinedError_Issues_AnyOf as the provided CombinedError_Issues_AnyOf_0
-func (c *CombinedError_Issues_AnyOf) FromCombinedError_Issues_AnyOf_0(val CombinedError_Issues_AnyOf_0) error {
+// FromCombinedError_Merged_Issues_AnyOf_0 overwrites any union data inside the CombinedError_Merged_Issues_AnyOf as the provided CombinedError_Merged_Issues_AnyOf_0
+func (c *CombinedError_Merged_Issues_AnyOf) FromCombinedError_Merged_Issues_AnyOf_0(val CombinedError_Merged_Issues_AnyOf_0) error {
 	bts, err := json.Marshal(val)
 	c.union = bts
 	return err
 }
 
-// AsCombinedError_Issues_AnyOf_1 returns the union data inside the CombinedError_Issues_AnyOf as a CombinedError_Issues_AnyOf_1
-func (c *CombinedError_Issues_AnyOf) AsCombinedError_Issues_AnyOf_1() (CombinedError_Issues_AnyOf_1, error) {
-	return UnmarshalAs[CombinedError_Issues_AnyOf_1](c.union)
+// AsCombinedError_Merged_Issues_AnyOf_1 returns the union data inside the CombinedError_Merged_Issues_AnyOf as a CombinedError_Merged_Issues_AnyOf_1
+func (c *CombinedError_Merged_Issues_AnyOf) AsCombinedError_Merged_Issues_AnyOf_1() (CombinedError_Merged_Issues_AnyOf_1, error) {
+	return UnmarshalAs[CombinedError_Merged_Issues_AnyOf_1](c.union)
 }
 
-// FromCombinedError_Issues_AnyOf_1 overwrites any union data inside the CombinedError_Issues_AnyOf as the provided CombinedError_Issues_AnyOf_1
-func (c *CombinedError_Issues_AnyOf) FromCombinedError_Issues_AnyOf_1(val CombinedError_Issues_AnyOf_1) error {
+// FromCombinedError_Merged_Issues_AnyOf_1 overwrites any union data inside the CombinedError_Merged_Issues_AnyOf as the provided CombinedError_Merged_Issues_AnyOf_1
+func (c *CombinedError_Merged_Issues_AnyOf) FromCombinedError_Merged_Issues_AnyOf_1(val CombinedError_Merged_Issues_AnyOf_1) error {
 	bts, err := json.Marshal(val)
 	c.union = bts
 	return err
 }
 
-// AsCombinedError_Issues_AnyOf_2 returns the union data inside the CombinedError_Issues_AnyOf as a CombinedError_Issues_AnyOf_2
-func (c *CombinedError_Issues_AnyOf) AsCombinedError_Issues_AnyOf_2() (CombinedError_Issues_AnyOf_2, error) {
-	return UnmarshalAs[CombinedError_Issues_AnyOf_2](c.union)
+// AsCombinedError_Merged_Issues_AnyOf_2 returns the union data inside the CombinedError_Merged_Issues_AnyOf as a CombinedError_Merged_Issues_AnyOf_2
+func (c *CombinedError_Merged_Issues_AnyOf) AsCombinedError_Merged_Issues_AnyOf_2() (CombinedError_Merged_Issues_AnyOf_2, error) {
+	return UnmarshalAs[CombinedError_Merged_Issues_AnyOf_2](c.union)
 }
 
-// FromCombinedError_Issues_AnyOf_2 overwrites any union data inside the CombinedError_Issues_AnyOf as the provided CombinedError_Issues_AnyOf_2
-func (c *CombinedError_Issues_AnyOf) FromCombinedError_Issues_AnyOf_2(val CombinedError_Issues_AnyOf_2) error {
+// FromCombinedError_Merged_Issues_AnyOf_2 overwrites any union data inside the CombinedError_Merged_Issues_AnyOf as the provided CombinedError_Merged_Issues_AnyOf_2
+func (c *CombinedError_Merged_Issues_AnyOf) FromCombinedError_Merged_Issues_AnyOf_2(val CombinedError_Merged_Issues_AnyOf_2) error {
 	bts, err := json.Marshal(val)
 	c.union = bts
 	return err
 }
 
-func (c CombinedError_Issues_AnyOf) MarshalJSON() ([]byte, error) {
+func (c CombinedError_Merged_Issues_AnyOf) MarshalJSON() ([]byte, error) {
 	bts, err := c.union.MarshalJSON()
 
 	return bts, err
 }
 
-func (c *CombinedError_Issues_AnyOf) UnmarshalJSON(bts []byte) error {
+func (c *CombinedError_Merged_Issues_AnyOf) UnmarshalJSON(bts []byte) error {
 	err := c.union.UnmarshalJSON(bts)
 
 	return err

@@ -1,0 +1,108 @@
+openapi: 3.0.0
+info:
+  title: AnyOf and AllOf with Inline Struct Test
+  version: 1.0.0
+  description: |
+    Test case for anyOf and allOf with inline struct definitions using path-based references.
+    This reproduces the issue where inline structs in unions cause syntax errors.
+
+paths:
+  /config:
+    get:
+      operationId: getConfig
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  config:
+                    anyOf:
+                      - type: object
+                        properties:
+                          backup_hour:
+                            type: integer
+                            minimum: 0
+                            maximum: 23
+                            description: The hour of day (in UTC) when backup starts
+                          backup_minute:
+                            type: integer
+                            minimum: 0
+                            maximum: 59
+                            description: The minute of the backup hour when backup starts
+                      - type: object
+                        properties:
+                          retention_days:
+                            type: integer
+                            minimum: 1
+                            maximum: 365
+                            description: Number of days to retain backups
+                      - type: object
+                        properties:
+                          compression:
+                            type: boolean
+                            description: Enable compression
+    patch:
+      operationId: updateConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  anyOf:
+                    - $ref: '#/paths/~1config/get/responses/200/content/application~1json/schema/properties/config/anyOf/0'
+                    - $ref: '#/paths/~1config/get/responses/200/content/application~1json/schema/properties/config/anyOf/1'
+                    - $ref: '#/paths/~1config/get/responses/200/content/application~1json/schema/properties/config/anyOf/2'
+      responses:
+        '204':
+          description: Success
+
+  /firewall:
+    get:
+      operationId: getFirewall
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                  - type: object
+                    properties:
+                      rules:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            protocol:
+                              type: string
+                            port:
+                              type: integer
+    post:
+      operationId: createFirewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/paths/~1firewall/get/responses/200/content/application~1json/schema/allOf/0'
+                - $ref: '#/paths/~1firewall/get/responses/200/content/application~1json/schema/allOf/1'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/paths/~1firewall/get/responses/200/content/application~1json/schema'

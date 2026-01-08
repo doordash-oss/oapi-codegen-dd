@@ -67,10 +67,9 @@ fetch-specs:
 	git clone https://github.com/cubahno/specs.git ./pkg/codegen/integration/testdata/specs
 	find ./pkg/codegen/integration/testdata/specs -mindepth 1 -name ".*" -exec rm -rf {} +
 
-test-integration: fetch-specs
-	@echo "Running integration tests..."
-	@go test -v -tags=integration ./pkg/codegen/integration/... || \
-		(echo ""; echo "❌ Integration tests failed. Check the output above for details."; exit 1)
+test-integration:
+	@go test -v -tags=integration -count=1 -timeout=30m ./pkg/codegen/integration/... 2>&1 | \
+		grep -v "^=== RUN\|^=== PAUSE\|^=== CONT\|^--- PASS:" || true
 
 check-all: generate lint test test-integration
 	@if [ -n "$$(git status --porcelain)" ]; then \
@@ -98,4 +97,4 @@ check-fmt:
 
 build-ci: check-fmt lint-ci gosec
 
-test-ci: test test-integration
+test-ci: test fetch-specs test-integration

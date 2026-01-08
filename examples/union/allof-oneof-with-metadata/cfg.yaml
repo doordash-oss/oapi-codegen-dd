@@ -1,0 +1,3 @@
+# yaml-language-server: $schema=../../configuration-schema.json
+package: union
+skip-prune: true

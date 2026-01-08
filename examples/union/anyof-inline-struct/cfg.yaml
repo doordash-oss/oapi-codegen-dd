@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=../../configuration-schema.json
+package: gen
+skip-prune: true
+generate:
+  models: true

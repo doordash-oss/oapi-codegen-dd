@@ -14,177 +14,330 @@
 package integration
 
 import (
+	"context"
 	"embed"
 	"fmt"
-	"io"
 	"io/fs"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/doordash/oapi-codegen-dd/v3/pkg/codegen"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"time"
 )
 
 //go:embed testdata/specs
 var specsFS embed.FS
 
+type testResult struct {
+	name   string
+	passed bool
+	stage  string // "read", "generate", "write", "mod-init", "mod-tidy", "build"
+	err    string
+	tmpDir string
+}
+
+var showMaxErrors = 50
+
 func TestIntegration(t *testing.T) {
 	specPath := os.Getenv("SPEC")
+
+	// Get project root
+	projectRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("Failed to get project root: %v", err)
+	}
+
+	// Clean up .sandbox directory at the start (in project root)
+	sandboxDir := filepath.Join(projectRoot, ".sandbox")
+
+	// Remove existing sandbox directory
+	os.RemoveAll(sandboxDir)
+
+	// Create fresh sandbox directory
+	if err := os.MkdirAll(sandboxDir, 0755); err != nil {
+		t.Fatalf("Failed to create sandbox directory: %v", err)
+	}
 
 	// Collect specs to process
 	specs := collectSpecs(t, specPath)
 	if len(specs) == 0 {
-		log.Println("No specs to process, skipping integration test")
+		fmt.Fprintln(os.Stderr, "No specs to process, skipping integration test")
 		return
 	}
 
-	log.Printf("Found %d spec(s) to process\n", len(specs))
+	fmt.Fprintf(os.Stderr, "\n🔍 Found %d spec(s) to process\n", len(specs))
 
-	cfg := codegen.Configuration{
-		PackageName: "integration",
-		Generate: &codegen.GenerateOptions{
-			Client:             true,
-			ResponseValidators: true,
-		},
-		Client: &codegen.Client{
-			Name: "IntegrationClient",
-		},
+	// Enable verbose mode for single spec
+	verbose := len(specs) == 1
+
+	// Build the oapi-codegen binary once
+	fmt.Fprintf(os.Stderr, "🔨 Building oapi-codegen binary...\n")
+	binaryPath := filepath.Join(os.TempDir(), "oapi-codegen-test")
+
+	buildCmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/oapi-codegen")
+	buildCmd.Dir = projectRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to build oapi-codegen:\n%s", string(output))
 	}
-	cfg = cfg.Merge(codegen.NewDefaultConfiguration())
+	defer os.Remove(binaryPath)
+
+	fmt.Fprintf(os.Stderr, "⚙️ Running tests in parallel...\n\n")
 
 	// Track results for summary
 	var (
-		mu     sync.Mutex
-		passed []string
-		failed []string
-		total  = len(specs)
+		mu          sync.Mutex
+		wg          sync.WaitGroup
+		results     = make([]testResult, 0, len(specs))
+		total       = len(specs)
+		completed   = 0
+		currentSpec string
+		hasFailures = false
 	)
 
-	for _, name := range specs {
-		t.Run(fmt.Sprintf("test-%s", name), func(t *testing.T) {
-			t.Parallel()
+	// Progress tracker
+	progressTicker := make(chan struct{}, 100)
+	progressDone := make(chan struct{})
+	go func() {
+		defer close(progressDone)
+		for range progressTicker {
+			mu.Lock()
+			c := completed
+			spec := currentSpec
+			mu.Unlock()
+			if spec != "" {
+				// Shorten spec name if too long
+				if len(spec) > 50 {
+					spec = "..." + spec[len(spec)-47:]
+				}
+				// Pad with spaces to clear previous line (80 chars total)
+				msg := fmt.Sprintf("⏳ Progress: %d/%d - %s", c, total, spec)
+				fmt.Fprintf(os.Stderr, "\r%-80s", msg)
+			} else {
+				fmt.Fprintf(os.Stderr, "\r%-80s", fmt.Sprintf("⏳ Progress: %d/%d completed", c, total))
+			}
+		}
+	}()
 
-			// Track result - defer to ensure it runs even if test panics
+	// Process specs in parallel
+	semaphore := make(chan struct{}, 50) // Limit concurrency to 50
+
+	for _, name := range specs {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			semaphore <- struct{}{}        // Acquire
+			defer func() { <-semaphore }() // Release
+
+			result := &testResult{name: name, passed: true}
+
+			// Set current spec being processed and increment completed count
+			mu.Lock()
+			currentSpec = name
+			completed++
+			mu.Unlock()
+			select {
+			case progressTicker <- struct{}{}:
+			default:
+			}
+
+			// Track result at the end
 			defer func() {
 				mu.Lock()
-				defer mu.Unlock()
-				if t.Failed() {
-					failed = append(failed, name)
-				} else {
-					passed = append(passed, name)
+				results = append(results, *result)
+				if !result.passed {
+					hasFailures = true
+				}
+				mu.Unlock()
+				select {
+				case progressTicker <- struct{}{}:
+				default:
 				}
 			}()
 
-			contents, err := getFileContents(name)
-			if err != nil {
-				t.Fatalf("failed to download file: %s", err)
+			// Helper to record failure
+			recordFailure := func(stage, errMsg string, args ...any) {
+				result.passed = false
+				result.stage = stage
+				result.err = fmt.Sprintf(errMsg, args...)
+				if verbose {
+					fmt.Fprintf(os.Stderr, "\n❌ FAILED at stage '%s':\n%s\n", stage, result.err)
+				}
 			}
 
-			fmt.Printf("[%s] Generating code\n", name)
-			res, err := codegen.Generate(contents, cfg)
-			require.NoError(t, err, "failed to generate code")
-			require.NotNil(t, res, "result should not be nil")
+			// Create temp directory for this test inside .sandbox with spec-based name
+			// Convert spec path to safe directory name
+			safeName := strings.ReplaceAll(name, "/", "_")
+			safeName = strings.ReplaceAll(safeName, "testdata_specs_", "")
+			safeName = strings.TrimSuffix(safeName, ".yaml")
+			safeName = strings.TrimSuffix(safeName, ".yml")
+			safeName = strings.TrimSuffix(safeName, ".json")
 
-			assert.NotNil(t, res["package integration"])
-			assert.NotNil(t, res["type IntegrationClient struct {"])
-			assert.NotNil(t, res["RequestOptions struct {"])
-
-			// Save generated code to a temporary directory and build it
-			// Use os.MkdirTemp instead of t.TempDir() so we can control cleanup
-			tmpDir, err := os.MkdirTemp("", "oapi-codegen-test-*")
-			require.NoError(t, err, "failed to create temp dir")
-
-			// Clean up temp dir after test completes (unless test fails and we want to inspect)
-			defer func() {
-				if !t.Failed() {
-					os.RemoveAll(tmpDir)
-				}
-			}()
+			tmpDir := filepath.Join(sandboxDir, safeName)
+			if err := os.MkdirAll(tmpDir, 0755); err != nil {
+				recordFailure("setup", "failed to create temp dir: %s", err)
+				return
+			}
+			result.tmpDir = tmpDir
 
 			genFile := filepath.Join(tmpDir, "generated.go")
+			configFile := filepath.Join(tmpDir, "config.yaml")
 
-			fmt.Printf("[%s] Saving generated code to %s\n", name, genFile)
-			err = os.WriteFile(genFile, []byte(res.GetCombined()), 0644)
-			require.NoError(t, err, "failed to write generated code")
+			// Get absolute path to spec file
+			specPath, err := filepath.Abs(name)
+			if err != nil {
+				recordFailure("setup", "failed to get absolute path: %s", err)
+				return
+			}
+
+			// Create config file
+			configContent := `package: integration
+generate:
+  client: true
+  response-validators: true
+client:
+  name: IntegrationClient
+output:
+  use-single-file: true
+  filename: generated.go
+`
+
+			if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+				recordFailure("setup", "failed to write config file: %s", err)
+				return
+			}
+
+			// Create context with timeout for all operations
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+
+			if verbose {
+				fmt.Fprintf(os.Stderr, "\n📝 Testing: %s\n", name)
+				fmt.Fprintf(os.Stderr, "   Working directory: %s\n", tmpDir)
+			}
+
+			// Run oapi-codegen binary to generate code
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ⚙️  Running oapi-codegen...\n")
+			}
+			genCmd := exec.CommandContext(ctx, binaryPath, "-config", configFile, specPath)
+			genCmd.Dir = tmpDir
+			output, err := genCmd.CombinedOutput()
+			if err != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					recordFailure("generate", "oapi-codegen timed out after 2 minutes")
+				} else {
+					recordFailure("generate", "oapi-codegen failed:\n%s", string(output))
+				}
+				return
+			}
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ✅ Code generation successful\n")
+			}
 
 			// Initialize go module
-			fmt.Printf("[%s] Initializing go module\n", name)
-			cmd := exec.Command("go", "mod", "init", "integration")
-			cmd.Dir = tmpDir
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("failed to initialize go module:\n%s", string(output))
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ⚙️  Initializing go module...\n")
 			}
-
-			// Add replace directive to use local version of the library BEFORE go mod tidy
-			fmt.Printf("[%s] Adding replace directive for local library\n", name)
-			// Get the absolute path to the project root (3 levels up from this file)
-			projectRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
-			require.NoError(t, err, "failed to get project root path")
-
-			cmd = exec.Command("go", "mod", "edit", "-replace", fmt.Sprintf("github.com/doordash/oapi-codegen-dd/v3=%s", projectRoot))
+			cmd := exec.CommandContext(ctx, "go", "mod", "init", "integration")
 			cmd.Dir = tmpDir
 			output, err = cmd.CombinedOutput()
 			if err != nil {
-				t.Fatalf("failed to add replace directive:\n%s", string(output))
+				recordFailure("mod-init", "go mod init failed:\n%s", string(output))
+				return
 			}
 
-			// Run go mod tidy to download dependencies (after replace directive is set)
-			fmt.Printf("[%s] Running go mod tidy\n", name)
-			cmd = exec.Command("go", "mod", "tidy")
+			// Add replace directive to use local version of the library
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ⚙️  Adding replace directive...\n")
+			}
+			cmd = exec.CommandContext(ctx, "go", "mod", "edit", "-replace", fmt.Sprintf("github.com/doordash/oapi-codegen-dd/v3=%s", projectRoot))
 			cmd.Dir = tmpDir
 			output, err = cmd.CombinedOutput()
 			if err != nil {
-				t.Fatalf("failed to run go mod tidy:\n%s", string(output))
+				recordFailure("mod-edit", "go mod edit failed:\n%s", string(output))
+				return
+			}
+
+			// Run go mod tidy
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ⚙️  Running go mod tidy...\n")
+			}
+			cmd = exec.CommandContext(ctx, "go", "mod", "tidy")
+			cmd.Dir = tmpDir
+			output, err = cmd.CombinedOutput()
+			if err != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					recordFailure("mod-tidy", "go mod tidy timed out after 2 minutes")
+				} else {
+					recordFailure("mod-tidy", "go mod tidy failed:\n%s", string(output))
+				}
+				return
+			}
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ✅ Dependencies resolved\n")
 			}
 
 			// Build the generated code
-			fmt.Printf("[%s] Building generated code\n", name)
-			cmd = exec.Command("go", "build", "-o", "/dev/null", genFile)
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ⚙️  Building generated code...\n")
+			}
+			cmd = exec.CommandContext(ctx, "go", "build", "-o", "/dev/null", genFile)
 			cmd.Dir = tmpDir
 			output, err = cmd.CombinedOutput()
 			if err != nil {
-				t.Fatalf("failed to build generated code:\nGenerated file: %s\nBuild output:\n%s", genFile, string(output))
+				if ctx.Err() == context.DeadlineExceeded {
+					recordFailure("build", "go build timed out after 2 minutes")
+				} else {
+					recordFailure("build", "go build failed:\n%s", string(output))
+				}
+				return
 			}
-
-			fmt.Printf("[%s] Successfully built generated code\n", name)
-			fmt.Printf("[%s] Generated code saved at: %s\n", name, tmpDir)
-		})
+			if verbose {
+				fmt.Fprintf(os.Stderr, "   ✅ Build successful\n")
+			}
+		}()
 	}
 
-	// Wait for all subtests to complete before printing summary
-	t.Cleanup(func() {
-		printSummary(total, passed, failed)
-	})
-}
+	// Wait for all goroutines to complete
+	wg.Wait()
 
-func getFileContents(filePath string) ([]byte, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+	// Close progress tracker and wait for it to finish
+	close(progressTicker)
+	<-progressDone
+	fmt.Fprintf(os.Stderr, "\r✅ Progress: %d/%d completed\n\n", total, total)
+
+	// Print summary
+	printSummary(total, results)
+
+	// Fail the test if there were any failures
+	if hasFailures {
+		t.Fail()
 	}
-	defer func() { _ = file.Close() }()
-
-	contents, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	return contents, nil
 }
 
 func collectSpecs(t *testing.T, specPath string) []string {
 	var specs []string
 
 	if specPath != "" {
-		specs = append(specs, specPath)
-		return specs
+		// Check if the path exists as-is
+		if _, err := os.Stat(specPath); err == nil {
+			specs = append(specs, specPath)
+			return specs
+		}
+
+		// If not found, try prepending testdata/specs/
+		fullPath := filepath.Join("testdata", "specs", specPath)
+		if _, err := os.Stat(fullPath); err == nil {
+			specs = append(specs, fullPath)
+			return specs
+		}
+
+		// If still not found, fail
+		t.Fatalf("Spec file not found: %s (also tried %s)", specPath, fullPath)
 	}
 
 	// Walk through testdata/specs
@@ -214,25 +367,81 @@ func collectSpecs(t *testing.T, specPath string) []string {
 	return specs
 }
 
-func printSummary(total int, passed, failed []string) {
-	log.Println("\n" + strings.Repeat("=", 80))
-	log.Println("INTEGRATION TEST SUMMARY")
-	log.Println(strings.Repeat("=", 80))
-	log.Printf("Total specs tested: %d\n", total)
-	log.Printf("✅ Passed: %d\n", len(passed))
-	log.Printf("❌ Failed: %d\n", len(failed))
-	log.Println(strings.Repeat("-", 80))
+func printSummary(total int, results []testResult) {
+	var passed, failed []testResult
+	failuresByStage := make(map[string]int)
 
-	if len(failed) > 0 {
-		log.Println("\nFailed specs:")
-		for _, spec := range failed {
-			log.Printf("  ❌ %s\n", spec)
+	for _, r := range results {
+		if r.passed {
+			passed = append(passed, r)
+		} else {
+			failed = append(failed, r)
+			failuresByStage[r.stage]++
 		}
 	}
 
-	if len(passed) > 0 && len(failed) == 0 {
-		log.Println("\n🎉 All specs passed!")
+	fmt.Println(strings.Repeat("═", 80))
+	fmt.Fprintln(os.Stderr, "📊 INTEGRATION TEST SUMMARY")
+	fmt.Fprintln(os.Stderr, strings.Repeat("═", 80))
+
+	passRate := float64(len(passed)) / float64(total) * 100
+	if len(failed) == 0 {
+		fmt.Fprintf(os.Stderr, "✅ ALL TESTS PASSED: %d/%d (100%%)\n", len(passed), total)
+	} else {
+		fmt.Fprintf(os.Stderr, "📈 Results: %d passed, %d failed out of %d total (%.1f%% pass rate)\n",
+			len(passed), len(failed), total, passRate)
 	}
 
-	log.Println(strings.Repeat("=", 80))
+	fmt.Fprintln(os.Stderr, strings.Repeat("─", 80))
+
+	if len(failed) > 0 {
+		fmt.Fprintln(os.Stderr, "\n❌ FAILURES BY STAGE:")
+		// Sort stages for consistent output
+		stages := []string{"read", "generate", "write", "setup", "mod-init", "mod-edit", "mod-tidy", "build"}
+		for _, stage := range stages {
+			if count, ok := failuresByStage[stage]; ok {
+				fmt.Fprintf(os.Stderr, "   • %-12s: %d\n", stage, count)
+			}
+		}
+
+		fmt.Fprintln(os.Stderr, "\n📋 FAILED SPECS (first 10):")
+		if len(failed) < showMaxErrors {
+			showMaxErrors = len(failed)
+		}
+		for i := 0; i < showMaxErrors; i++ {
+			r := failed[i]
+			// Shorten the spec name if it's too long
+			specName := r.name
+			if len(specName) > 60 {
+				specName = "..." + specName[len(specName)-57:]
+			}
+			fmt.Fprintf(os.Stderr, "\n   %d. %s\n", i+1, specName)
+			fmt.Fprintf(os.Stderr, "      Stage: %s\n", r.stage)
+
+			// Show first line of error only
+			errLines := strings.Split(r.err, "\n")
+			if len(errLines) > 0 {
+				errMsg := errLines[0]
+				if len(errMsg) > 100 {
+					errMsg = errMsg[:97] + "..."
+				}
+				fmt.Fprintf(os.Stderr, "      Error: %s\n", errMsg)
+			}
+
+			if r.tmpDir != "" {
+				fmt.Fprintf(os.Stderr, "      Debug: %s/generated.go\n", r.tmpDir)
+			}
+		}
+
+		if len(failed) > showMaxErrors {
+			fmt.Fprintf(os.Stderr, "\n   ... and %d more failures (run with SPEC=<name> to test individually)\n", len(failed)-showMaxErrors)
+		}
+
+		fmt.Fprintln(os.Stderr, "\n💡 TIP: To debug a specific failure:")
+		fmt.Fprintln(os.Stderr, "   SPEC=<spec-name> make test-integration")
+	} else {
+		fmt.Fprintln(os.Stderr, "\n🎉 ALL SPECS PASSED!")
+	}
+
+	fmt.Fprintln(os.Stderr, strings.Repeat("═", 80))
 }

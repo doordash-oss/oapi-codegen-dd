@@ -1,0 +1,141 @@
+openapi: 3.0.0
+info:
+  title: Deep Path References Example
+  version: 1.0.0
+  description: |
+    This example demonstrates how oapi-codegen handles deep path references
+    (references to inline schemas within paths/responses/properties).
+    
+    Multiple properties reference the same inline schema using $ref,
+    which causes oapi-codegen to generate a shared type definition.
+
+paths:
+  /users/{id}:
+    get:
+      operationId: GetUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+                    description: When the user was created
+                  updatedAt:
+                    type: string
+                    format: date-time
+                    description: When the user was last updated
+                  metadata:
+                    type: object
+                    properties:
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                      score:
+                        type: integer
+
+  /posts/{id}:
+    get:
+      operationId: GetPost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  content:
+                    type: string
+                  # Reference to the same createdAt schema from /users/{id}
+                  createdAt:
+                    $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/createdAt'
+                  # Reference to the same updatedAt schema from /users/{id}
+                  updatedAt:
+                    $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/updatedAt'
+                  # Reference to the same metadata schema from /users/{id}
+                  metadata:
+                    $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/metadata'
+
+  /comments:
+    get:
+      operationId: ListComments
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    text:
+                      type: string
+                    # Multiple references to the same timestamp schemas
+                    createdAt:
+                      $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/createdAt'
+                    updatedAt:
+                      $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/updatedAt'
+                    # Reference to metadata
+                    metadata:
+                      $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/metadata'
+
+  /events:
+    post:
+      operationId: CreateEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                # Reusing the same timestamp type
+                timestamp:
+                  $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/createdAt'
+                # Reusing the metadata type
+                metadata:
+                  $ref: '#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/metadata'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+

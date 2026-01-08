@@ -11,6 +11,7 @@
 package codegen
 
 import (
+	"os"
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -166,5 +167,100 @@ func TestNewConstraints(t *testing.T) {
 			MaxProperties: &maxProps,
 			Nullable:      ptr(true),
 		}, res)
+	})
+
+	t.Run("integer with maxLength - invalid spec, should be ignored", func(t *testing.T) {
+		maxLn := int64(8)
+		schema := &base.Schema{
+			Type:      []string{"integer"},
+			Format:    "int32",
+			MaxLength: &maxLn,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// maxLength on integer is invalid per OpenAPI spec
+		// We should NOT store it at all
+		assert.Equal(t, Constraints{
+			Nullable: ptr(true),
+		}, res)
+	})
+
+	t.Run("number with minLength and maxLength - invalid spec, should be ignored", func(t *testing.T) {
+		minLn := int64(2)
+		maxLn := int64(11)
+		schema := &base.Schema{
+			Type:      []string{"number"},
+			Format:    "float",
+			MinLength: &minLn,
+			MaxLength: &maxLn,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// minLength/maxLength on number is invalid per OpenAPI spec
+		// We should NOT store them at all
+		assert.Equal(t, Constraints{
+			Nullable: ptr(true),
+		}, res)
+	})
+
+	t.Run("string with minimum and maximum - invalid spec, should be ignored", func(t *testing.T) {
+		minVal := float64(10)
+		maxVal := float64(100)
+		schema := &base.Schema{
+			Type:    []string{"string"},
+			Minimum: &minVal,
+			Maximum: &maxVal,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// minimum/maximum on string is invalid per OpenAPI spec
+		// We should NOT store them at all
+		assert.Equal(t, Constraints{
+			Nullable: ptr(true),
+		}, res)
+	})
+}
+
+func TestInvalidConstraintsCodegen(t *testing.T) {
+	t.Run("integer and number with minLength/maxLength should not fail", func(t *testing.T) {
+		spec, err := os.ReadFile("testdata/invalid-constraints.yaml")
+		assert.NoError(t, err)
+
+		opts := Configuration{
+			PackageName: "testpkg",
+			Output: &Output{
+				UseSingleFile: true,
+			},
+		}
+
+		code, err := Generate(spec, opts)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, code)
+
+		combined := code.GetCombined()
+
+		// Verify integer field has minimum/maximum validation but NOT minLength/maxLength
+		assert.Contains(t, combined, "Age")
+		assert.Contains(t, combined, `validate:"omitempty,gte=18,lte=99"`)
+
+		// Verify number field has minimum/maximum validation but NOT minLength/maxLength
+		assert.Contains(t, combined, "Price")
+		assert.Contains(t, combined, `validate:"omitempty,gte=0.01,lte=999.99"`)
+
+		// Verify boolean field has no validation tags (minLength/maxLength ignored)
+		assert.Contains(t, combined, "Active")
+		assert.Contains(t, combined, `Active`)
+		assert.NotContains(t, combined, `Active *bool    `+"`json:\"active,omitempty\" validate:") // No validate tag
+
+		// Verify string field HAS minLength/maxLength validation
+		assert.Contains(t, combined, "Name")
+		assert.Contains(t, combined, `validate:"omitempty,max=50,min=2"`)
+
+		// Verify string field with invalid minimum/maximum has only minLength/maxLength
+		assert.Contains(t, combined, "Description")
+		assert.Contains(t, combined, `validate:"omitempty,max=200,min=5"`)
 	})
 }

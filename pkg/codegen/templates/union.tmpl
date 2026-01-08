@@ -91,14 +91,15 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
             {{if $discriminator -}}
                 {{range $value, $type := $discriminator.Mapping -}}
                     {{if eq $type $element -}}
-                        {{$hasProperty := false -}}
                         {{range $properties -}}
                             {{if eq .GoName $discriminator.PropertyName -}}
-                                {{$alias}}.{{$discriminator.PropertyName}} = "{{$value}}"
-                                {{$hasProperty = true -}}
+                                {{if .IsPointerType -}}
+                                    {{$alias}}.{{$discriminator.PropertyName}} = runtime.Ptr({{.Schema.TypeDecl}}("{{escapeGoString $value}}"))
+                                {{else -}}
+                                    {{$alias}}.{{$discriminator.PropertyName}} = {{.Schema.TypeDecl}}("{{escapeGoString $value}}")
+                                {{end -}}
                             {{end -}}
                         {{end -}}
-                        {{if not $hasProperty}}val.{{$discriminator.PropertyName}} = "{{$value}}"{{end}}
                     {{end -}}
                 {{end -}}
             {{end -}}
@@ -128,7 +129,7 @@ func marshalJSONWithDiscriminator(data []byte, field, value string) ([]byte, err
                 }
                 switch discriminator{
                     {{range $value, $type := $discriminator.Mapping -}}
-                        case "{{$value}}":
+                        case "{{escapeGoString $value}}":
                             return {{$alias}}.As{{$type}}()
                     {{end -}}
                     default:
@@ -178,7 +179,7 @@ func ({{$args.alias}} *{{$args.name}}) MarshalJSON() ([]byte, error) {
     if err != nil {
         return nil, err
     }
-    return marshalJSONWithDiscriminator(obj, "{{$args.discriminator.Property}}", disc)
+    return marshalJSONWithDiscriminator(obj, "{{escapeGoString $args.discriminator.Property}}", disc)
 }
 {{ end }}
 
@@ -192,7 +193,7 @@ func ({{$args.alias}} *{{$args.name}}) UnmarshalJSON(data []byte) error {
 
     switch discriminator{
     {{range $value, $type := $args.discriminator.Mapping -}}
-        case "{{$value}}":
+        case "{{escapeGoString $value}}":
             var res {{$type}}
             if err = json.Unmarshal(data, &res); err != nil {
                 return err

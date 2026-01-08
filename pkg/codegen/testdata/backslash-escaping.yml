@@ -1,0 +1,59 @@
+openapi: 3.0.0
+info:
+  title: Backslash Escaping Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: getTest
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestObject'
+components:
+  schemas:
+    TestObject:
+      type: object
+      properties:
+        # Test enum with backslash
+        status:
+          type: string
+          enum:
+            - "normal"
+            - "path\\with\\backslash"
+            - "another\\value"
+        # Test discriminator with backslash in mapping value
+        paymentType:
+          oneOf:
+            - $ref: '#/components/schemas/CreditCard'
+            - $ref: '#/components/schemas/BankTransfer'
+          discriminator:
+            propertyName: type
+            mapping:
+              credit: '#/components/schemas/CreditCard'
+              "bank\\transfer": '#/components/schemas/BankTransfer'
+    
+    CreditCard:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: ["credit"]
+        cardNumber:
+          type: string
+    
+    BankTransfer:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: ["bank\\transfer"]
+        accountNumber:
+          type: string

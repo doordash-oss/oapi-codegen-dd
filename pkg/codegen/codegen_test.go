@@ -26,6 +26,12 @@ var testDocument string
 //go:embed testdata/user.yml
 var userDocument string
 
+//go:embed testdata/backslash-escaping.yml
+var backslashEscapingYAML string
+
+//go:embed testdata/backslash-escaping.json
+var backslashEscapingJSON string
+
 func TestExampleOpenAPICodeGeneration(t *testing.T) {
 	// Input vars for code generation:
 	packageName := "testswagger"
@@ -196,4 +202,62 @@ func TestGoTypeImport(t *testing.T) {
 	for _, imp := range imports {
 		assert.Contains(t, code, imp)
 	}
+}
+
+func TestBackslashEscaping(t *testing.T) {
+	// Generate code
+	cfg := Configuration{
+		PackageName: "testbackslash",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	codes, err := Generate([]byte(backslashEscapingYAML), cfg)
+	require.NoError(t, err)
+	require.NotEmpty(t, codes)
+
+	codeStr := codes.GetCombined()
+
+	// Verify that backslashes in enum values are properly escaped
+	// The YAML has "path\\with\\backslash" which is the string path\with\backslash (1 backslash)
+	// In the generated Go code, this should be "path\\with\\backslash" (2 backslashes in source)
+	assert.Contains(t, codeStr, `"path\\with\\backslash"`)
+	assert.Contains(t, codeStr, `"another\\value"`)
+
+	// Verify that backslashes in discriminator mapping values are properly escaped
+	// The discriminator value "bank\transfer" should become "bank\\transfer" in the case statement (2 backslashes in source)
+	assert.Contains(t, codeStr, `"bank\\transfer"`)
+
+	// Verify that the code compiles by checking it doesn't have syntax errors
+	// The format.Source function will fail if there are syntax errors
+	_, err = format.Source([]byte(codeStr))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestBackslashEscapingJSON(t *testing.T) {
+	// Generate code (JSON format)
+	cfg := Configuration{
+		PackageName: "testbackslash",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	codes, err := Generate([]byte(backslashEscapingJSON), cfg)
+	require.NoError(t, err)
+	require.NotEmpty(t, codes)
+
+	codeStr := codes.GetCombined()
+
+	// Verify that backslashes in enum values are properly escaped (same as YAML test)
+	assert.Contains(t, codeStr, `"path\\with\\backslash"`)
+	assert.Contains(t, codeStr, `"another\\value"`)
+
+	// Verify that backslashes in discriminator mapping values are properly escaped
+	assert.Contains(t, codeStr, `"bank\\transfer"`)
+
+	// Verify that the code compiles
+	_, err = format.Source([]byte(codeStr))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
 }

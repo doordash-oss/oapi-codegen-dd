@@ -79,10 +79,33 @@ func createEnumsSchema(schema *base.Schema, options ParseOptions) (GoSchema, err
 	}
 
 	sanitizedValues := sanitizeEnumNames(enumNames, enumValues)
+
+	// If all enum values were filtered out (e.g., all were null),
+	// treat this as a regular type, not an enum
+	if len(sanitizedValues) == 0 {
+		// Return a regular type without enum values
+		return oapiSchemaToGoType(schema, options)
+	}
+
 	outSchema.EnumValues = make(map[string]string, len(sanitizedValues))
 
 	for k, v := range sanitizedValues {
 		outSchema.EnumValues[schemaNameToTypeName(k)] = v
+	}
+
+	// Fix GoType if enum values don't match the declared type
+	// This handles specs that declare type: integer but have string enum values
+	if len(sanitizedValues) > 0 {
+		// Check the first enum value to determine the actual type
+		for _, value := range sanitizedValues {
+			if needsQuotesForEnumValue(value, outSchema.GoType) {
+				// The enum values are strings but the declared type is not string
+				// Override the GoType to string to match the actual values
+				outSchema.GoType = "string"
+			}
+			// Only need to check one value
+			break
+		}
 	}
 
 	if len(path) == 0 {
@@ -123,6 +146,13 @@ func sanitizeEnumNames(enumNames, enumValues []string) map[string]string {
 	deDup := make([][]string, 0, len(enumValues))
 
 	for i, v := range enumValues {
+		// Skip null values - they cannot be represented as Go constants
+		// null in JSON/OpenAPI should be represented as nil in Go (for pointers)
+		// Note: empty string "" is valid and should NOT be filtered out
+		if v == "null" {
+			continue
+		}
+
 		n := v
 		if i < len(enumNames) {
 			n = enumNames[i]
@@ -169,6 +199,12 @@ func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinit
 				continue
 			}
 
+			// Skip enum generation for types that can't be used as constants or map keys
+			// (arrays, slices, maps, structs, etc.)
+			if !isComparableType(p.Schema) {
+				continue
+			}
+
 			name := p.Schema.RefType
 			if name == "" {
 				name = p.GoName
@@ -178,9 +214,26 @@ func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinit
 				continue
 			}
 
+			// Determine the wrapper based on the actual enum values
+			// For arrays with enum items, check the array element type
 			wrapper := ""
-			if p.Schema.GoType == "string" {
-				wrapper = `"`
+			enumType := p.Schema.GoType
+			if p.Schema.ArrayType != nil {
+				// For array types, the enum values are from the items, not the array itself
+				enumType = p.Schema.ArrayType.GoType
+			}
+
+			// Check if any enum value needs quotes
+			// This handles cases where the spec declares type: integer but has string enum values
+			if len(p.Schema.EnumValues) > 0 {
+				// Check the first enum value to determine if quotes are needed
+				for _, value := range p.Schema.EnumValues {
+					if needsQuotesForEnumValue(value, enumType) {
+						wrapper = `"`
+					}
+					// Only need to check one value
+					break
+				}
 			}
 
 			enums = append(enums, EnumDefinition{
@@ -193,16 +246,28 @@ func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinit
 		}
 
 		if len(td.Schema.EnumValues) > 0 {
-			wrapper := ""
-			if td.Schema.GoType == "string" {
-				wrapper = `"`
+			// Skip enum generation for types that can't be used as constants or map keys
+			// (arrays, slices, maps, structs, etc.)
+			if isComparableType(td.Schema) {
+				wrapper := ""
+				// Check if any enum value needs quotes
+				// This handles cases where the spec declares type: integer but has string enum values
+				for _, value := range td.Schema.EnumValues {
+					if needsQuotesForEnumValue(value, td.Schema.GoType) {
+						wrapper = `"`
+					}
+					// Only need to check one value
+					break
+				}
+				enums = append(enums, EnumDefinition{
+					Schema:         td.Schema,
+					Name:           td.Name,
+					ValueWrapper:   wrapper,
+					PrefixTypeName: options.AlwaysPrefixEnumValues,
+				})
+			} else {
+				rest = append(rest, td)
 			}
-			enums = append(enums, EnumDefinition{
-				Schema:         td.Schema,
-				Name:           td.Name,
-				ValueWrapper:   wrapper,
-				PrefixTypeName: options.AlwaysPrefixEnumValues,
-			})
 		} else {
 			rest = append(rest, td)
 		}
@@ -250,4 +315,60 @@ func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinit
 	}
 
 	return enums, rest, m
+}
+
+// isComparableType checks if a Go type can be used as a constant or map key
+func isComparableType(schema GoSchema) bool {
+	// Arrays, slices, maps, and structs cannot be used as constants or map keys
+	if schema.ArrayType != nil {
+		return false
+	}
+	if schema.IsAnyType() {
+		return false
+	}
+	if len(schema.Properties) > 0 {
+		return false
+	}
+
+	// time.Time cannot be used as a constant (constants must be compile-time values)
+	// This handles cases where format: date-time is combined with enum values
+	if schema.GoType == "time.Time" {
+		return false
+	}
+
+	// Only primitive types (string, int, float, bool) can be used as enum constants
+	return true
+}
+
+// needsQuotesForEnumValue determines if an enum value needs quotes based on the actual value
+// rather than just the declared type. This handles cases where the spec declares type: integer
+// but provides string enum values.
+func needsQuotesForEnumValue(value string, goType string) bool {
+	// If the declared type is string, always use quotes
+	if goType == "string" {
+		return true
+	}
+
+	// For integer types, check if the value is actually a valid integer
+	if strings.HasPrefix(goType, "int") {
+		// Try to parse as an integer - if it fails, it's a string and needs quotes
+		_, err := strconv.ParseInt(value, 10, 64)
+		return err != nil
+	}
+
+	// For float types, check if the value is actually numeric
+	if strings.HasPrefix(goType, "float") || goType == "number" {
+		// Try to parse as a number - if it fails, it's a string and needs quotes
+		_, err := strconv.ParseFloat(value, 64)
+		return err != nil
+	}
+
+	// For bool type, check if value is actually a boolean
+	if goType == "bool" {
+		_, err := strconv.ParseBool(value)
+		return err != nil
+	}
+
+	// Default: no quotes for other types
+	return false
 }

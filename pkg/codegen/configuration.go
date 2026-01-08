@@ -59,7 +59,6 @@ func (o Configuration) Merge(other Configuration) Configuration {
 func (o Configuration) WithDefaults() Configuration {
 	defaults := NewDefaultConfiguration()
 
-	// Fill simple string fields
 	if o.PackageName == "" {
 		o.PackageName = defaults.PackageName
 	}
@@ -67,37 +66,36 @@ func (o Configuration) WithDefaults() Configuration {
 		o.CopyrightHeader = defaults.CopyrightHeader
 	}
 
-	// Fill Output
-	if o.Output == nil {
-		o.Output = defaults.Output
-	} else if defaults.Output != nil {
+	if o.Output != nil {
 		if o.Output.Directory == "" {
 			o.Output.Directory = defaults.Output.Directory
 		}
 		if o.Output.Filename == "" {
 			o.Output.Filename = defaults.Output.Filename
 		}
+	} else {
+		o.Output = defaults.Output
 	}
 
-	// Fill Generate options
 	if o.Generate == nil {
 		o.Generate = defaults.Generate
-	} else if defaults.Generate != nil {
-		if o.Generate.DefaultIntType == "" {
-			o.Generate.DefaultIntType = defaults.Generate.DefaultIntType
+		if o.Generate == nil {
+			o.Generate = &GenerateOptions{
+				Client:                 defaults.Generate.Client,
+				AlwaysPrefixEnumValues: defaults.Generate.AlwaysPrefixEnumValues,
+				DefaultIntType:         defaults.Generate.DefaultIntType,
+			}
 		}
 	}
 
-	// Fill Client
 	if o.Client == nil {
 		o.Client = defaults.Client
-	} else if defaults.Client != nil {
-		if o.Client.Name == "" {
-			o.Client.Name = defaults.Client.Name
-		}
-		if o.Client.Timeout == 0 {
-			o.Client.Timeout = defaults.Client.Timeout
-		}
+	}
+	if o.Client.Name == "" {
+		o.Client.Name = defaults.Client.Name
+	}
+	if o.Client.Timeout == 0 {
+		o.Client.Timeout = defaults.Client.Timeout
 	}
 
 	return o
@@ -271,6 +269,7 @@ func NewDefaultConfiguration() Configuration {
 			AlwaysPrefixEnumValues: true,
 		},
 		Output: &Output{
+			Directory:     ".",
 			UseSingleFile: true,
 			Filename:      "gen.go",
 		},

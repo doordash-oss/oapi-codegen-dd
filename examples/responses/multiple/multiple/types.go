@@ -35,10 +35,6 @@ func (p Problem) Validate() error {
 	return schemaTypesValidate.Struct(p)
 }
 
-func (s Problem) Error() string {
-	return "unmapped client error"
-}
-
 type Booking struct {
 	ID            *uuid.UUID `json:"id,omitempty"`
 	TripID        *uuid.UUID `json:"trip_id,omitempty"`

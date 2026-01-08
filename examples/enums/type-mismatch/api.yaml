@@ -1,0 +1,53 @@
+openapi: 3.0.0
+info:
+  title: Enum Type Mismatch
+  description: Test handling of enum type mismatches (e.g., type integer with string enum values)
+  version: 1.0.0
+
+paths: {}
+
+components:
+  schemas:
+    # This schema has type: integer but string enum values
+    # The code generator should handle this gracefully by using string type
+    OrderDirection:
+      type: integer
+      enum:
+        - asc
+        - desc
+
+    # Another example with type: number but string enum values
+    Priority:
+      type: number
+      enum:
+        - low
+        - medium
+        - high
+
+    # Correct usage: type: integer with numeric enum values
+    StatusCode:
+      type: integer
+      enum:
+        - 200
+        - 404
+        - 500
+
+    # Correct usage: type: string with string enum values
+    Color:
+      type: string
+      enum:
+        - red
+        - green
+        - blue
+
+    TestObject:
+      type: object
+      properties:
+        orderDirection:
+          $ref: '#/components/schemas/OrderDirection'
+        priority:
+          $ref: '#/components/schemas/Priority'
+        statusCode:
+          $ref: '#/components/schemas/StatusCode'
+        color:
+          $ref: '#/components/schemas/Color'

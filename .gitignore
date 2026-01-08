@@ -7,4 +7,5 @@ bin/
 .go-version
 gosec-report*.json
 pkg/codegen/integration/testdata/specs*/**/*
+.sandbox/
 examples/stash/**/*

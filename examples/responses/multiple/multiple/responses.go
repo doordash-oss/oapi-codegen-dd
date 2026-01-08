@@ -27,14 +27,54 @@ type CreateBookingResponse struct {
 	Links         *LinksSelf `json:"links,omitempty"`
 }
 
-type CreateBookingErrorResponse = BadRequest
+type CreateBookingErrorResponse struct {
+	Type     *string `json:"type,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
+	Instance *string `json:"instance,omitempty"`
+	Status   *int    `json:"status,omitempty"`
+}
 
-type CreateBookingErrorResponseApplicationProblemPlusJSON = Unauthorized
+func (r CreateBookingErrorResponse) Error() string {
+	return "unmapped client error"
+}
 
-type CreateBookingErrorResponseApplicationProblemPlusJSON404 = NotFound
+type CreateBookingErrorResponseApplicationProblemPlusJSON struct {
+	Type     *string `json:"type,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
+	Instance *string `json:"instance,omitempty"`
+	Status   *int    `json:"status,omitempty"`
+}
 
-type CreateBookingErrorResponseApplicationProblemPlusJSON409 = Conflict
+type CreateBookingErrorResponseApplicationProblemPlusJSON404 struct {
+	Type     *string `json:"type,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
+	Instance *string `json:"instance,omitempty"`
+	Status   *int    `json:"status,omitempty"`
+}
 
-type CreateBookingErrorResponseApplicationProblemPlusJSON429 = TooManyRequests
+type CreateBookingErrorResponseApplicationProblemPlusJSON409 struct {
+	Type     *string `json:"type,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
+	Instance *string `json:"instance,omitempty"`
+	Status   *int    `json:"status,omitempty"`
+}
 
-type CreateBookingErrorResponseApplicationProblemPlusJSON500 = InternalServerError
+type CreateBookingErrorResponseApplicationProblemPlusJSON429 struct {
+	Type     *string `json:"type,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
+	Instance *string `json:"instance,omitempty"`
+	Status   *int    `json:"status,omitempty"`
+}
+
+type CreateBookingErrorResponseApplicationProblemPlusJSON500 struct {
+	Type     *string `json:"type,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
+	Instance *string `json:"instance,omitempty"`
+	Status   *int    `json:"status,omitempty"`
+}

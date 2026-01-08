@@ -1,0 +1,70 @@
+openapi: 3.0.0
+info:
+  title: Expression Circular Reference Test
+  version: 1.0.0
+  description: Test case for Expression schema with circular references (Or, And, Not)
+
+paths:
+  /filter:
+    post:
+      operationId: applyFilter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+
+components:
+  schemas:
+    FilterRequest:
+      type: object
+      properties:
+        filter:
+          $ref: '#/components/schemas/Expression'
+
+    Expression:
+      type: object
+      properties:
+        Or:
+          allOf:
+            - $ref: '#/components/schemas/Expressions'
+            - description: Return results that match either Expression
+        And:
+          allOf:
+            - $ref: '#/components/schemas/Expressions'
+            - description: Return results that match both Expressions
+        Not:
+          allOf:
+            - $ref: '#/components/schemas/Expression'
+            - description: Return results that don't match the Expression
+        Dimensions:
+          allOf:
+            - $ref: '#/components/schemas/DimensionValues'
+            - description: The specific Dimension to use
+
+    Expressions:
+      type: array
+      items:
+        $ref: '#/components/schemas/Expression'
+
+    DimensionValues:
+      type: object
+      properties:
+        Key:
+          type: string
+        Values:
+          type: array
+          items:
+            type: string
+

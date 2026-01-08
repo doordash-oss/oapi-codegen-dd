@@ -40,14 +40,14 @@ import (
 )
 
 var (
-	pathParamRE    *regexp.Regexp
-	predeclaredSet map[string]struct{}
-	separatorSet   map[rune]struct{}
-	nameNormalizer = toCamelCaseWithInitialism
-	initialismMap  = makeInitialismMap(initialismList)
+	pathParamRE         *regexp.Regexp
+	predeclaredSet      map[string]struct{}
+	separatorSet        map[rune]struct{}
+	nameNormalizer      = toCamelCaseWithInitialism
+	initialismMap       = makeInitialismMap(initialismList)
+	camelCaseMatchParts = regexp.MustCompile(`[\p{Lu}\d]+([\p{Ll}\d]+|$)`)
+	numericPattern      = regexp.MustCompile(`^\d+$`)
 )
-
-var camelCaseMatchParts = regexp.MustCompile(`[\p{Lu}\d]+([\p{Ll}\d]+|$)`)
 
 var initialismList = []string{
 	"ACH",
@@ -243,19 +243,127 @@ func refPathToObjName(refPath string) string {
 // #/components/schemas/Foo -> Foo
 // #/components/parameters/Bar -> Bar
 // #/components/responses/Baz -> Baz
+// #/paths/~1api~1v1~1foo/get/responses/200/content/application~1json/schema/properties/time -> GetApiV1FooResponse200_Schema_Properties_Time
 // Remote components (document.json#/Foo) are not supported
 func refPathToGoType(refPath string) (string, error) {
+	if refPath == "" {
+		return "", ErrEmptyReferencePath
+	}
+
 	pathParts := strings.Split(refPath, "/")
 	depth := len(pathParts)
 
-	if depth != 4 {
+	if depth < 2 {
 		return "", fmt.Errorf("unexpected reference depth: %d for ref: %s", depth, refPath)
 	}
 
-	// lastPart now stores the final element of the type path. This is what
-	// we use as the base for a type name.
-	lastPart := pathParts[len(pathParts)-1]
-	return schemaNameToTypeName(lastPart), nil
+	// Standard component references: #/components/schemas/Foo
+	if depth == 4 && pathParts[1] == "components" {
+		lastPart := pathParts[len(pathParts)-1]
+		return schemaNameToTypeName(lastPart), nil
+	}
+
+	// Deep path references (e.g., inline schemas in paths/responses/properties)
+	// Generate a meaningful name from the path structure
+	return generateTypeNameFromPath(pathParts), nil
+}
+
+// generateTypeNameFromPath creates a type name from a deep JSON pointer path.
+// Examples:
+//
+//	#/paths/~1api~1v1~1foo/get/responses/200/content/application~1json/schema -> GetApiV1FooResponse200Schema
+//	#/paths/~1api~1v1~1foo/get/responses/200/content/application~1json/schema/properties/time -> GetApiV1FooResponse200Schema_Time
+func generateTypeNameFromPath(pathParts []string) string {
+	if len(pathParts) < 2 {
+		return "Schema"
+	}
+
+	var nameParts []string
+
+	// Skip the leading "#" part
+	for i := 1; i < len(pathParts); i++ {
+		part := pathParts[i]
+
+		// Skip generic/noise parts that don't add meaning
+		if part == "content" || part == "schema" {
+			continue
+		}
+
+		// Decode JSON Pointer escapes: ~1 -> /, ~0 -> ~
+		part = strings.ReplaceAll(part, "~1", "/")
+		part = strings.ReplaceAll(part, "~0", "~")
+
+		// URL decode (e.g., %7B -> {, %7D -> })
+		if decoded, err := url.QueryUnescape(part); err == nil {
+			part = decoded
+		}
+
+		// Clean up path parameters: /api/v1/foo/{id} -> /api/v1/foo
+		// Remove parameter placeholders like {id}, {name}, etc.
+		part = regexp.MustCompile(`\{[^}]+\}`).ReplaceAllString(part, "")
+
+		// For path segments, extract meaningful parts
+		if part == "paths" {
+			continue // Skip the "paths" keyword itself
+		}
+
+		// Handle path URLs: /api/v1/company/search -> ApiV1CompanySearch
+		if strings.HasPrefix(part, "/") {
+			// Split by / and filter out empty parts
+			segments := strings.Split(strings.Trim(part, "/"), "/")
+			for _, seg := range segments {
+				if seg != "" && seg != "api" {
+					nameParts = append(nameParts, seg)
+				}
+			}
+			continue
+		}
+
+		// Handle HTTP methods
+		if part == "get" || part == "post" || part == "put" || part == "delete" || part == "patch" {
+			nameParts = append(nameParts, part)
+			continue
+		}
+
+		// Handle response codes
+		if part == "responses" {
+			continue
+		}
+		if numericPattern.MatchString(part) {
+			nameParts = append(nameParts, "response"+part)
+			continue
+		}
+		if part == "default" {
+			nameParts = append(nameParts, "defaultResponse")
+			continue
+		}
+
+		// Handle media types: application/json -> Json
+		if strings.Contains(part, "/") {
+			// Likely a media type
+			if strings.HasSuffix(part, "/json") || part == "application/json" {
+				nameParts = append(nameParts, "json")
+			} else {
+				// Use the part after the slash
+				parts := strings.Split(part, "/")
+				if len(parts) > 1 {
+					nameParts = append(nameParts, parts[len(parts)-1])
+				}
+			}
+			continue
+		}
+
+		// Regular parts (properties, items, etc.)
+		nameParts = append(nameParts, part)
+	}
+
+	// If we ended up with no meaningful parts, use a generic name
+	if len(nameParts) == 0 {
+		return "Schema"
+	}
+
+	// Convert to a valid Go type name using pathToTypeName
+	return pathToTypeName(nameParts)
 }
 
 // orderedParamsFromUri returns the argument names, in order, in a given URI string, so for
@@ -395,6 +503,8 @@ func typeNamePrefixInternal(name string, handleDigits bool) (prefix string) {
 			prefix += "Percent"
 		case '_':
 			prefix += "Underscore"
+		case '@':
+			prefix += "At"
 		default:
 			// Prepend "N" to schemas starting with a number (only if handleDigits is true)
 			if handleDigits && prefix == "" && unicode.IsDigit(r) {
@@ -412,7 +522,15 @@ func typeNamePrefixInternal(name string, handleDigits bool) (prefix string) {
 // schemaNameToTypeName converts a GoSchema name to a valid Go type name.
 // It converts to camel case, and makes sure the name is valid in Go
 func schemaNameToTypeName(name string) string {
-	return typeNamePrefix(name) + nameNormalizer(name)
+	// Handle parameter names ending with [] (e.g., "dataSegmentCode[]")
+	// These are typically array parameters in query strings
+	// We append "Array" suffix to distinguish them from the singular version
+	arraySuffix := ""
+	if strings.HasSuffix(name, "[]") {
+		name = strings.TrimSuffix(name, "[]")
+		arraySuffix = "Array"
+	}
+	return typeNamePrefix(name) + nameNormalizer(name) + arraySuffix
 }
 
 // pathToTypeName converts a path, like Object/field1/nestedField into a go
@@ -497,11 +615,19 @@ func escapePathElements(path string) string {
 // x-go-name, the new name is returned, otherwise, the original name is
 // returned.
 func renameComponent(schemaName string, schemaRef *base.SchemaProxy) (string, error) {
+	if schemaRef == nil {
+		return schemaName, nil
+	}
+
 	// References will not change type names.
 	if schemaRef.IsReference() {
 		return schemaNameToTypeName(schemaName), nil
 	}
 	schema := schemaRef.Schema()
+	if schema == nil {
+		return schemaName, nil
+	}
+
 	exts := extractExtensions(schema.Extensions)
 
 	if extension, ok := exts[extGoName]; ok {

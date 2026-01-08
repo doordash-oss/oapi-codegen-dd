@@ -25,16 +25,16 @@ limitations under the License.
 {{ $eitherType := eq (len .Schema.UnionElements) 2}}
 
 // Override default JSON handling for {{$args.Name}} to handle AdditionalProperties and union
-func ({{$args.alias}} *{{$args.Name}}) UnmarshalJSON(b []byte) error {
+func ({{$args.alias}} *{{$args.Name}}) UnmarshalJSON(data []byte) error {
     {{- if $eitherType }}
-    if err := {{$args.alias}}.Unmarshal(b); err != nil {
+    if err := {{$args.alias}}.Unmarshal(data); err != nil {
     {{ else }}
-    if err := {{$args.alias}}.union.UnmarshalJSON(b); err != nil {
+    if err := {{$args.alias}}.union.UnmarshalJSON(data); err != nil {
     {{ end -}}
         return err
     }
     object := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(b, &object); err != nil {
+	if err := json.Unmarshal(data, &object); err != nil {
 		return err
 	}
 

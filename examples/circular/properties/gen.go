@@ -19,7 +19,11 @@ func init() {
 }
 
 // User info.
-type User = any
+type User struct{}
+
+func (u User) Validate() error {
+	return nil
+}
 
 type Address struct {
 	City *Address `json:"city,omitempty"`

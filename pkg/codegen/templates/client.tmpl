@@ -57,9 +57,9 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
     {{- if and $op.Body $op.Body.Encoding }}
         bodyEncoding := make(map[string]runtime.FieldEncoding)
         {{- range $key, $value := $op.Body.Encoding }}
-            bodyEncoding["{{$key}}"] = runtime.FieldEncoding{
-                ContentType: "{{$value.ContentType}}",
-                Style:       "{{$value.Style}}",
+            bodyEncoding["{{escapeGoString $key}}"] = runtime.FieldEncoding{
+                ContentType: "{{escapeGoString $value.ContentType}}",
+                Style:       "{{escapeGoString $value.Style}}",
                 {{- if ne $value.Explode nil }}
                 Explode: &[]bool{ {{$value.Explode}} }[0],
                 {{- end }}
@@ -84,7 +84,7 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
         {{- end }}
     {{- end }}
     reqParams := runtime.RequestOptionsParameters{
-        RequestURL:  c.apiClient.GetBaseURL() + "{{$op.Path}}",
+        RequestURL:  c.apiClient.GetBaseURL() + "{{escapeGoString $op.Path}}",
         Method:  "{{$op.Method}}",{{- if $op.HasRequestOptions }}
         Options: options,{{- end}}{{- if $op.Body }}
         ContentType: "{{$op.Body.ContentType}}",{{- end }}
@@ -103,7 +103,7 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
 
     {{ template "responseParserFn" (dict "op" $op) }}
 
-    resp, err := c.apiClient.ExecuteRequest(ctx, req, "{{ $op.Path }}")
+    resp, err := c.apiClient.ExecuteRequest(ctx, req, "{{ escapeGoString $op.Path }}")
     if err != nil {
         return nil, fmt.Errorf("error executing request: %w", err)
     }

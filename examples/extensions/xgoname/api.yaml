@@ -2,6 +2,22 @@ openapi: "3.0.0"
 info:
   version: 1.0.0
   title: x-go-name
+paths:
+  /clients:
+    post:
+      operationId: createClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientWithExtension'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientWithExtension'
 components:
   schemas:
     Client:

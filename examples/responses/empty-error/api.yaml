@@ -1,0 +1,76 @@
+openapi: 3.0.0
+info:
+  title: Empty Error Response Example
+  version: 1.0.0
+  description: |
+    Example demonstrating empty error response schemas.
+    Empty schemas {} are generated as struct{} for responses so they can have Error() methods.
+
+paths:
+  /users:
+    post:
+      operationId: createUser
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestException'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictException'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerException'
+
+components:
+  schemas:
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - email
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - email
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+
+    # Empty error schemas - these will be generated as struct{} for responses
+    BadRequestException: {}
+    ConflictException: {}
+    InternalServerException: {}

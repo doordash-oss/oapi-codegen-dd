@@ -77,7 +77,7 @@ func main() {
 }
 
 func TestParser_Parse(t *testing.T) {
-	parseOptions := ParseOptions{}
+	parseOptions := ParseOptions{currentTypes: map[string]TypeDefinition{}}
 	cfg := Configuration{
 		Output: &Output{
 			UseSingleFile: true,

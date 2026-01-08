@@ -11,6 +11,29 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+type OrderStatus string
+
+const (
+	OrderStatusConfirmed OrderStatus = "confirmed"
+	OrderStatusPending   OrderStatus = "pending"
+	OrderStatusShipped   OrderStatus = "shipped"
+)
+
+// validOrderStatusValues is a map of valid values for OrderStatus
+var validOrderStatusValues = map[OrderStatus]bool{
+	OrderStatusConfirmed: true,
+	OrderStatusPending:   true,
+	OrderStatusShipped:   true,
+}
+
+// Validate checks if the OrderStatus value is valid
+func (o OrderStatus) Validate() error {
+	if !validOrderStatusValues[o] {
+		return runtime.NewValidationError("", fmt.Sprintf("invalid OrderStatus value: %v", o))
+	}
+	return nil
+}
+
 type GetFooResponse = map[string]any
 
 var schemaTypesValidate *validator.Validate
@@ -21,10 +44,18 @@ func init() {
 }
 
 type Order struct {
+	Status *OrderStatus  `json:"status,omitempty"`
 	Client *Order_Client `json:"client,omitempty"`
 }
 
 func (o Order) Validate() error {
+	if o.Status != nil {
+		if v, ok := any(o.Status).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				return runtime.NewValidationErrorFromError("Status", err)
+			}
+		}
+	}
 	if o.Client != nil {
 		if v, ok := any(o.Client).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {

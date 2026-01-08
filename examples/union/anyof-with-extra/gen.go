@@ -51,9 +51,9 @@ func (c *ClientWithExtra) Set(fieldName string, value ClientWithExtra_Additional
 }
 
 // Override default JSON handling for ClientWithExtra to handle AdditionalProperties
-func (c *ClientWithExtra) UnmarshalJSON(b []byte) error {
+func (c *ClientWithExtra) UnmarshalJSON(data []byte) error {
 	object := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(b, &object); err != nil {
+	if err := json.Unmarshal(data, &object); err != nil {
 		return err
 	}
 

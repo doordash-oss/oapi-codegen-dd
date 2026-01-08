@@ -56,6 +56,9 @@ type ParseOptions struct {
 	path         []string
 	specLocation SpecLocation
 
+	// Track visited schema paths to prevent infinite recursion
+	visited map[string]bool
+
 	// naming parameters
 	baseName     string
 	nameSuffixes []string

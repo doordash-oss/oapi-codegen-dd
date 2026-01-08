@@ -58,7 +58,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-1", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		// With single element oneOf, it should just return the User type directly
@@ -72,7 +72,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-2", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\"-\"`\n}", res.GoType)
@@ -85,7 +85,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-3", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\"-\"`\n}", res.GoType)
@@ -94,5 +94,152 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		assert.Equal(t, "User_OneOf", res.AdditionalTypes[0].Name)
 		assert.Equal(t, "struct {\nunion json.RawMessage\n}", res.AdditionalTypes[0].Schema.GoType)
 		assert.Equal(t, []UnionElement{"User", "Error", "string"}, res.AdditionalTypes[0].Schema.UnionElements)
+	})
+}
+
+func TestExtractDiscriminatorValue(t *testing.T) {
+	t.Run("extracts discriminator value from inline schema with enum", func(t *testing.T) {
+		// Create a simple inline schema with a discriminator property that has an enum value
+		yamlContent := `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: test
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - dog
+                      name:
+                        type: string
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - cat
+                      lives:
+                        type: integer
+                discriminator:
+                  propertyName: type
+`
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
+		require.NoError(t, err)
+
+		v3Model, err := srcDoc.BuildV3Model()
+		require.NoError(t, err)
+
+		doc := v3Model.Model
+		schemaProxy := getOperationResponse(t, doc, "/test", "get")
+		require.NotNil(t, schemaProxy)
+
+		schema := schemaProxy.Schema()
+		require.NotNil(t, schema)
+		require.NotNil(t, schema.OneOf)
+		require.Len(t, schema.OneOf, 2)
+
+		// Test extracting discriminator value from first element (dog)
+		dogValue := extractDiscriminatorValue(schema.OneOf[0], "type")
+		assert.Equal(t, "dog", dogValue)
+
+		// Test extracting discriminator value from second element (cat)
+		catValue := extractDiscriminatorValue(schema.OneOf[1], "type")
+		assert.Equal(t, "cat", catValue)
+	})
+
+	t.Run("returns empty string when discriminator property not found", func(t *testing.T) {
+		yamlContent := `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: test
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      name:
+                        type: string
+`
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
+		require.NoError(t, err)
+
+		v3Model, err := srcDoc.BuildV3Model()
+		require.NoError(t, err)
+
+		doc := v3Model.Model
+		schemaProxy := getOperationResponse(t, doc, "/test", "get")
+		require.NotNil(t, schemaProxy)
+
+		schema := schemaProxy.Schema()
+		require.NotNil(t, schema)
+		require.NotNil(t, schema.OneOf)
+		require.Len(t, schema.OneOf, 1)
+
+		// Test with non-existent discriminator property
+		value := extractDiscriminatorValue(schema.OneOf[0], "type")
+		assert.Equal(t, "", value)
+	})
+
+	t.Run("returns empty string when property has no enum", func(t *testing.T) {
+		yamlContent := `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: test
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+`
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
+		require.NoError(t, err)
+
+		v3Model, err := srcDoc.BuildV3Model()
+		require.NoError(t, err)
+
+		doc := v3Model.Model
+		schemaProxy := getOperationResponse(t, doc, "/test", "get")
+		require.NotNil(t, schemaProxy)
+
+		schema := schemaProxy.Schema()
+		require.NotNil(t, schema)
+		require.NotNil(t, schema.OneOf)
+		require.Len(t, schema.OneOf, 1)
+
+		// Test with property that has no enum
+		value := extractDiscriminatorValue(schema.OneOf[0], "type")
+		assert.Equal(t, "", value)
 	})
 }

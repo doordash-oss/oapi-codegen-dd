@@ -178,7 +178,9 @@ func describeOperationParameters(params []*v3high.Parameter, options ParseOption
 
 		// If this is a reference to a predefined type, simply use the reference
 		// name as the type. $ref: "#/components/schemas/custom_type" becomes "CustomType".
-		if ref != "" {
+		// However, for deep path references (e.g., #/paths/.../parameters/1/schema),
+		// GenerateGoSchema has already created the type definition, so we don't override it.
+		if ref != "" && isStandardComponentReference(ref) {
 			goType, err := refPathToGoType(ref)
 			if err != nil {
 				return nil, fmt.Errorf("error dereferencing (%s) for param (%s): %s", ref, param.Name, err)
@@ -234,6 +236,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 	)
 
 	encodings := map[string]ParameterEncoding{}
+	goFieldNames := make(map[string]int) // Track Go field names to detect conflicts
 
 	for _, param := range objectParams {
 		pSchema := param.Schema
@@ -260,8 +263,20 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 			oapiSchema = oapiSchemaProxy.Schema()
 		}
 
+		// Generate the Go field name and handle conflicts
+		baseGoName := createPropertyGoFieldName(param.ParamName, exts)
+		goName := baseGoName
+		if count, exists := goFieldNames[baseGoName]; exists {
+			// Conflict detected - append a number
+			count++
+			goFieldNames[baseGoName] = count
+			goName = fmt.Sprintf("%s%d", baseGoName, count)
+		} else {
+			goFieldNames[baseGoName] = 0
+		}
+
 		properties = append(properties, Property{
-			GoName:        createPropertyGoFieldName(param.ParamName, exts),
+			GoName:        goName,
 			Description:   param.Spec.Description,
 			JsonFieldName: param.ParamName,
 			Schema:        pSchema,

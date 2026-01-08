@@ -16,9 +16,18 @@ paths:
 
 components:
   schemas:
+    OrderStatus:
+      type: string
+      enum:
+        - pending
+        - confirmed
+        - shipped
+
     Order:
       type: object
       properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
         client:
           allOf:
             - description: should be ignored without type

@@ -1,0 +1,32 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: self-referencing-additional-properties
+  description: Test case for self-referencing schemas via additionalProperties
+
+components:
+  schemas:
+    # Example with self-referencing schema via additionalProperties
+    # This reproduces the issue from ClickMeter API
+    AggregatedResult:
+      type: object
+      properties:
+        totalClicks:
+          type: integer
+        hourlyBreakDown:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AggregatedResult'
+
+paths:
+  /test:
+    get:
+      operationId: GetTest
+      responses:
+        '200':
+          description: Test response with component schema reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregatedResult'
+

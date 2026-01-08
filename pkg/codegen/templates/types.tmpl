@@ -55,7 +55,7 @@ func init() {
     {{ if $responseErrors }}
     {{- $isResponseError := index $responseErrors $td.Name }}
     {{ if $isResponseError }}
-    {{ if not $td.IsAlias }}
+    {{ if and (not $td.IsAlias) (not $td.Schema.IsAnyType) }}
     {{ $alias := $loc | fst | lower }}
     func ({{$alias}} {{$td.Name}}) Error() string {
         {{- if index $config.ErrorMapping $td.Name}}
@@ -89,7 +89,7 @@ func init() {
                 maskedVal := runtime.MaskSensitivePointer(masked.{{ .GoName }}, runtime.SensitiveDataConfig{
                     Type: runtime.MaskType{{ .SensitiveData.Mask | ucFirst }},
                     Pattern: "{{ .SensitiveData.EscapedPattern }}",
-                    Algorithm: "{{ .SensitiveData.Algorithm }}",
+                    Algorithm: "{{escapeGoString .SensitiveData.Algorithm}}",
                     KeepPrefix: {{ .SensitiveData.KeepPrefix }},
                     KeepSuffix: {{ .SensitiveData.KeepSuffix }},
                 })
@@ -105,7 +105,7 @@ func init() {
                 maskedVal := runtime.MaskSensitiveValue(masked.{{ .GoName }}, runtime.SensitiveDataConfig{
                     Type: runtime.MaskType{{ .SensitiveData.Mask | ucFirst }},
                     Pattern: "{{ .SensitiveData.EscapedPattern }}",
-                    Algorithm: "{{ .SensitiveData.Algorithm }}",
+                    Algorithm: "{{escapeGoString .SensitiveData.Algorithm}}",
                     KeepPrefix: {{ .SensitiveData.KeepPrefix }},
                     KeepSuffix: {{ .SensitiveData.KeepSuffix }},
                 })
@@ -170,7 +170,10 @@ func init() {
 
         {{- range $td.Schema.Properties }}
             {{ if and .Schema.RefType}}
-                {{ if .IsPointerType }}
+                {{/* Initialize pointer types for struct-based RefTypes (unions, allOf, named structs) */}}
+                {{/* Skip initialization only for enums (have EnumValues) */}}
+                {{/* Struct types can always be initialized with composite literals */}}
+                {{ if and .IsPointerType (eq (len .Schema.EnumValues) 0) }}
                     if {{$alias}}.{{ .GoName }} == nil {
                         {{$alias}}.{{ .GoName }} = &{{ .Schema.RefType }}{}
                     }

@@ -38,7 +38,7 @@ type operationsCollection struct {
 
 // Generate creates Go code from an OpenAPI document and a configuration in single file output.
 func Generate(docContents []byte, cfg Configuration) (GeneratedCode, error) {
-	cfg = cfg.Merge(NewDefaultConfiguration())
+	cfg = cfg.WithDefaults()
 	parseCtx, errs := CreateParseContext(docContents, cfg)
 	if errs != nil {
 		return nil, fmt.Errorf("error creating parse context: %w", errs[0])
@@ -73,12 +73,13 @@ func CreateParseContext(docContents []byte, cfg Configuration) (*ParseContext, [
 }
 
 func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) (*ParseContext, error) {
-	cfg = cfg.Merge(NewDefaultConfiguration())
+	cfg = cfg.WithDefaults()
 	parseOptions := ParseOptions{
 		OmitDescription:        cfg.Generate.OmitDescription,
 		DefaultIntType:         cfg.Generate.DefaultIntType,
 		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
 		currentTypes:           map[string]TypeDefinition{},
+		visited:                map[string]bool{},
 	}
 
 	builtModel, err := doc.BuildV3Model()
@@ -160,7 +161,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		}
 	}
 
-	respErrs, err := collectResponseErrors(responseErrors, typeDefs)
+	respErrs, err := collectResponseErrors(responseErrors, typeDefs, enums)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting response errors: %w", err)
 	}
@@ -303,8 +304,9 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		}
 	}
 
-	// Deduplicate operation IDs
+	// Deduplicate operation IDs and resolve RequestOptions name collisions
 	operations = deduplicateOperationIDs(operations)
+	operations = resolveRequestOptionsCollisions(operations, options.currentTypes)
 
 	allTypeDefs := extractAllTypeDefinitions(typeDefs)
 
@@ -314,6 +316,40 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		typeDefs:       allTypeDefs,
 		responseErrors: responseErrors,
 	}, nil
+}
+
+// resolveRequestOptionsCollisions checks if any operation's RequestOptions type name
+// would collide with existing component schemas, and renames the operation ID if needed.
+func resolveRequestOptionsCollisions(operations []OperationDefinition, currentTypes map[string]TypeDefinition) []OperationDefinition {
+	result := make([]OperationDefinition, len(operations))
+
+	for i, op := range operations {
+		if !op.HasRequestOptions() {
+			result[i] = op
+			continue
+		}
+
+		// Check if the RequestOptions type name would collide
+		requestOptionsTypeName := UppercaseFirstCharacter(op.ID) + "RequestOptions"
+
+		if _, exists := currentTypes[requestOptionsTypeName]; exists {
+			// Collision detected - we need to find a new operation ID such that
+			// {newID}RequestOptions doesn't collide
+			// We'll try appending numbers until we find one that works
+			for suffix := 1; ; suffix++ {
+				newID := fmt.Sprintf("%s%d", op.ID, suffix)
+				newRequestOptionsTypeName := UppercaseFirstCharacter(newID) + "RequestOptions"
+				if _, exists := currentTypes[newRequestOptionsTypeName]; !exists {
+					op.ID = newID
+					break
+				}
+			}
+		}
+
+		result[i] = op
+	}
+
+	return result
 }
 
 // deduplicateOperationIDs ensures all operation IDs are unique by appending a suffix to duplicates
@@ -399,10 +435,19 @@ func extractAllTypeDefinitions(types []TypeDefinition) []TypeDefinition {
 
 // collectResponseErrors collects the response errors from the type definitions.
 // We need non-alias types for the response errors, so we could generate Error function.
-func collectResponseErrors(errNames []string, types []TypeDefinition) ([]string, error) {
+func collectResponseErrors(errNames []string, types []TypeDefinition, enums []EnumDefinition) ([]string, error) {
 	tds := make(map[string]TypeDefinition)
 	for _, typeDef := range types {
 		tds[typeDef.Name] = typeDef
+	}
+
+	// Also add enum types to the map
+	for _, enumDef := range enums {
+		// Convert EnumDefinition to TypeDefinition for lookup
+		tds[enumDef.Name] = TypeDefinition{
+			Name:   enumDef.Name,
+			Schema: enumDef.Schema,
+		}
 	}
 
 	var res []string

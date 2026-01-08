@@ -67,6 +67,8 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 	isInt := slices.Contains(schema.Type, "integer")
 	isFloat := slices.Contains(schema.Type, "number")
 	isBoolean := slices.Contains(schema.Type, "boolean")
+	isString := slices.Contains(schema.Type, "string")
+	isArray := slices.Contains(schema.Type, "array")
 	var validationTags []string
 
 	name := opts.name
@@ -111,7 +113,9 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 	}
 
 	var minValue *float64
-	if schema.Minimum != nil {
+	// Only store minimum for numeric types (integer/number)
+	// For strings, minimum is invalid per OpenAPI spec - ignore it completely
+	if schema.Minimum != nil && (isInt || isFloat) {
 		minTag := "gte"
 		val := *schema.Minimum
 		if schema.ExclusiveMinimum != nil && ((schema.ExclusiveMinimum.IsA() && schema.ExclusiveMinimum.A) || schema.ExclusiveMinimum.IsB()) {
@@ -122,15 +126,17 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 		}
 
 		minValue = &val
+		tag := fmt.Sprintf("%s=%g", minTag, val)
 		if isInt {
-			validationTags = append(validationTags, fmt.Sprintf("%s=%d", minTag, int64(val)))
-		} else if isFloat {
-			validationTags = append(validationTags, fmt.Sprintf("%s=%g", minTag, val))
+			tag = fmt.Sprintf("%s=%d", minTag, int64(val))
 		}
+		validationTags = append(validationTags, tag)
 	}
 
 	var maxValue *float64
-	if schema.Maximum != nil {
+	// Only store maximum for numeric types (integer/number)
+	// For strings, maximum is invalid per OpenAPI spec - ignore it completely
+	if schema.Maximum != nil && (isInt || isFloat) {
 		maxTag := "lte"
 		val := *schema.Maximum
 		if schema.ExclusiveMaximum != nil && ((schema.ExclusiveMaximum.IsA() && schema.ExclusiveMaximum.A) || schema.ExclusiveMaximum.IsB()) {
@@ -141,21 +147,25 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 		}
 
 		maxValue = &val
+		tag := fmt.Sprintf("%s=%g", maxTag, val)
 		if isInt {
-			validationTags = append(validationTags, fmt.Sprintf("%s=%d", maxTag, int64(val)))
-		} else if isFloat {
-			validationTags = append(validationTags, fmt.Sprintf("%s=%g", maxTag, val))
+			tag = fmt.Sprintf("%s=%d", maxTag, int64(val))
 		}
+		validationTags = append(validationTags, tag)
 	}
 
 	var minLength *int64
-	if schema.MinLength != nil {
+	// Only store minLength for strings and arrays
+	// For integers/numbers/booleans, minLength is invalid per OpenAPI spec - ignore it completely
+	if schema.MinLength != nil && (isString || isArray) {
 		minLength = schema.MinLength
 		validationTags = append(validationTags, fmt.Sprintf("min=%d", *minLength))
 	}
 
 	var maxLength *int64
-	if schema.MaxLength != nil {
+	// Only store maxLength for strings and arrays
+	// For integers/numbers/booleans, maxLength is invalid per OpenAPI spec - ignore it completely
+	if schema.MaxLength != nil && (isString || isArray) {
 		maxLength = schema.MaxLength
 		validationTags = append(validationTags, fmt.Sprintf("max=%d", *maxLength))
 	}

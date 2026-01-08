@@ -30,6 +30,26 @@ func (u UnionElement) Method() string {
 	return method
 }
 
+// goPrimitiveTypes is a set of Go primitive type names used to determine
+// whether a type needs a separate type definition in unions.
+var goPrimitiveTypes = map[string]bool{
+	"string":  true,
+	"int":     true,
+	"int8":    true,
+	"int16":   true,
+	"int32":   true,
+	"int64":   true,
+	"uint":    true,
+	"uint8":   true,
+	"uint16":  true,
+	"uint32":  true,
+	"uint64":  true,
+	"float":   true,
+	"float32": true,
+	"float64": true,
+	"bool":    true,
+}
+
 func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminator, options ParseOptions) (GoSchema, error) {
 	outSchema := GoSchema{}
 	path := options.path
@@ -44,7 +64,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	// Early return for single element unions (no null involved)
 	if len(elements) == 1 {
 		ref := elements[0].GoLow().GetReference()
-		opts := options.WithReference(ref)
+		opts := options.WithReference(ref).WithPath(options.path)
 		return GenerateGoSchema(elements[0], opts)
 	}
 
@@ -70,7 +90,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	// If after filtering we have only 1 element, return it as a nullable type
 	if len(nonNullElements) == 1 {
 		ref := nonNullElements[0].GoLow().GetReference()
-		opts := options.WithReference(ref)
+		opts := options.WithReference(ref).WithPath(options.path)
 		schema, err := GenerateGoSchema(nonNullElements[0], opts)
 		if err != nil {
 			return GoSchema{}, err
@@ -83,24 +103,6 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 
 	// Use the filtered elements for union generation
 	elements = nonNullElements
-
-	primitives := map[string]bool{
-		"string":  true,
-		"int":     true,
-		"int8":    true,
-		"int16":   true,
-		"int32":   true,
-		"int64":   true,
-		"uint":    true,
-		"uint8":   true,
-		"uint16":  true,
-		"uint32":  true,
-		"uint64":  true,
-		"float":   true,
-		"float32": true,
-		"float64": true,
-		"bool":    true,
-	}
 
 	for i, element := range elements {
 		if element == nil {
@@ -115,7 +117,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 		}
 
 		// define new types only for non-primitive types
-		if ref == "" && !primitives[elementSchema.GoType] {
+		if ref == "" && !goPrimitiveTypes[elementSchema.GoType] {
 			elementName := pathToTypeName(elementPath)
 			if elementSchema.TypeDecl() != elementName {
 				td := TypeDefinition{
@@ -130,13 +132,37 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 			}
 			elementSchema.GoType = elementName
 			outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, elementSchema.AdditionalTypes...)
+		} else if ref != "" && !goPrimitiveTypes[elementSchema.GoType] {
+			// Handle path-based references (not component refs)
+			// For path-based references to inline schemas, we need to create type definitions
+			if !isStandardComponentReference(ref) && strings.HasPrefix(elementSchema.GoType, "struct") {
+				elementName := pathToTypeName(elementPath)
+				// Check if a type definition already exists
+				typeExists := false
+				for _, at := range elementSchema.AdditionalTypes {
+					if at.Name == elementName {
+						typeExists = true
+						break
+					}
+				}
+
+				if !typeExists {
+					td := TypeDefinition{
+						Schema:         elementSchema,
+						Name:           elementName,
+						SpecLocation:   SpecLocationUnion,
+						JsonName:       "-",
+						NeedsMarshaler: needsMarshaler(elementSchema),
+					}
+					options.AddType(td)
+					outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, td)
+					elementSchema.GoType = elementName
+				}
+			}
+			outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, elementSchema.AdditionalTypes...)
 		}
 
 		if discriminator != nil {
-			if discriminator.Mapping.Len() != 0 && element.GetReference() == "" {
-				return GoSchema{}, ErrAmbiguousDiscriminatorMapping
-			}
-
 			// Explicit mapping.
 			var mapped bool
 			for k, v := range discriminator.Mapping.FromOldest() {
@@ -148,7 +174,26 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 			}
 			// Implicit mapping.
 			if !mapped {
-				outSchema.Discriminator.Mapping[refPathToObjName(element.GetReference())] = elementSchema.GoType
+				var discriminatorValue string
+
+				// For inline schemas (no reference), try to extract the discriminator value
+				if element.GetReference() == "" {
+					discriminatorValue = extractDiscriminatorValue(element, discriminator.PropertyName)
+					if discriminatorValue == "" {
+						// If we have an explicit mapping but can't determine the discriminator value
+						// for an inline schema, that's an error
+						if discriminator.Mapping.Len() != 0 {
+							return GoSchema{}, ErrAmbiguousDiscriminatorMapping
+						}
+						// Otherwise, skip this element (it won't be mapped)
+						continue
+					}
+				} else {
+					// For referenced schemas, use the reference name
+					discriminatorValue = refPathToObjName(element.GetReference())
+				}
+
+				outSchema.Discriminator.Mapping[discriminatorValue] = elementSchema.GoType
 			}
 		}
 		outSchema.UnionElements = append(outSchema.UnionElements, UnionElement(elementSchema.GoType))
@@ -177,4 +222,32 @@ func deduplicateUnionElements(elements []UnionElement) []UnionElement {
 	}
 
 	return result
+}
+
+// extractDiscriminatorValue attempts to extract the discriminator value from a schema.
+// For inline schemas, it looks for the discriminator property and extracts its enum value.
+// Returns empty string if the value cannot be determined.
+func extractDiscriminatorValue(element *base.SchemaProxy, discriminatorProp string) string {
+	if element == nil {
+		return ""
+	}
+
+	schema := element.Schema()
+	if schema == nil || schema.Properties == nil {
+		return ""
+	}
+
+	// Look for the discriminator property in the schema
+	propProxy, found := schema.Properties.Get(discriminatorProp)
+	if !found || propProxy == nil {
+		return ""
+	}
+
+	propSchema := propProxy.Schema()
+	if propSchema == nil || len(propSchema.Enum) == 0 {
+		return ""
+	}
+
+	// Return the first (and typically only) enum value
+	return propSchema.Enum[0].Value
 }

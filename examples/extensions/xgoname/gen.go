@@ -3,9 +3,147 @@
 package xgoname
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
 )
+
+// CustomClientName is the client for the API implementing the CustomClientName interface.
+type CustomClientName struct {
+	apiClient runtime.APIClient
+}
+
+// NewCustomClientName creates a new instance of the CustomClientName client.
+func NewCustomClientName(apiClient runtime.APIClient) *CustomClientName {
+	return &CustomClientName{apiClient: apiClient}
+}
+
+// NewDefaultCustomClientName creates a new instance of the CustomClientName client with default api client.
+func NewDefaultCustomClientName(baseURL string, opts ...runtime.APIClientOption) (*CustomClientName, error) {
+	apiClient, err := runtime.NewAPIClient(baseURL, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating API client: %w", err)
+	}
+	return &CustomClientName{apiClient: apiClient}, nil
+}
+
+// ClientInterface is the interface for the API client.
+type CustomClientNameInterface interface {
+	CreateClient(ctx context.Context, options *CreateClientRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreateClientResponse, error)
+}
+
+func (c *CustomClientName) CreateClient(ctx context.Context, options *CreateClientRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreateClientResponse, error) {
+	var err error
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL:  c.apiClient.GetBaseURL() + "/clients",
+		Method:      "POST",
+		Options:     options,
+		ContentType: "application/json",
+	}
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*CreateClientResponse, error) {
+		bodyBytes := resp.Content
+		if resp.StatusCode != 200 {
+			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+				runtime.WithStatusCode(resp.StatusCode))
+		}
+		target := new(CreateClientResponse)
+		if err = json.Unmarshal(bodyBytes, target); err != nil {
+			err = fmt.Errorf("error decoding response: %w", err)
+			return nil, err
+		}
+		return target, nil
+	}
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/clients")
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+	return responseParser(ctx, resp)
+}
+
+var _ CustomClientNameInterface = (*CustomClientName)(nil)
+
+var clientOptionsValidate = validator.New(validator.WithRequiredStructEnabled())
+
+// CreateClientRequestOptions is the options needed to make a request to CreateClient.
+type CreateClientRequestOptions struct {
+	Body *CreateClientBody
+}
+
+// Validate validates all the fields in the options.
+// Use it if fields validation was not run.
+func (o *CreateClientRequestOptions) Validate() error {
+	var errors runtime.ValidationErrors
+
+	if err := clientOptionsValidate.Struct(o.Body); err != nil {
+		errors = append(errors, runtime.NewValidationErrorsFromErrors("Body", []error{err})...)
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return errors
+}
+
+// GetPathParams returns the path params as a map.
+func (o *CreateClientRequestOptions) GetPathParams() (map[string]any, error) {
+	return nil, nil
+}
+
+// GetQuery returns the query params as a map.
+func (o *CreateClientRequestOptions) GetQuery() (map[string]any, error) {
+	return nil, nil
+}
+
+// GetBody returns the payload in any type that can be marshalled to JSON by the client.
+func (o *CreateClientRequestOptions) GetBody() any {
+	return o.Body
+}
+
+// GetHeader returns the headers as a map.
+func (o *CreateClientRequestOptions) GetHeader() (map[string]string, error) {
+	return nil, nil
+}
+
+func asMap[V any](v any) (map[string]V, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var m map[string]V
+	err = json.Unmarshal(res, &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+var bodyTypesValidate *validator.Validate
+
+func init() {
+	bodyTypesValidate = validator.New(validator.WithRequiredStructEnabled())
+	runtime.RegisterCustomTypeFunc(bodyTypesValidate)
+}
+
+type CreateClientBody = ClientRenamedByExtension
+
+type CreateClientResponse struct {
+	Name              string   `json:"name" validate:"required"`
+	AccountIdentifier *float32 `json:"id,omitempty"`
+}
 
 var schemaTypesValidate *validator.Validate
 

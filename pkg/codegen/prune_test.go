@@ -19,7 +19,10 @@ import (
 
 func TestFindReferences(t *testing.T) {
 	t.Run("unfiltered", func(t *testing.T) {
-		doc, err := LoadDocumentFromContents([]byte(pruneSpecTestFixture))
+		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
 		assert.NoError(t, err)
 
 		model, _ := doc.BuildV3Model()
@@ -29,7 +32,10 @@ func TestFindReferences(t *testing.T) {
 	})
 
 	t.Run("only cat", func(t *testing.T) {
-		doc, err := LoadDocumentFromContents([]byte(pruneSpecTestFixture))
+		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
 		assert.NoError(t, err)
 
 		model, _ := doc.BuildV3Model()
@@ -52,7 +58,10 @@ func TestFindReferences(t *testing.T) {
 	})
 
 	t.Run("only dog", func(t *testing.T) {
-		doc, err := LoadDocumentFromContents([]byte(pruneSpecTestFixture))
+		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
 		assert.NoError(t, err)
 
 		model, _ := doc.BuildV3Model()
@@ -75,8 +84,10 @@ func TestFindReferences(t *testing.T) {
 }
 
 func TestFilterOnlyCat(t *testing.T) {
-	// Get a spec from the test definition in this file:
-	doc, err := LoadDocumentFromContents([]byte(pruneSpecTestFixture))
+	contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+	assert.NoError(t, err)
+
+	doc, err := LoadDocumentFromContents(contents)
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -104,7 +115,7 @@ func TestFilterOnlyCat(t *testing.T) {
 	assert.NotEmpty(t, m2.Model.Paths.PathItems.GetOrZero("/cat").Get, "GET /cat operation should still be in spec")
 	assert.Empty(t, m2.Model.Paths.PathItems.GetOrZero("/dog").Get, "GET /dog should have been removed from spec")
 
-	doc, err = pruneSchema(doc2)
+	doc, err = pruneSchema(doc2, oapiCodegenExtensions)
 	assert.Nil(t, err)
 	if err != nil {
 		t.Fatal(err)
@@ -115,8 +126,10 @@ func TestFilterOnlyCat(t *testing.T) {
 }
 
 func TestFilterOnlyDog(t *testing.T) {
-	// Get a spec from the test definition in this file:
-	doc, err := LoadDocumentFromContents([]byte(pruneSpecTestFixture))
+	contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+	assert.NoError(t, err)
+
+	doc, err := LoadDocumentFromContents(contents)
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -146,7 +159,7 @@ func TestFilterOnlyDog(t *testing.T) {
 	assert.NotEmpty(t, m2.Model.Paths.PathItems.GetOrZero("/dog").Get)
 	assert.Empty(t, m2.Model.Paths.PathItems.GetOrZero("/cat").Get)
 
-	doc3, _ := pruneSchema(doc2)
+	doc3, _ := pruneSchema(doc2, oapiCodegenExtensions)
 	assert.Nil(t, err)
 	if err != nil {
 		t.Fatal(err)
@@ -157,8 +170,10 @@ func TestFilterOnlyDog(t *testing.T) {
 }
 
 func TestPruningUnusedComponents(t *testing.T) {
-	// Get a spec from the test definition in this file:
-	doc, err := LoadDocumentFromContents([]byte(pruneComprehensiveTestFixture))
+	contents, err := os.ReadFile("testdata/prune-all-components.yml")
+	assert.NoError(t, err)
+
+	doc, err := LoadDocumentFromContents(contents)
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -174,7 +189,7 @@ func TestPruningUnusedComponents(t *testing.T) {
 	assert.Equal(t, 1, m.Components.Links.Len())
 	assert.Equal(t, 1, m.Components.Callbacks.Len())
 
-	doc, _ = pruneSchema(doc)
+	doc, _ = pruneSchema(doc, oapiCodegenExtensions)
 	model, _ = doc.BuildV3Model()
 	m = &model.Model
 
@@ -188,304 +203,12 @@ func TestPruningUnusedComponents(t *testing.T) {
 	assert.Equal(t, 0, m.Components.Callbacks.Len())
 }
 
-const pruneComprehensiveTestFixture = `
-openapi: 3.0.1
-
-info:
-  title: OpenAPI-CodeGen Test
-  description: 'This is a test OpenAPI Spec'
-  version: 1.0.0
-
-servers:
-- url: https://test.oapi-codegen.com/v2
-- url: http://test.oapi-codegen.com/v2
-
-paths:
-  /test:
-    get:
-      operationId: doesNothing
-      summary: does nothing
-      tags: [nothing]
-      responses:
-        default:
-          description: returns nothing
-          content:
-            application/json:
-              schema:
-                type: object
-components:
-  schemas:
-    Object1:
-      type: object
-      properties:
-        object:
-          $ref: "#/components/schemas/Object2"
-    Object2:
-      type: object
-      properties:
-        object:
-          $ref: "#/components/schemas/Object3"
-    Object3:
-      type: object
-      properties:
-        object:
-          $ref: "#/components/schemas/Object4"
-    Object4:
-      type: object
-      properties:
-        object:
-          $ref: "#/components/schemas/Object5"
-    Object5:
-      type: object
-      properties:
-        object:
-          $ref: "#/components/schemas/Object6"
-    Object6:
-      type: object
-    Pet:
-      type: object
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        tag:
-          type: string
-    Error:
-      required:
-        - code
-        - message
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Error code
-        message:
-          type: string
-          description: Error message
-  parameters:
-    offsetParam:
-      name: offset
-      in: query
-      description: Number of items to skip before returning the results.
-      required: false
-      schema:
-        type: integer
-        format: int32
-        minimum: 0
-        default: 0
-  securitySchemes:
-    BasicAuth:
-      type: http
-      scheme: basic
-    BearerAuth:
-      type: http
-      scheme: bearer
-  requestBodies:
-    PetBody:
-      description: A JSON object containing pet information
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Pet'
-  responses:
-    NotFound:
-      description: The specified resource was not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Unauthorized
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-  headers:
-    X-RateLimit-Limit:
-      schema:
-        type: integer
-      description: Request limit per hour.
-    X-RateLimit-Remaining:
-      schema:
-        type: integer
-      description: The number of requests left for the time window.
-    X-RateLimit-Reset:
-      schema:
-        type: string
-        format: date-time
-      description: The UTC date/time at which the current rate limit window resets
-  examples:
-    objectExample:
-      value:
-        id: 1
-        name: new object
-      summary: A sample object
-  links:
-    GetUserByUserId:
-      description: >
-        The id value returned in the response can be used as
-        the userId parameter in GET /users/{userId}.
-      operationId: getUser
-      parameters:
-        userId: '$response.body#/id'
-  callbacks:
-    MyCallback:
-      '{$request.body#/callbackUrl}':
-        post:
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  properties:
-                    message:
-                      type: string
-                      example: Some event happened
-                  required:
-                    - message
-          responses:
-            '200':
-              description: Your server returns this code if it accepts the callback
-`
-
-const pruneSpecTestFixture = `
-openapi: 3.0.1
-
-info:
-  title: OpenAPI-CodeGen Test
-  description: 'This is a test OpenAPI Spec'
-  version: 1.0.0
-
-servers:
-- url: https://test.oapi-codegen.com/v2
-- url: http://test.oapi-codegen.com/v2
-
-paths:
-  /cat:
-    get:
-      tags:
-        - cat
-      summary: Get cat status
-      operationId: getCatStatus
-      responses:
-        200:
-          description: Success
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: '#/components/schemas/CatAlive'
-                  - $ref: '#/components/schemas/CatDead'
-            application/xml:
-              schema:
-                anyOf:
-                  - $ref: '#/components/schemas/CatAlive'
-                  - $ref: '#/components/schemas/CatDead'
-            application/yaml:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/CatAlive'
-                  - $ref: '#/components/schemas/CatDead'
-        default:
-          description: Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /dog:
-    get:
-      tags:
-        - dog
-      summary: Get dog status
-      operationId: getDogStatus
-      responses:
-        200:
-          description: Success
-          content:
-            application/json:
-              schema:
-                oneOf:
-                  - $ref: '#/components/schemas/DogAlive'
-                  - $ref: '#/components/schemas/DogDead'
-            application/xml:
-              schema:
-                anyOf:
-                  - $ref: '#/components/schemas/DogAlive'
-                  - $ref: '#/components/schemas/DogDead'
-            application/yaml:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/DogAlive'
-                  - $ref: '#/components/schemas/DogDead'
-        default:
-          description: Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-components:
-  schemas:
-
-    Error:
-      properties:
-        code:
-          type: integer
-          format: int32
-        message:
-          type: string
-
-    CatAlive:
-      properties:
-        name:
-          type: string
-        alive_since:
-          type: string
-          format: date-time
-
-    CatDead:
-      properties:
-        name:
-          type: string
-        dead_since:
-          type: string
-          format: date-time
-        cause:
-          type: string
-          enum: [car, dog, oldage]
-
-    DogAlive:
-      properties:
-        name:
-          type: string
-        alive_since:
-          type: string
-          format: date-time
-
-    DogDead:
-      properties:
-        name:
-          type: string
-        dead_since:
-          type: string
-          format: date-time
-        cause:
-          type: string
-          enum: [car, cat, oldage]
-
-`
-
 func TestPruneParameterSchemaRefs(t *testing.T) {
 	// Test that schemas referenced by component parameters are not pruned
-	doc, err := LoadDocumentFromContents([]byte(pruneParameterSchemaTestFixture))
+	contents, err := os.ReadFile("testdata/prune-component-params.yml")
+	assert.NoError(t, err)
+
+	doc, err := LoadDocumentFromContents(contents)
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -496,7 +219,7 @@ func TestPruneParameterSchemaRefs(t *testing.T) {
 	assert.Equal(t, 2, m.Components.Parameters.Len(), "Should have 2 parameters before pruning")
 
 	// Prune the schema
-	doc, err = pruneSchema(doc)
+	doc, err = pruneSchema(doc, oapiCodegenExtensions)
 	assert.NoError(t, err)
 
 	model, _ = doc.BuildV3Model()
@@ -511,50 +234,6 @@ func TestPruneParameterSchemaRefs(t *testing.T) {
 	assert.NotNil(t, m.Components.Schemas.GetOrZero("FormatProp"), "FormatProp schema should be preserved")
 	assert.Nil(t, m.Components.Schemas.GetOrZero("UnusedSchema"), "UnusedSchema should be pruned")
 }
-
-const pruneParameterSchemaTestFixture = `
-openapi: 3.0.0
-info:
-  title: Parameter Schema Test
-  version: 1.0.0
-paths:
-  /items:
-    get:
-      operationId: listItems
-      parameters:
-        - $ref: "#/components/parameters/DateStart"
-        - $ref: "#/components/parameters/Format"
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-components:
-  parameters:
-    DateStart:
-      name: f.datum.start
-      in: query
-      schema:
-        $ref: "#/components/schemas/DateProp"
-      example: "2021-06-13"
-    Format:
-      name: format
-      in: query
-      schema:
-        $ref: "#/components/schemas/FormatProp"
-  schemas:
-    DateProp:
-      type: string
-      format: date
-    FormatProp:
-      type: string
-      enum: [json, xml]
-    UnusedSchema:
-      type: string
-      description: This schema is not referenced and should be pruned
-`
 
 func TestPruneInlineParameterSchemaRefs(t *testing.T) {
 	t.Run("schemas referenced in inline path parameters should not be pruned", func(t *testing.T) {
@@ -583,7 +262,7 @@ func TestPruneInlineParameterSchemaRefs(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Prune unused schemas
-		doc3, err := pruneSchema(doc2)
+		doc3, err := pruneSchema(doc2, oapiCodegenExtensions)
 		assert.NoError(t, err)
 
 		model3, err := doc3.BuildV3Model()
@@ -606,5 +285,233 @@ func TestPruneInlineParameterSchemaRefs(t *testing.T) {
 
 		_, hasItem := model3.Model.Components.Schemas.Get("Item")
 		assert.False(t, hasItem, "Item should be pruned - items tag was filtered out")
+	})
+}
+
+func TestPruneComponentSchemaRefs(t *testing.T) {
+	t.Run("component schemas that are refs to other schemas should preserve the target", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-component-schema-refs.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// Before pruning: should have 6 schemas
+		// AuthSpecification, SourceAuthSpecification, DestinationAuthSpecification,
+		// SourceDefinitionSpecificationRead, DestinationDefinitionSpecificationRead, UnusedSchema
+		assert.Equal(t, 6, model.Model.Components.Schemas.Len())
+
+		// Prune unused schemas
+		doc2, err := pruneSchema(doc, oapiCodegenExtensions)
+		assert.NoError(t, err)
+
+		model2, err := doc2.BuildV3Model()
+		assert.NoError(t, err)
+
+		// After pruning: should have 5 schemas (all except UnusedSchema)
+		// AuthSpecification should NOT be pruned even though it's only referenced
+		// by other component schemas (SourceAuthSpecification, DestinationAuthSpecification)
+		assert.Equal(t, 5, model2.Model.Components.Schemas.Len())
+
+		// Verify all the necessary schemas exist
+		_, hasAuthSpec := model2.Model.Components.Schemas.Get("AuthSpecification")
+		assert.True(t, hasAuthSpec, "AuthSpecification should not be pruned - it's referenced by component schemas")
+
+		_, hasSourceAuthSpec := model2.Model.Components.Schemas.Get("SourceAuthSpecification")
+		assert.True(t, hasSourceAuthSpec, "SourceAuthSpecification should not be pruned")
+
+		_, hasDestAuthSpec := model2.Model.Components.Schemas.Get("DestinationAuthSpecification")
+		assert.True(t, hasDestAuthSpec, "DestinationAuthSpecification should not be pruned")
+
+		_, hasSourceDefSpec := model2.Model.Components.Schemas.Get("SourceDefinitionSpecificationRead")
+		assert.True(t, hasSourceDefSpec, "SourceDefinitionSpecificationRead should not be pruned")
+
+		_, hasDestDefSpec := model2.Model.Components.Schemas.Get("DestinationDefinitionSpecificationRead")
+		assert.True(t, hasDestDefSpec, "DestinationDefinitionSpecificationRead should not be pruned")
+
+		// Verify UnusedSchema was pruned
+		_, hasUnused := model2.Model.Components.Schemas.Get("UnusedSchema")
+		assert.False(t, hasUnused, "UnusedSchema should be pruned - it's not referenced anywhere")
+	})
+}
+
+func TestPruneComponentRequestBodyRefs(t *testing.T) {
+	t.Run("component request bodies that are refs to other request bodies should preserve the target", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-component-requestbody-refs.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// Before pruning: should have 4 request bodies and 3 schemas
+		assert.Equal(t, 4, model.Model.Components.RequestBodies.Len())
+		assert.Equal(t, 3, model.Model.Components.Schemas.Len())
+
+		// Prune unused components
+		doc2, err := pruneSchema(doc, oapiCodegenExtensions)
+		assert.NoError(t, err)
+
+		model2, err := doc2.BuildV3Model()
+		assert.NoError(t, err)
+
+		// After pruning: should have 3 request bodies (all except UnusedRequest)
+		// CursorRequest should NOT be pruned even though it's only referenced
+		// by other component request bodies (AuditEventsRequest, ItemUsagesRequest)
+		assert.Equal(t, 3, model2.Model.Components.RequestBodies.Len())
+
+		// After pruning: should have 2 schemas (Cursor, ResetCursor - UnusedSchema should be pruned)
+		assert.Equal(t, 2, model2.Model.Components.Schemas.Len())
+
+		// Verify all the necessary request bodies exist
+		_, hasCursorReq := model2.Model.Components.RequestBodies.Get("CursorRequest")
+		assert.True(t, hasCursorReq, "CursorRequest should not be pruned - it's referenced by component request bodies")
+
+		_, hasAuditReq := model2.Model.Components.RequestBodies.Get("AuditEventsRequest")
+		assert.True(t, hasAuditReq, "AuditEventsRequest should not be pruned")
+
+		_, hasItemReq := model2.Model.Components.RequestBodies.Get("ItemUsagesRequest")
+		assert.True(t, hasItemReq, "ItemUsagesRequest should not be pruned")
+
+		// Verify UnusedRequest was pruned
+		_, hasUnusedReq := model2.Model.Components.RequestBodies.Get("UnusedRequest")
+		assert.False(t, hasUnusedReq, "UnusedRequest should be pruned - it's not referenced anywhere")
+
+		// Verify schemas
+		_, hasCursor := model2.Model.Components.Schemas.Get("Cursor")
+		assert.True(t, hasCursor, "Cursor schema should not be pruned")
+
+		_, hasResetCursor := model2.Model.Components.Schemas.Get("ResetCursor")
+		assert.True(t, hasResetCursor, "ResetCursor schema should not be pruned")
+
+		_, hasUnusedSchema := model2.Model.Components.Schemas.Get("UnusedSchema")
+		assert.False(t, hasUnusedSchema, "UnusedSchema should be pruned - it's not referenced anywhere")
+	})
+}
+
+func TestPruneDefaultResponseHeaders(t *testing.T) {
+	t.Run("headers referenced in default responses should not be pruned", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-default-response-headers.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// Before pruning: should have 3 headers and 3 schemas
+		assert.Equal(t, 3, model.Model.Components.Headers.Len())
+		assert.Equal(t, 3, model.Model.Components.Schemas.Len())
+
+		// Prune unused components
+		doc2, err := pruneSchema(doc, oapiCodegenExtensions)
+		assert.NoError(t, err)
+
+		model2, err := doc2.BuildV3Model()
+		assert.NoError(t, err)
+
+		// After pruning: should have 2 headers (ErrorCode, ErrorMessage - UnusedHeader should be pruned)
+		assert.Equal(t, 2, model2.Model.Components.Headers.Len())
+
+		// After pruning: should have 2 schemas (SuccessResponse, ErrorResponse - UnusedSchema should be pruned)
+		assert.Equal(t, 2, model2.Model.Components.Schemas.Len())
+
+		// Verify ErrorCode and ErrorMessage headers exist
+		_, hasErrorCode := model2.Model.Components.Headers.Get("ErrorCode")
+		assert.True(t, hasErrorCode, "ErrorCode header should not be pruned - it's referenced in default response")
+
+		_, hasErrorMessage := model2.Model.Components.Headers.Get("ErrorMessage")
+		assert.True(t, hasErrorMessage, "ErrorMessage header should not be pruned - it's referenced in default response")
+
+		// Verify UnusedHeader was pruned
+		_, hasUnusedHeader := model2.Model.Components.Headers.Get("UnusedHeader")
+		assert.False(t, hasUnusedHeader, "UnusedHeader should be pruned - it's not referenced anywhere")
+
+		// Verify schemas
+		_, hasSuccess := model2.Model.Components.Schemas.Get("SuccessResponse")
+		assert.True(t, hasSuccess, "SuccessResponse schema should not be pruned")
+
+		_, hasError := model2.Model.Components.Schemas.Get("ErrorResponse")
+		assert.True(t, hasError, "ErrorResponse schema should not be pruned")
+
+		_, hasUnusedSchema := model2.Model.Components.Schemas.Get("UnusedSchema")
+		assert.False(t, hasUnusedSchema, "UnusedSchema should be pruned - it's not referenced anywhere")
+	})
+}
+
+func TestPruneExamples(t *testing.T) {
+	t.Run("examples removed during pruning", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/with-examples.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		// Prune the document
+		prunedDoc, err := pruneSchema(doc, oapiCodegenExtensions)
+		assert.NoError(t, err)
+
+		model, err := prunedDoc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// components/examples should be removed by pruning (they're not referenced by operations)
+		// We track example references via collectExampleRefs
+		assert.Equal(t, 0, model.Model.Components.Examples.Len())
+
+		// Schema examples are also not removed
+		paySessionReq := model.Model.Components.Schemas.GetOrZero("PaySessionRequest")
+		schema := paySessionReq.Schema()
+		assert.NotNil(t, schema.Example)
+
+		// Property examples should be empty, but example (singular) should be kept
+		fooProp := schema.Properties.GetOrZero("foo")
+		fooSchema := fooProp.Schema()
+		assert.Nil(t, fooSchema.Examples)
+		assert.NotNil(t, fooSchema.Example)
+
+		// Check inline operation request body examples are removed
+		sessionsPath := model.Model.Paths.PathItems.GetOrZero("/sessions")
+		postOp := sessionsPath.Post
+		assert.NotNil(t, postOp.RequestBody)
+		jsonContent := postOp.RequestBody.Content.GetOrZero("application/json")
+		assert.Equal(t, 0, jsonContent.Examples.Len())
+
+		// Parameter examples should be empty, but example (singular) should be kept
+		param := model.Model.Components.Parameters.GetOrZero("Idempotency-Key")
+		assert.Equal(t, 0, param.Examples.Len())
+		assert.NotNil(t, param.Example)
+
+		// Header examples should be empty, but example (singular) should be kept
+		header := model.Model.Components.Headers.GetOrZero("Idempotency-Key")
+		assert.Equal(t, 0, header.Examples.Len())
+		assert.NotNil(t, header.Example)
+	})
+
+	t.Run("webhooks removed during pruning", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		// Prune the document
+		prunedDoc, err := pruneSchema(doc, oapiCodegenExtensions)
+		assert.NoError(t, err)
+
+		model, err := prunedDoc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// components/examples should be removed because they're only referenced by webhooks
+		// and webhooks are removed during cleanup
+		assert.Equal(t, 0, model.Model.Components.Examples.Len())
+
+		// webhooks should be removed
+		assert.Nil(t, model.Model.Webhooks)
 	})
 }

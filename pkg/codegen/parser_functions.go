@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode"
@@ -23,21 +24,22 @@ import (
 // TemplateFunctions is passed to the template engine, and we can call each
 // function here by keyName from the template code.
 var TemplateFunctions = template.FuncMap{
-	"genTypeName": nameNormalizer,
-	"lcFirst":     lowercaseFirstCharacter,
-	"ucFirst":     uppercaseFirstCharacter,
-	"caps":        strings.ToUpper,
-	"lower":       strings.ToLower,
-	"snake":       strcase.ToSnake,
-	"toGoComment": stringToGoCommentWithPrefix,
-	"ternary":     ternary,
-	"join":        join,
-	"fst":         fst,
-	"hasPrefix":   strings.HasPrefix,
-	"hasSuffix":   strings.HasSuffix,
-	"str":         str,
-	"dict":        dict,
-	"slice":       func() []any { return []any{} },
+	"genTypeName":    nameNormalizer,
+	"lcFirst":        lowercaseFirstCharacter,
+	"ucFirst":        uppercaseFirstCharacter,
+	"caps":           strings.ToUpper,
+	"lower":          strings.ToLower,
+	"snake":          strcase.ToSnake,
+	"toGoComment":    stringToGoCommentWithPrefix,
+	"ternary":        ternary,
+	"join":           join,
+	"fst":            fst,
+	"hasPrefix":      strings.HasPrefix,
+	"hasSuffix":      strings.HasSuffix,
+	"str":            str,
+	"dict":           dict,
+	"slice":          func() []any { return []any{} },
+	"escapeGoString": escapeGoString,
 	"append": func(slice []any, val any) []any {
 		return append(slice, val)
 	},
@@ -115,4 +117,16 @@ func dict(values ...any) (map[string]any, error) {
 		d[key] = values[i+1]
 	}
 	return d, nil
+}
+
+// escapeGoString escapes a string for use in a Go string literal.
+// It uses strconv.Quote to properly escape all special characters including backslashes.
+func escapeGoString(s string) string {
+	// strconv.Quote adds surrounding quotes, so we need to remove them
+	quoted := strconv.Quote(s)
+	// Remove the first and last character (the quotes)
+	if len(quoted) >= 2 {
+		return quoted[1 : len(quoted)-1]
+	}
+	return quoted
 }

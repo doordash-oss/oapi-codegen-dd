@@ -63,7 +63,7 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], options ParseOptions) ([]TypeDefinition, error) {
 	var types []TypeDefinition
 	for paramName, paramOrRef := range params.FromOldest() {
-		goType, err := paramToGoType(paramOrRef, options.WithPath(nil))
+		goType, err := paramToGoType(paramOrRef, options.WithPath([]string{paramName}))
 		if err != nil {
 			return nil, fmt.Errorf("error generating Go type for schema in parameter %s: %w", paramName, err)
 		}

@@ -1,0 +1,71 @@
+openapi: 3.0.0
+info:
+  title: Component Schema Refs Test
+  version: 1.0.0
+paths:
+  /sources:
+    get:
+      operationId: listSources
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceDefinitionSpecificationRead'
+  /destinations:
+    get:
+      operationId: listDestinations
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DestinationDefinitionSpecificationRead'
+components:
+  schemas:
+    # Base schema that other component schemas reference
+    AuthSpecification:
+      type: object
+      properties:
+        auth_type:
+          type: string
+          enum:
+            - oauth2.0
+        oauth2Specification:
+          type: object
+    
+    # Component schema that is just a $ref to another component schema
+    SourceAuthSpecification:
+      $ref: '#/components/schemas/AuthSpecification'
+    
+    # Component schema that is just a $ref to another component schema
+    DestinationAuthSpecification:
+      $ref: '#/components/schemas/AuthSpecification'
+    
+    # Schema that uses SourceAuthSpecification
+    SourceDefinitionSpecificationRead:
+      type: object
+      properties:
+        authSpecification:
+          $ref: '#/components/schemas/SourceAuthSpecification'
+        connectionSpecification:
+          type: object
+    
+    # Schema that uses DestinationAuthSpecification
+    DestinationDefinitionSpecificationRead:
+      type: object
+      properties:
+        authSpecification:
+          $ref: '#/components/schemas/DestinationAuthSpecification'
+        connectionSpecification:
+          type: object
+    
+    # Unused schema that should be pruned
+    UnusedSchema:
+      type: object
+      properties:
+        unused:
+          type: string
+

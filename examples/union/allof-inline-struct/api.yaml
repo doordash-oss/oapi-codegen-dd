@@ -1,0 +1,42 @@
+openapi: 3.0.0
+info:
+  title: AllOf Inline Struct Test
+  version: 1.0.0
+paths:
+  /base:
+    get:
+      operationId: getBase
+      responses:
+        '200':
+          description: Base response with inline schema
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+  /test:
+    post:
+      operationId: createTest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/paths/~1base/get/responses/200/content/application~1json/schema/properties/items/items'
+                - type: object
+                  properties:
+                    status:
+                      type: string
+      responses:
+        '200':
+          description: Success

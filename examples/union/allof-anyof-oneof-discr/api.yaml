@@ -13,6 +13,15 @@ paths:
             application/json:
               schema:
                 type: object
+  /pet:
+    get:
+      responses:
+        '200':
+          description: Get a pet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
 
 components:
   schemas:
@@ -66,3 +75,42 @@ components:
         mapping:
           client: '#/components/schemas/Client'
           identity: '#/components/schemas/Identity'
+
+    # Test case for discriminator with optional property (pointer type)
+    # The discriminator property has a default value, making it optional
+    Dog:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - dog
+          default: dog
+
+    Cat:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - cat
+
+    # Union with discriminator where one member has optional discriminator property
+    Pet:
+      oneOf:
+        - $ref: '#/components/schemas/Dog'
+        - $ref: '#/components/schemas/Cat'
+      discriminator:
+        propertyName: type
+        mapping:
+          dog: '#/components/schemas/Dog'
+          cat: '#/components/schemas/Cat'

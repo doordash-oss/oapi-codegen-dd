@@ -11,7 +11,6 @@
 package codegen
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,109 +99,6 @@ func TestFilterOperationsByOperationID(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, code)
 		assert.NotContains(t, code.GetCombined(), `"/cat"`)
-	})
-
-	t.Run("examples removed", func(t *testing.T) {
-		contents, err := os.ReadFile("testdata/with-examples.yml")
-		require.NoError(t, err)
-
-		opts := Configuration{
-			PackageName: packageName,
-			Output: &Output{
-				UseSingleFile: true,
-			},
-		}
-
-		// Run our code generation:
-		code, err := Generate(contents, opts)
-		require.NoError(t, err)
-		assert.NotEmpty(t, code)
-
-		combined := code.GetCombined()
-		assert.Contains(t, combined, `type ExtraA = string`)
-		assert.Contains(t, combined, `type ExtraB = string`)
-
-		// Load the document to verify examples are removed
-		doc, err := LoadDocumentFromContents(contents)
-		require.NoError(t, err)
-
-		// Apply filtering (which includes example removal)
-		filteredDoc, err := filterOutDocument(doc, opts.Filter)
-		require.NoError(t, err)
-
-		model, err := filteredDoc.BuildV3Model()
-		require.NoError(t, err)
-
-		// components/examples should be empty (no example references)
-		assert.Equal(t, 0, model.Model.Components.Examples.Len())
-
-		// Schema examples should be empty, but example (singular) should be kept
-		paySessionReq := model.Model.Components.Schemas.GetOrZero("PaySessionRequest")
-		schema := paySessionReq.Schema()
-		assert.Nil(t, schema.Examples)
-		assert.NotNil(t, schema.Example)
-
-		// Property examples should be empty, but example (singular) should be kept
-		fooProp := schema.Properties.GetOrZero("foo")
-		fooSchema := fooProp.Schema()
-		assert.Nil(t, fooSchema.Examples)
-		assert.NotNil(t, fooSchema.Example)
-
-		// Request body examples should be empty
-		reqBody := model.Model.Components.RequestBodies.GetOrZero("PaySessionRequest")
-		jsonContent := reqBody.Content.GetOrZero("application/json")
-		assert.Equal(t, 0, jsonContent.Examples.Len())
-
-		// XML content examples should be empty, but example (singular) should be kept
-		xmlContent := reqBody.Content.GetOrZero("application/xml")
-		assert.Equal(t, 0, xmlContent.Examples.Len())
-		assert.NotNil(t, xmlContent.Example)
-
-		// Parameter examples should be empty, but example (singular) should be kept
-		param := model.Model.Components.Parameters.GetOrZero("Idempotency-Key")
-		assert.Equal(t, 0, param.Examples.Len())
-		assert.NotNil(t, param.Example)
-
-		// Header examples should be empty, but example (singular) should be kept
-		header := model.Model.Components.Headers.GetOrZero("Idempotency-Key")
-		assert.Equal(t, 0, header.Examples.Len())
-		assert.NotNil(t, header.Example)
-
-		// Response examples should be empty
-		response := model.Model.Components.Responses.GetOrZero("SuccessResponse")
-		jsonRespContent := response.Content.GetOrZero("application/json")
-		assert.Equal(t, 0, jsonRespContent.Examples.Len())
-	})
-
-	t.Run("examples removed from webhooks", func(t *testing.T) {
-		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
-		require.NoError(t, err)
-
-		opts := Configuration{
-			PackageName: packageName,
-			Output: &Output{
-				UseSingleFile: true,
-			},
-		}
-
-		// Run our code generation - should not error
-		code, err := Generate(contents, opts)
-		require.NoError(t, err)
-		assert.NotEmpty(t, code)
-
-		// Load the document to verify examples are removed
-		doc, err := LoadDocumentFromContents(contents)
-		require.NoError(t, err)
-
-		// Apply filtering (which includes example removal)
-		filteredDoc, err := filterOutDocument(doc, opts.Filter)
-		require.NoError(t, err)
-
-		model, err := filteredDoc.BuildV3Model()
-		require.NoError(t, err)
-
-		// components/examples should be empty
-		assert.Equal(t, 0, model.Model.Components.Examples.Len())
 	})
 
 	t.Run("empty filter does not remove operations", func(t *testing.T) {

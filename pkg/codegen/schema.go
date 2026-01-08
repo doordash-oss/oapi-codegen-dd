@@ -318,19 +318,140 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 
 	ref := options.reference
 
+	// Create a tracking key - prefer the schema's actual reference, then options.reference, then path
+	var trackingKey string
+	var schemaRef string
+	if low := schemaProxy.GoLow(); low != nil {
+		schemaRef = low.GetReference()
+	}
+
+	// Use the schema's actual reference if options.reference is not set AND we're processing
+	// a nested property schema (like additionalProperties, array items, etc).
+	// For top-level schemas (responses, request bodies, component schemas), respect the
+	// options.reference even if it's empty, as it may be intentionally cleared.
+	// Detect nested schemas by checking if the path contains known nested schema indicators.
+	isNestedSchema := false
+	for _, pathElement := range options.path {
+		if pathElement == "AdditionalProperties" || pathElement == "Items" {
+			isNestedSchema = true
+			break
+		}
+	}
+	if ref == "" && schemaRef != "" && isNestedSchema {
+		ref = schemaRef
+	}
+
+	if schemaRef != "" {
+		trackingKey = schemaRef
+	} else if ref != "" {
+		trackingKey = ref
+	} else if len(options.path) > 0 {
+		// For component schemas (single path element), construct the reference
+		if len(options.path) == 1 {
+			trackingKey = "#/components/schemas/" + options.path[0]
+		} else {
+			trackingKey = strings.Join(options.path, ".")
+		}
+	}
+
 	// use the referenced type:
 	// properties will be picked up from the referenced schema later.
 	if ref != "" {
-		refType, err := refPathToGoType(ref)
-		if err != nil {
-			return GoSchema{}, fmt.Errorf("error turning reference (%s) into a Go type: %s", schemaProxy.GetReference(), err)
+		// Check if this is a standard component reference (#/components/schemas/Foo)
+		// vs a deep path reference (#/paths/.../properties/time)
+		isComponentRef := isStandardComponentReference(ref)
+
+		if isComponentRef {
+			// For standard component references, just return the type name
+			// The type definition already exists or will be created separately
+
+			// Check for circular references before processing the reference
+			if options.visited != nil && options.visited[trackingKey] {
+				// We've encountered a circular reference
+				// Return the referenced type name
+				refType, err := refPathToGoType(ref)
+				if err != nil {
+					return GoSchema{}, fmt.Errorf("error turning reference (%s) into a Go type: %s", ref, err)
+				}
+
+				return GoSchema{
+					GoType:         refType,
+					DefineViaAlias: true,
+					Description:    schema.Description,
+					OpenAPISchema:  schema,
+				}, nil
+			}
+
+			// Not a circular reference, just return the type name.
+			// First, try to look up the actual type name from currentTypes.
+			// This is important because the type may have been renamed via x-go-name.
+			refType, err := refPathToGoType(ref)
+			if err != nil {
+				return GoSchema{}, fmt.Errorf("error turning reference (%s) into a Go type: %s", schemaProxy.GetReference(), err)
+			}
+
+			// Check if we have a type definition for this reference that might have a different name
+			// (e.g., due to x-go-name extension)
+			if options.currentTypes != nil {
+				// Try to find the type definition by looking through all types
+				// We need to match by the schema reference, not the Go type name
+				for _, td := range options.currentTypes {
+					// Check if this type definition corresponds to our reference
+					// The JsonName field contains the original schema name from the spec
+					if td.JsonName != "" {
+						// Construct the expected reference from the JsonName
+						expectedRef := "#/components/schemas/" + td.JsonName
+						if expectedRef == ref {
+							// Found the type definition, use its actual Go name
+							refType = td.Name
+							break
+						}
+					}
+				}
+			}
+
+			return GoSchema{
+				GoType:         refType,
+				DefineViaAlias: true,
+				Description:    schema.Description,
+				OpenAPISchema:  schema,
+			}, nil
 		}
+
+		// For deep path references, we need to process the schema and create a type definition
+		// Fall through to normal schema processing below
+		// The ref will be used to generate the type name
+	}
+
+	// Check for circular references for non-reference schemas
+	// Only track visited schemas that have an actual schema reference (schemaRef)
+	// Don't track component schemas or inline schemas based on path alone
+	// Note: ref may not be empty here if it's a deep path reference (not a component ref)
+	shouldTrack := trackingKey != "" && schemaRef != ""
+
+	if shouldTrack && options.visited != nil && options.visited[trackingKey] {
+		// For non-reference circular dependencies, return the type name
+		// This handles cases like recursive schemas (e.g., a Node with children of type Node)
+		typeName := pathToTypeName(options.path)
 		return GoSchema{
-			GoType:         refType,
+			GoType:         typeName,
 			DefineViaAlias: true,
 			Description:    schema.Description,
 			OpenAPISchema:  schema,
 		}, nil
+	}
+
+	// Mark this schema as being visited to detect circular references
+	// We'll unmark it when we're done processing to allow the same schema to be used elsewhere
+	if shouldTrack {
+		if options.visited == nil {
+			options.visited = make(map[string]bool)
+		}
+		options.visited[trackingKey] = true
+		// Defer unmarking to allow this schema to be processed again in a different context
+		defer func() {
+			delete(options.visited, trackingKey)
+		}()
 	}
 
 	outSchema := GoSchema{
@@ -408,6 +529,46 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 	}
 
 	enhanced := enhanceSchema(outSchema, merged, options)
+
+	// Handle deep path references: create a type definition for the schema
+	// This handles cases like #/paths/.../properties/time where the schema is inline
+	// but referenced from multiple places
+	if ref != "" && !isStandardComponentReference(ref) {
+		// Generate a type name from the reference path
+		refType, err := refPathToGoType(ref)
+		if err != nil {
+			return GoSchema{}, fmt.Errorf("error turning reference (%s) into a Go type: %w", ref, err)
+		}
+
+		// Create a type definition for this schema
+		// Only create if we have a meaningful schema (not just a simple type alias)
+		if len(enhanced.Properties) > 0 || enhanced.HasAdditionalProperties || len(enhanced.UnionElements) > 0 || !enhanced.DefineViaAlias {
+			typeDef := TypeDefinition{
+				Name:             refType,
+				JsonName:         ref,
+				Schema:           enhanced,
+				SpecLocation:     options.specLocation,
+				NeedsMarshaler:   needsMarshaler(enhanced),
+				HasSensitiveData: hasSensitiveData(enhanced),
+			}
+			options.AddType(typeDef)
+			enhanced.AdditionalTypes = append(enhanced.AdditionalTypes, typeDef)
+			enhanced.RefType = refType
+		} else {
+			// For simple types (like string with format date), create a type alias
+			typeDef := TypeDefinition{
+				Name:           refType,
+				JsonName:       ref,
+				Schema:         enhanced,
+				SpecLocation:   options.specLocation,
+				NeedsMarshaler: false,
+			}
+			options.AddType(typeDef)
+			enhanced.AdditionalTypes = append(enhanced.AdditionalTypes, typeDef)
+			enhanced.RefType = refType
+		}
+	}
+
 	return enhanced, nil
 }
 
@@ -508,7 +669,10 @@ func enhanceSchema(src, other GoSchema, options ParseOptions) GoSchema {
 	src.GoType = src.createGoStruct(srcFields)
 
 	src.RefType = other.RefType
-	if other.RefType != "" {
+	// Only define via alias if we have a RefType but no properties or union elements
+	// If we have properties or union elements, we need to generate a struct, not an alias
+	// This ensures that methods like Error() can be generated for response types
+	if other.RefType != "" && len(src.Properties) == 0 && len(src.UnionElements) == 0 {
 		src.DefineViaAlias = true
 	}
 
@@ -570,4 +734,16 @@ func hasSensitiveData(schema GoSchema) bool {
 		}
 	}
 	return false
+}
+
+// isStandardComponentReference checks if a $ref is a standard component reference
+// (e.g., #/components/schemas/Foo) vs a deep path reference
+// (e.g., #/paths/.../properties/time)
+func isStandardComponentReference(ref string) bool {
+	parts := strings.Split(ref, "/")
+	// Standard component references have exactly 4 parts: #, components, <type>, <name>
+	// e.g., #/components/schemas/Foo
+	// e.g., #/components/parameters/Bar
+	// e.g., #/components/responses/Baz
+	return len(parts) == 4 && parts[1] == "components"
 }
