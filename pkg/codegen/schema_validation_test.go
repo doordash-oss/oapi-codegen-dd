@@ -1057,3 +1057,176 @@ func TestGoSchema_ValidateDecl_IntegerWithValidationTags(t *testing.T) {
 	`
 	assertCodeEqual(t, expected, result)
 }
+
+// TestGoSchema_NeedsValidation_StructWithArrayOfCustomTypes tests that a struct
+// with only array properties whose item types need validation correctly returns
+// true for NeedsValidation(). This is a regression test for the bug where
+// DisputesListResponse with Items []DisputeInfo didn't get a Validate() method.
+func TestGoSchema_NeedsValidation_StructWithArrayOfCustomTypes(t *testing.T) {
+	// Simulate DisputeInfo - a custom type that needs validation
+	disputeInfoSchema := GoSchema{
+		GoType:  "struct { ID string }",
+		RefType: "DisputeInfo",
+	}
+
+	// Simulate DisputesListResponse with Items []DisputeInfo
+	schema := GoSchema{
+		GoType: "struct { Items []DisputeInfo }",
+		Properties: []Property{
+			{
+				GoName: "Items",
+				Schema: GoSchema{
+					GoType:    "[]DisputeInfo",
+					ArrayType: &disputeInfoSchema,
+				},
+			},
+		},
+	}
+
+	// The struct should need validation because Items contains DisputeInfo which needs validation
+	if !schema.NeedsValidation() {
+		t.Error("Expected NeedsValidation() to return true for struct with array of custom types")
+	}
+}
+
+// TestGoSchema_ValidateDecl_StructWithArrayOfCustomTypes tests that validation
+// code is correctly generated for a struct with array properties whose item types
+// need validation.
+func TestGoSchema_ValidateDecl_StructWithArrayOfCustomTypes(t *testing.T) {
+	// Simulate DisputeInfo - a custom type that needs validation
+	disputeInfoSchema := GoSchema{
+		GoType:  "struct { ID string }",
+		RefType: "DisputeInfo",
+	}
+
+	// Simulate DisputesListResponse with Items []DisputeInfo
+	schema := GoSchema{
+		GoType: "struct { Items []DisputeInfo }",
+		Properties: []Property{
+			{
+				GoName: "Items",
+				Schema: GoSchema{
+					GoType:    "[]DisputeInfo",
+					ArrayType: &disputeInfoSchema,
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("d", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		for i, item := range d.Items {
+			if v, ok := any(item).(runtime.Validator); ok {
+				if err := v.Validate(); err != nil {
+					errors = errors.Append(fmt.Sprintf("Items[%d]", i), err)
+				}
+			}
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+// TestGoSchema_ValidateDecl_StructWithMultipleArraysOfCustomTypes tests validation
+// for a struct with multiple array properties.
+func TestGoSchema_ValidateDecl_StructWithMultipleArraysOfCustomTypes(t *testing.T) {
+	// Simulate two custom types
+	disputeInfoSchema := GoSchema{
+		GoType:  "struct { ID string }",
+		RefType: "DisputeInfo",
+	}
+	linkDescriptionSchema := GoSchema{
+		GoType:  "struct { Href string }",
+		RefType: "LinkDescription",
+	}
+
+	// Simulate DisputesListResponse with Items []DisputeInfo and Links []LinkDescription
+	schema := GoSchema{
+		GoType: "struct { Items []DisputeInfo; Links []LinkDescription }",
+		Properties: []Property{
+			{
+				GoName: "Items",
+				Schema: GoSchema{
+					GoType:    "[]DisputeInfo",
+					ArrayType: &disputeInfoSchema,
+				},
+			},
+			{
+				GoName: "Links",
+				Schema: GoSchema{
+					GoType:    "[]LinkDescription",
+					ArrayType: &linkDescriptionSchema,
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("d", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		for i, item := range d.Items {
+			if v, ok := any(item).(runtime.Validator); ok {
+				if err := v.Validate(); err != nil {
+					errors = errors.Append(fmt.Sprintf("Items[%d]", i), err)
+				}
+			}
+		}
+		for i, item := range d.Links {
+			if v, ok := any(item).(runtime.Validator); ok {
+				if err := v.Validate(); err != nil {
+					errors = errors.Append(fmt.Sprintf("Links[%d]", i), err)
+				}
+			}
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+// TestGoSchema_ValidateDecl_StructWithMapOfCustomTypes tests validation
+// for a struct with map properties whose value types need validation.
+func TestGoSchema_ValidateDecl_StructWithMapOfCustomTypes(t *testing.T) {
+	// Simulate a custom type
+	disputeInfoSchema := GoSchema{
+		GoType:  "struct { ID string }",
+		RefType: "DisputeInfo",
+	}
+
+	// Simulate a struct with Data map[string]DisputeInfo
+	schema := GoSchema{
+		GoType: "struct { Data map[string]DisputeInfo }",
+		Properties: []Property{
+			{
+				GoName: "Data",
+				Schema: GoSchema{
+					GoType:                   "map[string]DisputeInfo",
+					AdditionalPropertiesType: &disputeInfoSchema,
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("d", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		for k, v := range d.Data {
+			if validator, ok := any(v).(runtime.Validator); ok {
+				if err := validator.Validate(); err != nil {
+					errors = errors.Append(fmt.Sprintf("Data[%s]", k), err)
+				}
+			}
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}

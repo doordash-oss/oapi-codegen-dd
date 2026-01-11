@@ -340,40 +340,48 @@ func (s GoSchema) generateCustomPropertyValidation(alias, validatorVar string) s
 	lines = append(lines, declareErrorsVar())
 	for _, prop := range s.Properties {
 		if prop.needsCustomValidation() {
-			// Property needs custom validation - call Validate() method
-			if prop.IsPointerType() {
-				lines = append(lines, fmt.Sprintf("if %s.%s != nil {", alias, prop.GoName))
-				lines = append(lines, fmt.Sprintf("    if v, ok := any(%s.%s).(runtime.Validator); ok {", alias, prop.GoName))
-				lines = append(lines, "        if err := v.Validate(); err != nil {")
-				lines = append(lines, fmt.Sprintf("            errors = errors.Append(\"%s\", err)", prop.GoName))
-				lines = append(lines, "        }")
-				lines = append(lines, "    }")
-				lines = append(lines, "}")
+			// Check if this is an array property with items that need validation
+			if prop.Schema.ArrayType != nil && prop.Schema.ArrayType.NeedsValidation() {
+				lines = append(lines, generateArrayPropertyValidation(alias, prop, validatorVar)...)
+			} else if prop.Schema.AdditionalPropertiesType != nil && prop.Schema.AdditionalPropertiesType.NeedsValidation() {
+				// Check if this is a map property with values that need validation
+				lines = append(lines, generateMapPropertyValidation(alias, prop, validatorVar)...)
 			} else {
-				// For non-pointer types, we still need to handle the case where the field
-				// might be nil (e.g., slices, maps, interfaces).
-				// If the field is optional (nullable), we should check for nil before validating.
-				// This is safe because:
-				// - For structs: they can't be nil (unless they're interfaces), so the check is a no-op
-				// - For slices/maps: they can be nil, and we want to skip validation if they are
-				// - For interfaces: they can be nil, and we want to skip validation if they are
-				isOptional := prop.Constraints.Nullable != nil && *prop.Constraints.Nullable
-
-				if isOptional {
-					// For optional fields, check if nil before validating
-					// Use type assertion to check if the value implements Validator
-					// If it does and is not nil, validate it
-					lines = append(lines, fmt.Sprintf("if v, ok := any(%s.%s).(runtime.Validator); ok && v != nil {", alias, prop.GoName))
-					lines = append(lines, "    if err := v.Validate(); err != nil {")
-					lines = append(lines, fmt.Sprintf("        errors = errors.Append(\"%s\", err)", prop.GoName))
+				// Property needs custom validation - call Validate() method
+				if prop.IsPointerType() {
+					lines = append(lines, fmt.Sprintf("if %s.%s != nil {", alias, prop.GoName))
+					lines = append(lines, fmt.Sprintf("    if v, ok := any(%s.%s).(runtime.Validator); ok {", alias, prop.GoName))
+					lines = append(lines, "        if err := v.Validate(); err != nil {")
+					lines = append(lines, fmt.Sprintf("            errors = errors.Append(\"%s\", err)", prop.GoName))
+					lines = append(lines, "        }")
 					lines = append(lines, "    }")
 					lines = append(lines, "}")
 				} else {
-					lines = append(lines, fmt.Sprintf("if v, ok := any(%s.%s).(runtime.Validator); ok {", alias, prop.GoName))
-					lines = append(lines, "    if err := v.Validate(); err != nil {")
-					lines = append(lines, fmt.Sprintf("        errors = errors.Append(\"%s\", err)", prop.GoName))
-					lines = append(lines, "    }")
-					lines = append(lines, "}")
+					// For non-pointer types, we still need to handle the case where the field
+					// might be nil (e.g., slices, maps, interfaces).
+					// If the field is optional (nullable), we should check for nil before validating.
+					// This is safe because:
+					// - For structs: they can't be nil (unless they're interfaces), so the check is a no-op
+					// - For slices/maps: they can be nil, and we want to skip validation if they are
+					// - For interfaces: they can be nil, and we want to skip validation if they are
+					isOptional := prop.Constraints.Nullable != nil && *prop.Constraints.Nullable
+
+					if isOptional {
+						// For optional fields, check if nil before validating
+						// Use type assertion to check if the value implements Validator
+						// If it does and is not nil, validate it
+						lines = append(lines, fmt.Sprintf("if v, ok := any(%s.%s).(runtime.Validator); ok && v != nil {", alias, prop.GoName))
+						lines = append(lines, "    if err := v.Validate(); err != nil {")
+						lines = append(lines, fmt.Sprintf("        errors = errors.Append(\"%s\", err)", prop.GoName))
+						lines = append(lines, "    }")
+						lines = append(lines, "}")
+					} else {
+						lines = append(lines, fmt.Sprintf("if v, ok := any(%s.%s).(runtime.Validator); ok {", alias, prop.GoName))
+						lines = append(lines, "    if err := v.Validate(); err != nil {")
+						lines = append(lines, fmt.Sprintf("        errors = errors.Append(\"%s\", err)", prop.GoName))
+						lines = append(lines, "    }")
+						lines = append(lines, "}")
+					}
 				}
 			}
 		} else if len(prop.Constraints.ValidationTags) > 0 {
@@ -395,6 +403,60 @@ func (s GoSchema) generateCustomPropertyValidation(alias, validatorVar string) s
 
 	lines = append(lines, returnNilIfEmptyErrors())
 	return strings.Join(lines, "\n")
+}
+
+// generateArrayPropertyValidation generates validation code for an array property
+func generateArrayPropertyValidation(alias string, prop Property, validatorVar string) []string {
+	var lines []string
+	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
+
+	// Check for nil before iterating
+	lines = append(lines, fmt.Sprintf("for i, item := range %s {", fieldAccess))
+
+	// If items have validation tags, use validator.Var()
+	if len(prop.Schema.ArrayType.Constraints.ValidationTags) > 0 {
+		tags := strings.Join(prop.Schema.ArrayType.Constraints.ValidationTags, ",")
+		lines = append(lines, fmt.Sprintf("    if err := %s.Var(item, \"%s\"); err != nil {", validatorVar, tags))
+		lines = append(lines, fmt.Sprintf("        errors = errors.Append(fmt.Sprintf(\"%s[%%d]\", i), err)", prop.GoName))
+		lines = append(lines, "    }")
+	} else {
+		// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+		lines = append(lines, "    if v, ok := any(item).(runtime.Validator); ok {")
+		lines = append(lines, "        if err := v.Validate(); err != nil {")
+		lines = append(lines, fmt.Sprintf("            errors = errors.Append(fmt.Sprintf(\"%s[%%d]\", i), err)", prop.GoName))
+		lines = append(lines, "        }")
+		lines = append(lines, "    }")
+	}
+
+	lines = append(lines, "}")
+	return lines
+}
+
+// generateMapPropertyValidation generates validation code for a map property
+func generateMapPropertyValidation(alias string, prop Property, validatorVar string) []string {
+	var lines []string
+	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
+
+	// Iterate over map values
+	lines = append(lines, fmt.Sprintf("for k, v := range %s {", fieldAccess))
+
+	// If values have validation tags, use validator.Var()
+	if len(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags) > 0 {
+		tags := strings.Join(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags, ",")
+		lines = append(lines, fmt.Sprintf("    if err := %s.Var(v, \"%s\"); err != nil {", validatorVar, tags))
+		lines = append(lines, fmt.Sprintf("        errors = errors.Append(fmt.Sprintf(\"%s[%%s]\", k), err)", prop.GoName))
+		lines = append(lines, "    }")
+	} else {
+		// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+		lines = append(lines, "    if validator, ok := any(v).(runtime.Validator); ok {")
+		lines = append(lines, "        if err := validator.Validate(); err != nil {")
+		lines = append(lines, fmt.Sprintf("            errors = errors.Append(fmt.Sprintf(\"%s[%%s]\", k), err)", prop.GoName))
+		lines = append(lines, "        }")
+		lines = append(lines, "    }")
+	}
+
+	lines = append(lines, "}")
+	return lines
 }
 
 // Helper predicates

@@ -3,6 +3,8 @@
 package gen
 
 import (
+	"fmt"
+
 	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
 )
@@ -26,6 +28,21 @@ type Node struct {
 	ID       *int    `json:"id,omitempty"`
 	Name     *string `json:"name,omitempty"`
 	Children []Node  `json:"children,omitempty"`
+}
+
+func (n Node) Validate() error {
+	var errors runtime.ValidationErrors
+	for i, item := range n.Children {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Children[%d]", i), err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
 }
 
 var typesValidator *validator.Validate

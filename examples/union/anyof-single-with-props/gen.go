@@ -34,6 +34,21 @@ type BaseError struct {
 	Issues  []ErrorDetail `json:"issues,omitempty"`
 }
 
+func (b BaseError) Validate() error {
+	var errors runtime.ValidationErrors
+	for i, item := range b.Issues {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Issues[%d]", i), err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
 type ErrorDetail struct {
 	Field *string `json:"field,omitempty"`
 	Issue *string `json:"issue,omitempty"`
@@ -41,6 +56,21 @@ type ErrorDetail struct {
 
 type SpecificError struct {
 	Issues []SpecificIssue `json:"issues,omitempty"`
+}
+
+func (s SpecificError) Validate() error {
+	var errors runtime.ValidationErrors
+	for i, item := range s.Issues {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Issues[%d]", i), err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
 }
 
 type SpecificIssue struct {
@@ -68,6 +98,21 @@ type CombinedError struct {
 	Name    *string         `json:"name,omitempty"`
 	Message *string         `json:"message,omitempty"`
 	Issues  []SpecificIssue `json:"issues,omitempty"`
+}
+
+func (c CombinedError) Validate() error {
+	var errors runtime.ValidationErrors
+	for i, item := range c.Issues {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Issues[%d]", i), err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
 }
 
 var typesValidator *validator.Validate

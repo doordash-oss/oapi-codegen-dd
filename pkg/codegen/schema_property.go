@@ -84,6 +84,7 @@ func (p Property) IsPointerType() bool {
 // 2. If primitive type with validation tags → use validator.Var() (return false)
 // 3. If custom type (even with validation tags) → call .Validate() (return true)
 // 4. If primitive type without validation tags → skip validation (return false)
+// 5. Special case: arrays/maps with item types that need validation → return true
 func (p Property) needsCustomValidation() bool {
 	// Get the type definition
 	typeDef := p.Schema.TypeDecl()
@@ -91,6 +92,23 @@ func (p Property) needsCustomValidation() bool {
 	// Empty type means no validation needed
 	if typeDef == "" {
 		return false
+	}
+
+	// Check if it's an array with items that need validation
+	// This must be checked before the general "primitive" check because arrays
+	// of custom types (e.g., []DisputeInfo) need custom validation to iterate
+	// over elements and call their Validate() methods
+	if p.Schema.ArrayType != nil {
+		if p.Schema.ArrayType.NeedsValidation() {
+			return true
+		}
+	}
+
+	// Check if it's a map with values that need validation
+	if p.Schema.AdditionalPropertiesType != nil {
+		if p.Schema.AdditionalPropertiesType.NeedsValidation() {
+			return true
+		}
 	}
 
 	// Check if it's a primitive type or primitive alias

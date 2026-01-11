@@ -76,6 +76,13 @@ func (o OrgModel) Validate() error {
 			}
 		}
 	}
+	for i, item := range o.Children {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Children[%d]", i), err)
+			}
+		}
+	}
 	if len(errors) == 0 {
 		return nil
 	}

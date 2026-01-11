@@ -260,8 +260,12 @@ type File_Links struct {
 
 func (f File_Links) Validate() error {
 	var errors runtime.ValidationErrors
-	if err := typesValidator.Var(f.Data, "required"); err != nil {
-		errors = errors.Append("Data", err)
+	for i, item := range f.Data {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Data[%d]", i), err)
+			}
+		}
 	}
 	if v, ok := any(f.Object).(runtime.Validator); ok {
 		if err := v.Validate(); err != nil {
@@ -299,6 +303,11 @@ func (f FileLink) Validate() error {
 	}
 	if err := typesValidator.Var(f.ID, "required,max=5000"); err != nil {
 		errors = errors.Append("ID", err)
+	}
+	for k, v := range f.Metadata {
+		if err := typesValidator.Var(v, "omitempty,max=500"); err != nil {
+			errors = errors.Append(fmt.Sprintf("Metadata[%s]", k), err)
+		}
 	}
 	if f.Object != nil {
 		if v, ok := any(f.Object).(runtime.Validator); ok {

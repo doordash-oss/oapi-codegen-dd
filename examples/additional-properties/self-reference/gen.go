@@ -3,6 +3,8 @@
 package gen
 
 import (
+	"fmt"
+
 	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
 )
@@ -15,6 +17,21 @@ type GetTestResponse struct {
 type AggregatedResult struct {
 	TotalClicks     *int                        `json:"totalClicks,omitempty"`
 	HourlyBreakDown map[string]AggregatedResult `json:"hourlyBreakDown,omitempty"`
+}
+
+func (a AggregatedResult) Validate() error {
+	var errors runtime.ValidationErrors
+	for k, v := range a.HourlyBreakDown {
+		if validator, ok := any(v).(runtime.Validator); ok {
+			if err := validator.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("HourlyBreakDown[%s]", k), err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
 }
 
 var typesValidator *validator.Validate
