@@ -142,6 +142,11 @@ func NewValidationErrorsFromError(err error) ValidationErrors {
 	return NewValidationErrorsFromErrors("", []error{err})
 }
 
+// NewValidationErrorsFromString creates a new ValidationErrors from a field and message.
+func NewValidationErrorsFromString(field, message string) ValidationErrors {
+	return ValidationErrors{{Field: field, Message: message}}
+}
+
 // NewValidationErrorsFromErrors creates a new ValidationErrors from a list of errors.
 // If prefix is provided, it will be prepended to each field name with a dot.
 func NewValidationErrorsFromErrors(prefix string, errs []error) ValidationErrors {

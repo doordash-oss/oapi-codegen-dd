@@ -52,6 +52,15 @@ func TestNewValidationError(t *testing.T) {
 	})
 }
 
+func TestNewValidationErrorsFromString(t *testing.T) {
+	errs := NewValidationErrorsFromString("TransactionId", "Field is required")
+
+	require.Len(t, errs, 1)
+	assert.Equal(t, "TransactionId", errs[0].Field)
+	assert.Equal(t, "Field is required", errs[0].Message)
+	assert.Equal(t, "TransactionId Field is required", errs.Error())
+}
+
 func TestNewValidationErrorsFromError(t *testing.T) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	type Foo struct {
