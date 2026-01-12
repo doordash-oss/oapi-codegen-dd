@@ -1,1 +1,89 @@
-ci.yml
+pipeline:
+  version: 2
+  options:
+    timeout:
+      time: 30
+      unit: minutes
+    skipDefaultCheckout: false
+  phases:
+    - podSpec:
+        spec:
+          containers:
+            - name: go
+              image: 839591177169.dkr.ecr.us-west-2.amazonaws.com/open-source-mirror/dockerhub/golang:1.25.3
+              command:
+                - cat
+              tty: true
+              resources:
+                limits:
+                  memory: 16Gi
+                  cpu: 16
+                requests:
+                  memory: 8Gi
+                  cpu: 8
+      stages:
+        - name: CI Checks
+          parallel:
+            stages:
+              - name: build-ci
+                steps:
+                  - type: sh
+                    container: go
+                    withCredentials:
+                      - type: UsernamePasswordMultiBinding
+                        credentialsId: TEAM_GITHUB_ACCESS_TOKEN
+                        usernameVariable: GITHUB_USERNAME
+                        passwordVariable: GITHUB_TOKEN
+                    script: |-
+                      set -euo pipefail
+                      
+                      # Configure git for private dependencies
+                      git config --global url."https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+                      
+                      # Install required tools
+                      echo "Installing gosec..."
+                      go install github.com/securego/gosec/v2/cmd/gosec@latest
+                      
+                      # Download dependencies
+                      echo "Downloading Go modules..."
+                      go mod download
+                      
+                      # Run build-ci target (includes lint-ci, tidy-ci, and gosec)
+                      echo "Running build-ci..."
+                      make build-ci
+              - name: test-ci
+                steps:
+                  - type: sh
+                    container: go
+                    withCredentials:
+                      - type: UsernamePasswordMultiBinding
+                        credentialsId: TEAM_GITHUB_ACCESS_TOKEN
+                        usernameVariable: GITHUB_USERNAME
+                        passwordVariable: GITHUB_TOKEN
+                    script: |-
+                      set -euo pipefail
+
+                      # Configure git for private dependencies
+                      git config --global url."https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+
+                      # Download dependencies
+                      echo "Downloading Go modules..."
+                      go mod download
+
+                      # Run generate and check for uncommitted changes
+                      echo "Running make generate..."
+                      make generate
+                      if ! git diff --exit-code; then
+                        echo "ERROR: make generate produced uncommitted changes"
+                        echo "Please run 'make generate' locally and commit the changes"
+                        exit 1
+                      fi
+
+                      echo "Running test-ci..."
+                      make test-ci
+                      
+                      echo "Running integration tests..."
+                      make fetch-specs
+                      INTEGRATION_MAX_CONCURRENCY=50 go test -v -tags=integration -count=1 -timeout=15m .
+                  - type: codeCov
+                    container: go

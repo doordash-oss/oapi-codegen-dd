@@ -3,7 +3,7 @@
 package example1
 
 import (
-	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 )
 
 // GetClientRequestOptions is the options needed to make a request to GetClient.

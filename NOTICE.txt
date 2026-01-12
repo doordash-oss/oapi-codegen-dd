@@ -12,8 +12,8 @@ Bundled third-party components and their licenses:
    Source: https://github.com/buger/jsonparser/blob/v1.1.1/LICENSE
    License: MIT
 
-3) github.com/doordash/oapi-codegen-dd/v3
-   Source: https://github.com/doordash/oapi-codegen-dd/blob/HEAD/LICENSE.txt
+3) github.com/doordash-oss/oapi-codegen-dd/v3
+   Source: https://github.com/doordash-oss/oapi-codegen-dd/blob/HEAD/LICENSE.txt
    License: Apache-2.0
 
 4) github.com/gabriel-vasile/mimetype

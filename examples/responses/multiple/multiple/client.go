@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/doordash/oapi-codegen-dd/v3/pkg/runtime"
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 )
 
 // Client is the client for the API implementing the Client interface.

@@ -291,7 +291,7 @@ output:
 			if verbose {
 				fmt.Fprintf(os.Stderr, "   ⚙️  Adding replace directive...\n")
 			}
-			cmd = exec.CommandContext(ctx, "go", "mod", "edit", "-replace", fmt.Sprintf("github.com/doordash/oapi-codegen-dd/v3=%s", projectRoot))
+			cmd = exec.CommandContext(ctx, "go", "mod", "edit", "-replace", fmt.Sprintf("github.com/doordash-oss/oapi-codegen-dd/v3=%s", projectRoot))
 			cmd.Dir = tmpDir
 			output, err = cmd.CombinedOutput()
 			if err != nil {
