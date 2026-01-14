@@ -11,7 +11,7 @@
 package codegen
 
 import (
-	_ "embed"
+	"embed"
 	"go/format"
 	"os"
 	"testing"
@@ -20,14 +20,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//go:embed testdata/*
+var testdataFS embed.FS
+
+func readTestdata(t *testing.T, name string) string {
+	t.Helper()
+	data, err := testdataFS.ReadFile("testdata/" + name)
+	if err != nil {
+		t.Fatalf("failed to read testdata/%s: %v", name, err)
+	}
+	return string(data)
+}
+
+// Keep these for backward compatibility with other test files
+//
 //go:embed testdata/test_spec.yml
 var testDocument string
-
-//go:embed testdata/backslash-escaping.yml
-var backslashEscapingYAML string
-
-//go:embed testdata/backslash-escaping.json
-var backslashEscapingJSON string
 
 func TestExampleOpenAPICodeGeneration(t *testing.T) {
 	// Input vars for code generation:
@@ -40,7 +48,7 @@ func TestExampleOpenAPICodeGeneration(t *testing.T) {
 	}
 
 	// Run our code generation:
-	codes, err := Generate([]byte(testDocument), cfg)
+	codes, err := Generate([]byte(readTestdata(t, "test_spec.yml")), cfg)
 	require.NoError(t, err)
 
 	code := codes.GetCombined()
@@ -210,7 +218,7 @@ func TestBackslashEscaping(t *testing.T) {
 		},
 	}
 
-	codes, err := Generate([]byte(backslashEscapingYAML), cfg)
+	codes, err := Generate([]byte(readTestdata(t, "backslash-escaping.yml")), cfg)
 	require.NoError(t, err)
 	require.NotEmpty(t, codes)
 
@@ -241,7 +249,7 @@ func TestBackslashEscapingJSON(t *testing.T) {
 		},
 	}
 
-	codes, err := Generate([]byte(backslashEscapingJSON), cfg)
+	codes, err := Generate([]byte(readTestdata(t, "backslash-escaping.json")), cfg)
 	require.NoError(t, err)
 	require.NotEmpty(t, codes)
 
@@ -256,5 +264,42 @@ func TestBackslashEscapingJSON(t *testing.T) {
 
 	// Verify that the code compiles
 	_, err = format.Source([]byte(codeStr))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestArrayItemPropertyNamedItem(t *testing.T) {
+	// Test that when an array item has a property named "item", the array item type
+	// gets a unique name (with numeric suffix) to avoid collision with the property's type.
+	cfg := Configuration{
+		PackageName: "testpkg",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "array-item-property-named-item.yml")), cfg)
+	require.NoError(t, err)
+	require.NotEmpty(t, codes)
+
+	code := codes.GetCombined()
+
+	// The array item type should be named with a numeric suffix to avoid collision
+	// with the "item" property's type
+	assert.Contains(t, code, "type GetTest_Response_Executions_Item struct")
+	assert.Contains(t, code, "type GetTest_Response_Executions_Item1 struct")
+
+	// The array should use the Item1 type (the array item type)
+	assert.Contains(t, code, "type GetTest_Response_Executions []GetTest_Response_Executions_Item1")
+
+	// The Item1 type should have the correct properties (id as float32, item as reference)
+	assert.Contains(t, code, "ID   *float32")
+	assert.Contains(t, code, "Item *GetTest_Response_Executions_Item")
+
+	// The Item type (property type) should have string properties
+	assert.Contains(t, code, "ID   *string")
+	assert.Contains(t, code, "Name *string")
+
+	// Verify that the code compiles
+	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
 }

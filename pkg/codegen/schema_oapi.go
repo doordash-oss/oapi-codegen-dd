@@ -87,6 +87,12 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 			// for them, which will be based on the field names we followed
 			// to get to the type.
 			typeName := pathToTypeName(append(path, "Item"))
+			// Check if the type name already exists from a property type (e.g., a property named "item").
+			// Property types created by replaceInlineTypes have JsonName == "-".
+			// If collision is with a property type, generate a unique name with numeric suffix.
+			if existing, exists := options.currentTypes[typeName]; exists && existing.JsonName == "-" {
+				typeName = generateTypeName(options.currentTypes, typeName, options.nameSuffixes)
+			}
 
 			typeDef := TypeDefinition{
 				Name:             typeName,
