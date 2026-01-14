@@ -1,0 +1,33 @@
+language: go
+
+go:
+  - "1.25.3"
+
+cache:
+  directories:
+    - $GOPATH/pkg/mod
+
+branches:
+  only:
+    - main
+    - master
+
+jobs:
+  include:
+    - name: build-ci
+      script:
+        - go install github.com/securego/gosec/v2/cmd/gosec@latest
+        - make build-ci
+
+    - name: test-ci
+      script:
+        - make generate
+        - |
+          if ! git diff --exit-code; then
+            echo "ERROR: make generate produced uncommitted changes"
+            echo "Please run 'make generate' locally and commit the changes"
+            exit 1
+          fi
+        - make test-ci
+        - make fetch-specs
+        - INTEGRATION_MAX_CONCURRENCY=50 go test -v -tags=integration -count=1 -timeout=15m .
