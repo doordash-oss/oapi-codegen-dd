@@ -73,5 +73,15 @@ jobs:
 workflows:
   ci:
     jobs:
-      - build-ci
-      - test-ci
+      - build-ci:
+          filters:
+            branches:
+              only:
+                - main
+                - master
+      - test-ci:
+          filters:
+            branches:
+              only:
+                - main
+                - master
