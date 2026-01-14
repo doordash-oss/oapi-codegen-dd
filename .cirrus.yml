@@ -1,0 +1,36 @@
+container:
+  image: golang:1.25.3
+  cpu: 8
+  memory: 8G
+
+env:
+  GOPROXY: https://proxy.golang.org,direct
+
+only_if: $CIRRUS_BRANCH == 'main' || $CIRRUS_BRANCH == 'master' || $CIRRUS_PR != ''
+
+build_ci_task:
+  name: build-ci
+  modules_cache:
+    folder: $GOPATH/pkg/mod
+    fingerprint_script: cat go.sum
+  install_gosec_script: go install github.com/securego/gosec/v2/cmd/gosec@latest
+  download_script: go mod download
+  build_script: make build-ci
+
+test_ci_task:
+  name: test-ci
+  modules_cache:
+    folder: $GOPATH/pkg/mod
+    fingerprint_script: cat go.sum
+  download_script: go mod download
+  generate_script: |
+    make generate
+    if ! git diff --exit-code; then
+      echo "ERROR: make generate produced uncommitted changes"
+      echo "Please run 'make generate' locally and commit the changes"
+      exit 1
+    fi
+  test_script: make test-ci
+  integration_script: |
+    make fetch-specs
+    INTEGRATION_MAX_CONCURRENCY=50 go test -v -tags=integration -count=1 -timeout=15m .
