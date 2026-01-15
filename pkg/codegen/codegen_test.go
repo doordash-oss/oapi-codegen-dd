@@ -303,3 +303,63 @@ func TestArrayItemPropertyNamedItem(t *testing.T) {
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
 }
+
+// TestOperationResponseAliasConflictWithComponentResponse tests that when an operation
+// response alias would conflict with a component response name, a unique name is generated.
+// When a component response references the same schema (e.g., Zone response -> Zone schema),
+// the component response doesn't create a separate type. The operation creates its own alias.
+func TestOperationResponseAliasConflictWithComponentResponse(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "response_alias_conflict.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// The operation "zone" references "OK", so it creates "ZoneResponse = OK"
+	assert.Contains(t, code, "type ZoneResponse = OK")
+
+	// The operation "getZones" references "Zone" response (which references Zone schema),
+	// so it creates "GetZonesResponse = Zone"
+	assert.Contains(t, code, "type GetZonesResponse = Zone")
+
+	// The Zone schema should be generated as a struct
+	assert.Contains(t, code, "type Zone struct")
+
+	// Verify that the code compiles
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+// TestOperationResponseAliasReusesSameType tests that when an operation response alias
+// would conflict with a component response name but they reference the same type,
+// the existing alias is reused instead of creating a new one.
+func TestOperationResponseAliasReusesSameType(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "response_alias_reuse.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// The component response "Zone" should be renamed to "ZoneResponse" due to conflict with schema "Zone"
+	assert.Contains(t, code, "type ZoneResponse = Zone")
+
+	// The operation "zone" also references "Zone" response, so it should reuse "ZoneResponse"
+	// and NOT create "ZoneResponse1"
+	assert.NotContains(t, code, "type ZoneResponse1")
+
+	// Verify that the code compiles
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}

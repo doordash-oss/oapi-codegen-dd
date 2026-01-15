@@ -24,11 +24,8 @@ limitations under the License.
   {{- if and $Enum.Schema.Description (not $root.Config.Generate.OmitDescription)}}{{ toGoComment $Enum.Schema.Description $Enum.Name }}{{- end}}
     type {{$Enum.Name}} {{$Enum.Schema.GoType}}
     const (
-      {{- $safeNames := slice }}
-      {{- range $name, $value := $Enum.GetValues}}
-      {{- $safeName := $root.TypeRegistry.GetName $name}}
-      {{- $safeNames = append $safeNames $safeName }}
-        {{$safeName}} {{$Enum.Name}} = {{$Enum.ValueWrapper}}{{escapeGoString $value}}{{$Enum.ValueWrapper}}
+      {{- range $ev := $Enum.Values}}
+        {{$ev.Name}} {{$Enum.Name}} = {{$Enum.ValueWrapper}}{{escapeGoString $ev.Value}}{{$Enum.ValueWrapper}}
       {{- end}}
     )
 
@@ -36,7 +33,7 @@ limitations under the License.
     // Validate checks if the {{$Enum.Name}} value is valid
     func ({{$alias}} {{$Enum.Name}}) Validate() error {
         switch {{$alias}} {
-        case {{range $i, $safeName := $safeNames}}{{if $i}}, {{end}}{{$safeName}}{{end}}:
+        case {{range $i, $ev := $Enum.Values}}{{if $i}}, {{end}}{{$ev.Name}}{{end}}:
             return nil
         default:
             return runtime.NewValidationErrorsFromString("Enum", fmt.Sprintf("must be a valid {{$Enum.Name}} value, got: %v", {{$alias}}))

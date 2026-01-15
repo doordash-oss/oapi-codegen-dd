@@ -86,7 +86,7 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 			HasSensitiveData: hasSensitiveData(anyOfSchema),
 		}
 		additionalTypes = append(additionalTypes, td)
-		options.AddType(td)
+		options.typeTracker.register(td, "")
 
 		out.Properties = append(out.Properties, Property{
 			GoName:      anyOfName,
@@ -113,14 +113,16 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 		oneOfSchema.GoType = oneOfSchema.createGoStruct(oneOfFields)
 
 		oneOfName := pathToTypeName(oneOfPath)
-		additionalTypes = append(additionalTypes, TypeDefinition{
+		td := TypeDefinition{
 			Name:             oneOfName,
 			Schema:           oneOfSchema,
 			SpecLocation:     SpecLocationUnion,
 			JsonName:         "-",
 			NeedsMarshaler:   needsMarshaler(oneOfSchema),
 			HasSensitiveData: hasSensitiveData(oneOfSchema),
-		})
+		}
+		additionalTypes = append(additionalTypes, td)
+		options.typeTracker.register(td, "")
 
 		out.Properties = append(out.Properties, Property{
 			GoName:      oneOfName,
@@ -303,9 +305,9 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 						NeedsMarshaler:   needsMarshaler(resolved),
 						HasSensitiveData: hasSensitiveData(resolved),
 					}
-					// Add to currentTypes map if it's not nil
-					if options.currentTypes != nil {
-						options.AddType(td)
+					// Add to type tracker if available
+					if options.typeTracker != nil {
+						options.typeTracker.register(td, "")
 					}
 					additionalTypes = append(additionalTypes, td)
 				}
@@ -360,7 +362,7 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		NeedsMarshaler:   needsMarshaler(out),
 		HasSensitiveData: hasSensitiveData(out),
 	}
-	options.AddType(td)
+	options.typeTracker.register(td, "")
 	out.AdditionalTypes = append(out.AdditionalTypes, td)
 	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
 

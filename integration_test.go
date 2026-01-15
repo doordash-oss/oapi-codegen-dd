@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,7 +67,14 @@ type testResult struct {
 }
 
 func TestIntegration(t *testing.T) {
-	specPath := os.Getenv("SPEC")
+	// Collect spec paths from environment
+	var specPaths []string
+	if spec := os.Getenv("SPEC"); spec != "" {
+		specPaths = append(specPaths, spec)
+	}
+	if specs := os.Getenv("SPECS"); specs != "" {
+		specPaths = append(specPaths, strings.Fields(specs)...)
+	}
 
 	// Get project root (current directory since test is at root)
 	projectRoot, err := filepath.Abs(".")
@@ -74,8 +82,8 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("Failed to get project root: %v", err)
 	}
 
-	// Clean up .sandbox directory at the start (in project root)
-	sandboxDir := filepath.Join(projectRoot, ".sandbox")
+	// Clean up sandbox directory at the start (in /tmp)
+	sandboxDir := "/tmp/oapi-codegen-sandbox"
 
 	// Remove existing sandbox directory
 	os.RemoveAll(sandboxDir)
@@ -86,13 +94,33 @@ func TestIntegration(t *testing.T) {
 	}
 
 	// Collect specs to process
-	specs := collectSpecs(t, specPath)
+	specs := collectSpecs(t, specPaths)
 	if len(specs) == 0 {
 		fmt.Fprintln(os.Stderr, "No specs to process, skipping integration test")
 		return
 	}
 
 	fmt.Fprintf(os.Stderr, "\n🔍 Found %d specs to process\n", len(specs))
+
+	// Sort specs to start known slow ones first (LPT scheduling)
+	slowSpecs := map[string]int{
+		"id4i.de.yaml":      0,
+		"stripe-spec3.yaml": 1,
+		"netbox.dev.yaml":   2,
+	}
+	sort.SliceStable(specs, func(i, j int) bool {
+		iPriority := len(slowSpecs)
+		jPriority := len(slowSpecs)
+		for suffix, priority := range slowSpecs {
+			if strings.HasSuffix(specs[i], suffix) {
+				iPriority = priority
+			}
+			if strings.HasSuffix(specs[j], suffix) {
+				jPriority = priority
+			}
+		}
+		return iPriority < jPriority
+	})
 
 	// Enable verbose mode for single spec
 	verbose := len(specs) == 1
@@ -117,30 +145,55 @@ func TestIntegration(t *testing.T) {
 		results     = make([]testResult, 0, len(specs))
 		total       = len(specs)
 		completed   = 0
-		currentSpec string
+		inProgress  = make(map[string]time.Time) // spec -> start time
 		hasFailures = false
 	)
 
-	// Progress tracker
-	progressTicker := make(chan struct{}, 100)
+	// Progress tracker with periodic refresh
+	stopProgress := make(chan struct{})
 	progressDone := make(chan struct{})
 	go func() {
 		defer close(progressDone)
-		for range progressTicker {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		printProgress := func() {
 			mu.Lock()
 			c := completed
-			spec := currentSpec
-			mu.Unlock()
-			if spec != "" {
-				// Shorten spec name if too long
-				if len(spec) > 50 {
-					spec = "..." + spec[len(spec)-47:]
+			// Build list of in-progress specs with durations
+			var running []string
+			for spec, started := range inProgress {
+				// Shorten spec name
+				name := spec
+				if len(name) > 30 {
+					name = "..." + name[len(name)-27:]
 				}
-				// Pad with spaces to clear previous line (80 chars total)
-				msg := fmt.Sprintf("⏳ Progress: %d/%d - %s", c, total, spec)
-				fmt.Fprintf(os.Stderr, "\r%-80s", msg)
+				running = append(running, fmt.Sprintf("%s(%.0fs)", name, time.Since(started).Seconds()))
+			}
+			mu.Unlock()
+
+			// Sort for consistent output
+			sort.Strings(running)
+
+			var msg string
+			if len(running) > 0 {
+				if len(running) > 3 {
+					msg = fmt.Sprintf("⏳ %d/%d | %s +%d more", c, total, strings.Join(running[:3], ", "), len(running)-3)
+				} else {
+					msg = fmt.Sprintf("⏳ %d/%d | %s", c, total, strings.Join(running, ", "))
+				}
 			} else {
-				fmt.Fprintf(os.Stderr, "\r%-80s", fmt.Sprintf("⏳ Progress: %d/%d completed", c, total))
+				msg = fmt.Sprintf("⏳ %d/%d completed", c, total)
+			}
+			fmt.Fprintf(os.Stderr, "\r%-120s", msg)
+		}
+
+		for {
+			select {
+			case <-ticker.C:
+				printProgress()
+			case <-stopProgress:
+				return
 			}
 		}
 	}()
@@ -165,28 +218,21 @@ func TestIntegration(t *testing.T) {
 
 			result := &testResult{name: name, passed: true}
 
-			// Set current spec being processed and increment completed count
+			// Track start of processing
 			mu.Lock()
-			currentSpec = name
-			completed++
+			inProgress[name] = time.Now()
 			mu.Unlock()
-			select {
-			case progressTicker <- struct{}{}:
-			default:
-			}
 
 			// Track result at the end
 			defer func() {
 				mu.Lock()
+				delete(inProgress, name)
+				completed++
 				results = append(results, *result)
 				if !result.passed {
 					hasFailures = true
 				}
 				mu.Unlock()
-				select {
-				case progressTicker <- struct{}{}:
-				default:
-				}
 			}()
 
 			// Helper to record failure
@@ -342,10 +388,10 @@ output:
 	// Wait for all goroutines to complete
 	wg.Wait()
 
-	// Close progress tracker and wait for it to finish
-	close(progressTicker)
+	// Stop progress tracker and wait for it to finish
+	close(stopProgress)
 	<-progressDone
-	fmt.Fprintf(os.Stderr, "\r✅ Progress: %d/%d completed\n\n", total, total)
+	fmt.Fprintf(os.Stderr, "\r✅ Progress: %d/%d completed%-80s\n\n", total, total, "")
 
 	// Print summary
 	printSummary(total, results)
@@ -356,29 +402,19 @@ output:
 	}
 }
 
-func collectSpecs(t *testing.T, specPath string) []string {
+func collectSpecs(t *testing.T, specPaths []string) []string {
 	var specs []string
-	explicitSpec := specPath != ""
 
-	if explicitSpec {
-		// Check if the path exists as-is
-		if _, err := os.Stat(specPath); err == nil {
-			specs = append(specs, specPath)
-			return specs
+	if len(specPaths) > 0 {
+		// Process each provided path (can be file or directory)
+		for _, specPath := range specPaths {
+			collected := collectSpecsFromPath(t, specPath)
+			specs = append(specs, collected...)
 		}
-
-		// If not found, try prepending testdata/specs/
-		fullPath := filepath.Join("testdata", "specs", specPath)
-		if _, err := os.Stat(fullPath); err == nil {
-			specs = append(specs, fullPath)
-			return specs
-		}
-
-		// If still not found, fail
-		t.Fatalf("Spec file not found: %s (also tried %s)", specPath, fullPath)
+		return specs
 	}
 
-	// Walk through testdata/specs
+	// No paths provided - walk through all testdata/specs
 	var skipped int
 	err := fs.WalkDir(specsFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -395,7 +431,7 @@ func collectSpecs(t *testing.T, specPath string) []string {
 
 		if strings.HasSuffix(fileName, ".yml") || strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".json") {
 			// Skip problematic specs unless explicitly requested
-			if !explicitSpec && skipSpecs[path] {
+			if skipSpecs[path] {
 				skipped++
 				return nil
 			}
@@ -413,6 +449,80 @@ func collectSpecs(t *testing.T, specPath string) []string {
 	}
 
 	return specs
+}
+
+// collectSpecsFromPath collects specs from a single path (file or directory)
+func collectSpecsFromPath(t *testing.T, specPath string) []string {
+	var specs []string
+
+	// Try as file first (check if it exists and is a file)
+	if info, err := os.Stat(specPath); err == nil && !info.IsDir() {
+		return []string{specPath}
+	}
+
+	// Try as directory
+	if info, err := os.Stat(specPath); err == nil && info.IsDir() {
+		err := filepath.Walk(specPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			fileName := info.Name()
+			if fileName[0] == '-' || strings.Contains(path, "/stash/") {
+				return nil
+			}
+
+			if strings.HasSuffix(fileName, ".yml") || strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".json") {
+				specs = append(specs, path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Failed to walk directory %s: %v", specPath, err)
+		}
+		return specs
+	}
+
+	// Try prepending testdata/specs/
+	testdataPath := filepath.Join("testdata", "specs", specPath)
+
+	// Check if it's a file in testdata/specs
+	if info, err := os.Stat(testdataPath); err == nil && !info.IsDir() {
+		return []string{testdataPath}
+	}
+
+	// Check if it's a directory in testdata/specs
+	if info, err := os.Stat(testdataPath); err == nil && info.IsDir() {
+		err := filepath.Walk(testdataPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			fileName := info.Name()
+			if fileName[0] == '-' || strings.Contains(path, "/stash/") {
+				return nil
+			}
+
+			if strings.HasSuffix(fileName, ".yml") || strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".json") {
+				specs = append(specs, path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Failed to walk directory %s: %v", testdataPath, err)
+		}
+		return specs
+	}
+
+	// Not found
+	t.Fatalf("Spec path not found: %s (also tried %s)", specPath, testdataPath)
+	return nil
 }
 
 func printSummary(total int, results []testResult) {

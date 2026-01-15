@@ -623,20 +623,24 @@ func renameComponent(schemaName string, schemaRef *base.SchemaProxy) (string, er
 	if schemaRef.IsReference() {
 		return schemaNameToTypeName(schemaName), nil
 	}
-	schema := schemaRef.Schema()
-	if schema == nil {
-		return schemaName, nil
-	}
 
-	exts := extractExtensions(schema.Extensions)
-
-	if extension, ok := exts[extGoName]; ok {
-		typeName, err := parseString(extension)
-		if err != nil {
-			return "", fmt.Errorf("invalid value for %q: %w", extPropGoType, err)
+	// Try to get x-go-name from low-level schema extensions without triggering full schema parsing.
+	// This is a performance optimization - we only need the extension value.
+	lowProxy := schemaRef.GoLow()
+	if lowProxy != nil {
+		lowSchema := lowProxy.Schema()
+		if lowSchema != nil && lowSchema.Extensions != nil {
+			for k, v := range lowSchema.Extensions.FromOldest() {
+				if k.Value == extGoName && v.Value != nil {
+					var name string
+					if err := v.Value.Decode(&name); err == nil && name != "" {
+						return name, nil
+					}
+				}
+			}
 		}
-		return typeName, nil
 	}
+
 	return schemaName, nil
 }
 

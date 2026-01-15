@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
-	"slices"
 	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -57,7 +56,7 @@ func pruneSchema(model *v3high.Document) error {
 	}
 }
 
-func removeOrphanedComponents(model *v3high.Document, refs []string) int {
+func removeOrphanedComponents(model *v3high.Document, refs map[string]bool) int {
 	if model.Components == nil {
 		return 0
 	}
@@ -67,7 +66,7 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 	if model.Components.Schemas != nil {
 		for _, key := range getComponentKeys(model.Components.Schemas.KeysFromOldest()) {
 			ref := fmt.Sprintf("#/components/schemas/%s", key)
-			if !slices.Contains(refs, ref) {
+			if !refs[ref] {
 				countRemoved++
 				model.Components.Schemas.Delete(key)
 			}
@@ -77,7 +76,7 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 	if model.Components.Parameters != nil {
 		for _, key := range getComponentKeys(model.Components.Parameters.KeysFromOldest()) {
 			ref := fmt.Sprintf("#/components/parameters/%s", key)
-			if !slices.Contains(refs, ref) {
+			if !refs[ref] {
 				countRemoved++
 				model.Components.Parameters.Delete(key)
 			}
@@ -87,7 +86,7 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 	if model.Components.RequestBodies != nil {
 		for _, key := range getComponentKeys(model.Components.RequestBodies.KeysFromOldest()) {
 			ref := fmt.Sprintf("#/components/requestBodies/%s", key)
-			if !slices.Contains(refs, ref) {
+			if !refs[ref] {
 				countRemoved++
 				model.Components.RequestBodies.Delete(key)
 			}
@@ -97,7 +96,7 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 	if model.Components.Responses != nil {
 		for _, key := range getComponentKeys(model.Components.Responses.KeysFromOldest()) {
 			ref := fmt.Sprintf("#/components/responses/%s", key)
-			if !slices.Contains(refs, ref) {
+			if !refs[ref] {
 				countRemoved++
 				model.Components.Responses.Delete(key)
 			}
@@ -107,7 +106,7 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 	if model.Components.Headers != nil {
 		for _, key := range getComponentKeys(model.Components.Headers.KeysFromOldest()) {
 			ref := fmt.Sprintf("#/components/headers/%s", key)
-			if !slices.Contains(refs, ref) {
+			if !refs[ref] {
 				countRemoved++
 				model.Components.Headers.Delete(key)
 			}
@@ -119,11 +118,11 @@ func removeOrphanedComponents(model *v3high.Document, refs []string) int {
 	return countRemoved
 }
 
-func findOperationRefs(model *v3high.Document) []string {
+func findOperationRefs(model *v3high.Document) map[string]bool {
 	refSet := make(map[string]bool)
 
 	if model.Paths == nil || model.Paths.PathItems == nil {
-		return []string{}
+		return refSet
 	}
 
 	// Walk all operations and collect refs
@@ -212,13 +211,8 @@ func findOperationRefs(model *v3high.Document) []string {
 		}
 	}
 
-	refs := make([]string, 0, len(refSet))
-	for r := range refSet {
-		refs = append(refs, r)
-	}
-	slices.Sort(refs)
-	slog.Debug("All collected refs", "refs", refs)
-	return refs
+	slog.Debug("All collected refs", "count", len(refSet))
+	return refSet
 }
 
 // addParentSchemaRef adds the parent schema reference if the given ref is a property reference

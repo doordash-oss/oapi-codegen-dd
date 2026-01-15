@@ -251,7 +251,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 				NeedsMarshaler: needsMarshaler(param.Schema),
 			}
 			typeDefs = append(typeDefs, td)
-			options.AddType(td)
+			options.typeTracker.register(td, "")
 		}
 
 		typeDefs = append(typeDefs, pSchema.AdditionalTypes...)
@@ -307,7 +307,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 		Schema:       s,
 		SpecLocation: specLocation,
 	}
-	options.AddType(td)
+	options.typeTracker.register(td, "")
 
 	res := &RequestParametersDefinition{
 		Name:     typeName,

@@ -118,7 +118,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 					JsonName:       "-",
 					NeedsMarshaler: needsMarshaler(elementSchema),
 				}
-				options.AddType(td)
+				options.typeTracker.register(td, "")
 				outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, td)
 			}
 			elementSchema.GoType = elementName
@@ -145,7 +145,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 						JsonName:       "-",
 						NeedsMarshaler: needsMarshaler(elementSchema),
 					}
-					options.AddType(td)
+					options.typeTracker.register(td, "")
 					outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, td)
 					elementSchema.GoType = elementName
 				}

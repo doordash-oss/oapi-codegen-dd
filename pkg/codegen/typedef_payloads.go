@@ -129,7 +129,7 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 		NeedsMarshaler:   needsMarshaler(bodySchema),
 		HasSensitiveData: hasSensitiveData(bodySchema),
 	}
-	options.AddType(td)
+	options.typeTracker.register(td, "")
 
 	// If the request has a body, but it's not a user defined
 	// type under #/components, we'll define a type for it, so

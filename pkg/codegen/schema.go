@@ -339,42 +339,31 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 			}
 
 			// Not a circular reference, just return the type name.
-			// First, try to look up the actual type name from currentTypes.
-			// This is important because the type may have been renamed via x-go-name.
+			// First, try to look up the actual type name from the type tracker by ref.
+			// This is important because the type may have been renamed via x-go-name or due to conflicts.
 			refType, err := refPathToGoType(ref)
 			if err != nil {
 				return GoSchema{}, fmt.Errorf("error turning reference (%s) into a Go type: %s", schemaProxy.GetReference(), err)
 			}
 
 			// Check if we have a type definition for this reference that might have a different name
-			// (e.g., due to x-go-name extension)
+			// (e.g., due to x-go-name extension or name conflicts)
 			// Also check if the referenced type is a primitive alias
 			isPrimitiveAlias := false
-			if options.currentTypes != nil {
-				// Try to find the type definition by looking through all types
-				// We need to match by the schema reference, not the Go type name
-				for _, td := range options.currentTypes {
-					// Check if this type definition corresponds to our reference
-					// The JsonName field contains the original schema name from the spec
-					if td.JsonName != "" {
-						// Construct the expected reference from the JsonName
-						expectedRef := "#/components/schemas/" + td.JsonName
-						if expectedRef == ref {
-							// Found the type definition, use its actual Go name
-							refType = td.Name
-
-							// Check if this is a primitive type alias
-							// e.g., type MsnBool = bool
-							if td.IsAlias() && isPrimitiveType(td.Schema.GoType) {
-								isPrimitiveAlias = true
-							}
-							break
+			if options.typeTracker != nil {
+				// Try to find the type by its original reference path
+				if actualName, found := options.typeTracker.LookupByRef(ref); found {
+					refType = actualName
+					// Check if this is a primitive type alias
+					if td, exists := options.typeTracker.LookupByName(actualName); exists {
+						if td.IsAlias() && isPrimitiveType(td.Schema.GoType) {
+							isPrimitiveAlias = true
 						}
 					}
 				}
 			}
 
-			// If we didn't find it in currentTypes (which might be empty during initial processing),
+			// If we didn't find it in typeTracker (which might be empty during initial processing),
 			// check the OpenAPI schema directly to see if it's a primitive type
 			// BUT: Don't mark enum types as primitive aliases - they have custom Validate() methods
 			if !isPrimitiveAlias && schema != nil && schema.Type != nil && len(schema.Type) > 0 {
@@ -402,12 +391,19 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 				// 1. RefType affects TypeDecl() which would change the type name used in struct fields
 				// 2. Component references already have their own type definitions with Validate() methods
 				// 3. The validation will be delegated via the type assertion in Property.needsCustomValidation()
+				// Include Constraints so that consumers (like connexions) can access min/max values
+				// for data generation even when using component references.
+				constraints := newConstraints(schema, ConstraintsContext{
+					hasNilType:   slices.Contains(schema.Type, "null"),
+					specLocation: options.specLocation,
+				})
 				return GoSchema{
 					GoType:           refType,
 					DefineViaAlias:   true,
 					IsPrimitiveAlias: isPrimitiveAlias,
 					Description:      schema.Description,
 					OpenAPISchema:    schema,
+					Constraints:      constraints,
 				}, nil
 			}
 
@@ -556,7 +552,7 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 				NeedsMarshaler:   needsMarshaler(enhanced),
 				HasSensitiveData: hasSensitiveData(enhanced),
 			}
-			options.AddType(typeDef)
+			options.typeTracker.register(typeDef, "")
 			enhanced.AdditionalTypes = append(enhanced.AdditionalTypes, typeDef)
 			enhanced.RefType = refType
 		} else {
@@ -568,7 +564,7 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 				SpecLocation:   options.specLocation,
 				NeedsMarshaler: false,
 			}
-			options.AddType(typeDef)
+			options.typeTracker.register(typeDef, "")
 			enhanced.AdditionalTypes = append(enhanced.AdditionalTypes, typeDef)
 			enhanced.RefType = refType
 		}
@@ -647,16 +643,11 @@ func replaceInlineTypes(src GoSchema, options ParseOptions) (GoSchema, string) {
 		return src, ""
 	}
 
-	currentTypes := options.currentTypes
-	baseName := options.baseName
+	baseName := pathToTypeName(options.path)
 	name := baseName
-	if baseName == "" {
-		baseName = pathToTypeName(options.path)
-		name = baseName
-	}
 
-	if _, exists := currentTypes[baseName]; exists {
-		name = generateTypeName(currentTypes, baseName, options.nameSuffixes)
+	if options.typeTracker.Exists(baseName) {
+		name = options.typeTracker.generateUniqueName(baseName)
 	}
 
 	isArrayType := src.ArrayType != nil
@@ -678,7 +669,7 @@ func replaceInlineTypes(src GoSchema, options ParseOptions) (GoSchema, string) {
 		NeedsMarshaler: needsMarshal,
 		JsonName:       "-",
 	}
-	options.AddType(td)
+	options.typeTracker.register(td, "")
 
 	return GoSchema{
 		RefType:         name,
@@ -708,31 +699,6 @@ func enhanceSchema(src, other GoSchema, options ParseOptions) GoSchema {
 	}
 
 	return src
-}
-
-func generateTypeName(currentTypes map[string]TypeDefinition, baseName string, suffixes []string) string {
-	if currentTypes == nil {
-		return baseName
-	}
-	if _, exists := currentTypes[baseName]; !exists {
-		return baseName
-	}
-
-	if len(suffixes) == 0 {
-		suffixes = []string{""}
-	}
-
-	for i := 0; ; i++ {
-		for _, suffix := range suffixes {
-			name := baseName + suffix
-			if i > 0 {
-				name = fmt.Sprintf("%s%d", name, i)
-			}
-			if _, exists := currentTypes[name]; !exists {
-				return name
-			}
-		}
-	}
 }
 
 func needsMarshaler(schema GoSchema) bool {

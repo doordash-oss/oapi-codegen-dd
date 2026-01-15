@@ -159,7 +159,7 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 						SpecLocation:     specLocation,
 						HasSensitiveData: hasSensitiveData(pSchema),
 					}
-					options.AddType(typeDef)
+					options.typeTracker.register(typeDef, "")
 					pSchema.AdditionalTypes = append(pSchema.AdditionalTypes, typeDef)
 				}
 
@@ -241,7 +241,7 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 				SpecLocation:     SpecLocationSchema,
 				HasSensitiveData: hasSensitiveData(outSchema),
 			}
-			options.AddType(newTypeDef)
+			options.typeTracker.register(newTypeDef, "")
 			outSchema = GoSchema{
 				Description:     newTypeDef.Schema.Description,
 				GoType:          typeName,
@@ -296,7 +296,7 @@ func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, op
 				Schema:       additionalSchema,
 				SpecLocation: SpecLocationUnion,
 			}
-			options.AddType(typeDef)
+			options.typeTracker.register(typeDef, "")
 			additionalSchema.RefType = typeName
 			additionalSchema.AdditionalTypes = append(additionalSchema.AdditionalTypes, typeDef)
 		}

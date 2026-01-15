@@ -125,6 +125,8 @@ type Payment struct {
 	ResponsePaymentID *string `json:"responsePaymentId,omitempty"`
 }
 
+type CreatePaymentResponse1 = Payment
+
 // CreatePaymentRequest The `CreatePaymentRequest` object.
 type CreatePaymentRequest struct {
 	MinimumUserAge      *int    `json:"minimumUserAge,omitempty"`

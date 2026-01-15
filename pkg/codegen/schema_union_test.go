@@ -58,7 +58,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-1", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		// With single element oneOf, it should just return the User type directly
@@ -72,7 +72,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-2", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\"-\"`\n}", res.GoType)
@@ -85,7 +85,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-3", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\"-\"`\n}", res.GoType)

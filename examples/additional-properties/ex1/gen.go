@@ -285,6 +285,8 @@ func (u UserProfile) Validate() error {
 	return runtime.ConvertValidatorError(typesValidator.Struct(u))
 }
 
+type Username1 = string
+
 type TagsWithLength map[string]string
 
 func (t TagsWithLength) Validate() error {
