@@ -13,13 +13,13 @@ type SourceType string
 
 const (
 	SourceTypeACHCreditTransfer SourceType = "ach_credit_transfer"
-	SourceTypeAlipay2           SourceType = "alipay"
+	SourceTypeAlipay1           SourceType = "alipay"
 )
 
 // Validate checks if the SourceType value is valid
 func (s SourceType) Validate() error {
 	switch s {
-	case SourceTypeACHCreditTransfer, SourceTypeAlipay2:
+	case SourceTypeACHCreditTransfer, SourceTypeAlipay1:
 		return nil
 	default:
 		return runtime.NewValidationErrorsFromString("Enum", fmt.Sprintf("must be a valid SourceType value, got: %v", s))

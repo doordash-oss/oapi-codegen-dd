@@ -24,7 +24,29 @@ import (
 func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], options ParseOptions) ([]TypeDefinition, error) {
 	types := make([]TypeDefinition, 0)
 
-	// We're going to define Go types for every object under components/schemas
+	// First pass: register all schema names with their refs.
+	// This allows forward references to be resolved correctly during schema generation.
+	schemaNames := make(map[string]string) // schemaName -> goTypeName
+	for schemaName, schemaRef := range schemas.FromOldest() {
+		goTypeName, err := renameComponent(schemaNameToTypeName(schemaName), schemaRef)
+		if err != nil {
+			return nil, fmt.Errorf("error making name for components/schemas/%s: %w", schemaName, err)
+		}
+
+		// Check if a type with the same name already exists (e.g., from parameters).
+		// If it does, generate a unique name to avoid conflicts.
+		if options.typeTracker.Exists(goTypeName) {
+			goTypeName = options.typeTracker.generateUniqueName(goTypeName)
+		}
+
+		schemaNames[schemaName] = goTypeName
+		componentRef := "#/components/schemas/" + schemaName
+		// Register just the name and ref mapping - full type definition comes in second pass
+		options.typeTracker.registerName(goTypeName)
+		options.typeTracker.registerRef(componentRef, goTypeName)
+	}
+
+	// Second pass: generate full schemas (now all refs can be resolved)
 	for schemaName, schemaRef := range schemas.FromOldest() {
 		ref := schemaRef.GoLow().GetReference()
 		opts := options.WithReference(ref).WithPath([]string{schemaName})
@@ -36,10 +58,7 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 			continue
 		}
 
-		goTypeName, err := renameComponent(schemaNameToTypeName(schemaName), schemaRef)
-		if err != nil {
-			return nil, fmt.Errorf("error making name for components/schemas/%s: %w", schemaName, err)
-		}
+		goTypeName := schemaNames[schemaName]
 
 		td := TypeDefinition{
 			JsonName:         schemaName,
@@ -50,7 +69,9 @@ func getComponentsSchemas(schemas *orderedmap.Map[string, *base.SchemaProxy], op
 			HasSensitiveData: hasSensitiveData(goSchema),
 		}
 		types = append(types, td)
-		opts.AddType(td)
+		// Update the registration with full type definition
+		componentRef := "#/components/schemas/" + schemaName
+		opts.typeTracker.register(td, componentRef)
 
 		types = append(types, goSchema.AdditionalTypes...)
 	}
@@ -93,7 +114,9 @@ func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], o
 			NeedsMarshaler:   needsMarshaler(goType),
 			HasSensitiveData: hasSensitiveData(goType),
 		}
-		options.AddType(typeDef)
+		// Register with the original ref path so we can look it up later
+		paramRef := "#/components/parameters/" + paramName
+		options.typeTracker.register(typeDef, paramRef)
 
 		if ref != "" {
 			// Generate a reference type for referenced parameters
@@ -145,7 +168,7 @@ func getComponentsRequestBodies(bodies *orderedmap.Map[string, *v3high.RequestBo
 				SpecLocation:   SpecLocationBody,
 				NeedsMarshaler: needsMarshaler(goType),
 			}
-			options.AddType(typeDef)
+			options.typeTracker.register(typeDef, "")
 
 			bodyRef := ""
 			if body.Schema != nil {
@@ -193,13 +216,13 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 			// Check if a type with the same name already exists (e.g., from components/schemas).
 			// If so, and the existing type is different (e.g., schema is struct, response is array),
 			// generate a unique name for the response type.
-			if existingType, exists := options.currentTypes[goTypeName]; exists {
+			if existingType, exists := options.typeTracker.LookupByName(goTypeName); exists {
 				// Check if the types are different (different GoType or different structure)
 				isDifferent := existingType.Schema.GoType != goType.GoType ||
 					(existingType.Schema.ArrayType == nil) != (goType.ArrayType == nil)
 				if isDifferent {
 					// Generate a unique name by appending "Response" suffix
-					goTypeName = generateTypeName(options.currentTypes, goTypeName, []string{"Response"})
+					goTypeName = options.typeTracker.generateUniqueNameWithSuffixes(goTypeName, []string{"Response"})
 				}
 			}
 
@@ -210,7 +233,6 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 				SpecLocation:   SpecLocationResponse,
 				NeedsMarshaler: needsMarshaler(goType),
 			}
-			options.AddType(typeDef)
 
 			// TODO: check if same as ref
 			contentRef := ""
@@ -230,6 +252,8 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 				typeDef.Schema.DefineViaAlias = true
 			}
 
+			// Register after setting RefType and DefineViaAlias so the tracker has the correct values
+			options.typeTracker.register(typeDef, "")
 			types = append(types, typeDef)
 		}
 	}

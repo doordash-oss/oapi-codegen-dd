@@ -50,11 +50,12 @@ type ResponseContentDefinition struct {
 
 func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
 	var (
-		successCode     int
-		errorCode       int
-		fstErrorCode    int
-		fstSuccessCode  int
-		typeDefinitions []TypeDefinition
+		successCode          int
+		errorCode            int
+		fstErrorCode         int
+		fstSuccessCode       int
+		typeDefinitions      []TypeDefinition
+		errorAliasRegistered bool // Track if we've already registered the error response alias
 	)
 
 	all := make(map[int]*ResponseContentDefinition)
@@ -203,14 +204,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		// This is important because a component response might have the same name as a schema type.
 		// For example, components/responses/BusinessGroup might be an array of components/schemas/BusinessGroup.
 		// In this case, the response type will be named BusinessGroupResponse (with Response suffix).
-		componentTd, componentTypeExists := options.currentTypes[componentTypeName]
+		componentTd, componentTypeExists := options.typeTracker.LookupByName(componentTypeName)
 		componentTypeExists = componentTypeExists && componentTypeName != "" && componentTd.SpecLocation == SpecLocationResponse
 
 		// If the component type doesn't exist with the original name, try with "Response" suffix.
 		// This handles the case where the response type was renamed to avoid conflict with a schema type.
 		if !componentTypeExists && componentTypeName != "" {
 			componentTypeNameWithSuffix := componentTypeName + "Response"
-			if td, exists := options.currentTypes[componentTypeNameWithSuffix]; exists && td.SpecLocation == SpecLocationResponse {
+			if td, exists := options.typeTracker.LookupByName(componentTypeNameWithSuffix); exists && td.SpecLocation == SpecLocationResponse {
 				componentTypeName = componentTypeNameWithSuffix
 				componentTd = td
 				componentTypeExists = true
@@ -218,20 +219,53 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 
 		if componentTypeExists {
-			// Create an operation-specific alias to the component response type
-			// e.g., GetFilesErrorResponse = InvalidRequestError
-			aliasName := operationID + typeSuffix
+			// For error responses, only create the alias for the first error response
+			// to avoid overwriting the alias in the tracker with subsequent error responses.
+			// The first error response is the one that will be used as the Error in ResponseDefinition.
+			if isSuccess || !errorAliasRegistered {
+				// Create an operation-specific alias to the component response type
+				// e.g., GetFilesErrorResponse = InvalidRequestError
+				aliasName := operationID + typeSuffix
 
-			// Create a type alias
-			td := TypeDefinition{
-				Name:           aliasName,
-				Schema:         GoSchema{RefType: componentTypeName, DefineViaAlias: true},
-				SpecLocation:   SpecLocationResponse,
-				NeedsMarshaler: false,
+				// Check if the alias already exists (e.g., from a component response with the same name)
+				// If so, check if it's the same type - if yes, reuse it; if no, generate a unique name
+				if existingTd, exists := options.typeTracker.LookupByName(aliasName); exists {
+					if existingTd.Schema.RefType == componentTypeName {
+						// Same type, reuse the existing alias
+						responseName = aliasName
+					} else {
+						// Different type, generate a unique name
+						aliasName = options.typeTracker.generateUniqueName(aliasName)
+						td := TypeDefinition{
+							Name:           aliasName,
+							Schema:         GoSchema{RefType: componentTypeName, DefineViaAlias: true},
+							SpecLocation:   SpecLocationResponse,
+							NeedsMarshaler: false,
+						}
+						options.typeTracker.register(td, "")
+						typeDefinitions = append(typeDefinitions, td)
+						responseName = aliasName
+					}
+				} else {
+					// Create a type alias
+					td := TypeDefinition{
+						Name:           aliasName,
+						Schema:         GoSchema{RefType: componentTypeName, DefineViaAlias: true},
+						SpecLocation:   SpecLocationResponse,
+						NeedsMarshaler: false,
+					}
+					options.typeTracker.register(td, "")
+					typeDefinitions = append(typeDefinitions, td)
+					responseName = aliasName
+				}
+
+				if !isSuccess {
+					errorAliasRegistered = true
+				}
+			} else {
+				// For subsequent error responses, use the component type name directly
+				responseName = componentTypeName
 			}
-			options.AddType(td)
-			typeDefinitions = append(typeDefinitions, td)
-			responseName = aliasName
 
 			// Use the component's schema instead of the regenerated contentSchema.
 			// This ensures we use the correct AdditionalTypes from the component
@@ -254,7 +288,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			codeName := strconv.Itoa(status)
 			baseName := operationID + typeSuffix
 			nameSuffixes := []string{tag, tag + codeName}
-			responseName = generateTypeName(options.currentTypes, baseName, nameSuffixes)
+			responseName = options.typeTracker.generateUniqueNameWithSuffixes(baseName, nameSuffixes)
 
 			if contentSchema.ArrayType != nil {
 				contentSchema, _ = replaceInlineTypes(contentSchema, options)
@@ -266,7 +300,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 				SpecLocation:   SpecLocationResponse,
 				NeedsMarshaler: needsMarshaler(contentSchema),
 			}
-			options.AddType(td)
+			options.typeTracker.register(td, "")
 			typeDefinitions = append(typeDefinitions, td)
 			typeDefinitions = append(typeDefinitions, contentSchema.AdditionalTypes...)
 		}
@@ -346,7 +380,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 				SpecLocation:   SpecLocationResponse,
 				NeedsMarshaler: needsMarshaler(contentSchema),
 			}
-			options.AddType(td)
+			options.typeTracker.register(td, "")
 			typeDefinitions = append(typeDefinitions, td)
 			typeDefinitions = append(typeDefinitions, contentSchema.AdditionalTypes...)
 

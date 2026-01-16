@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -22,30 +23,22 @@ import (
 // Schema is the scheme of a type which has a list of enum values, eg, the
 // "container" of the enum.
 // Name is the name of the enum's type, usually aliased from something.
-// ValueWrapper wraps the value. It's used to conditionally apply quotes
-// around strings.
+// EnumDefinition represents an enum type.
+// ValueWrapper wraps the value. It's used to conditionally apply quotes around strings.
 // PrefixTypeName determines if the enum value is prefixed with its TypeName.
+// Values contains the final constant names mapped to their values (computed in filterOutEnums).
 type EnumDefinition struct {
 	Name           string
 	ValueWrapper   string
 	PrefixTypeName bool
 	Schema         GoSchema
+	Values         []EnumValue
 }
 
-// GetValues generates enum names in a way to minimize global conflicts
-func (e *EnumDefinition) GetValues() map[string]string {
-	// in case there are no conflicts, it's safe to use the values as-is
-	if !e.PrefixTypeName {
-		return e.Schema.EnumValues
-	}
-
-	// If we do have conflicts, we will prefix the enum's typename to the values.
-	newValues := make(map[string]string, len(e.Schema.EnumValues))
-	for k, v := range e.Schema.EnumValues {
-		newName := e.Name + UppercaseFirstCharacter(k)
-		newValues[newName] = v
-	}
-	return newValues
+// EnumValue represents a single enum constant.
+type EnumValue struct {
+	Name  string
+	Value string
 }
 
 func createEnumsSchema(schema *base.Schema, options ParseOptions) (GoSchema, error) {
@@ -128,8 +121,8 @@ func createEnumsSchema(schema *base.Schema, options ParseOptions) (GoSchema, err
 
 		// Check if a type with the same name already exists.
 		// If it does, generate a unique name to avoid conflicts.
-		if _, exists := options.currentTypes[typeName]; exists {
-			typeName = generateTypeName(options.currentTypes, typeName, options.nameSuffixes)
+		if options.typeTracker.Exists(typeName) {
+			typeName = options.typeTracker.generateUniqueName(typeName)
 		}
 
 		typeDef := TypeDefinition{
@@ -139,7 +132,7 @@ func createEnumsSchema(schema *base.Schema, options ParseOptions) (GoSchema, err
 		}
 		outSchema.AdditionalTypes = append(outSchema.AdditionalTypes, typeDef)
 		outSchema.RefType = typeName
-		options.AddType(typeDef)
+		options.typeTracker.register(typeDef, "")
 	}
 
 	return outSchema, nil
@@ -187,7 +180,7 @@ func sanitizeEnumNames(enumNames, enumValues []string) map[string]string {
 	return sanitizedDeDup
 }
 
-func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinition, []TypeDefinition, TypeRegistry) {
+func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinition, []TypeDefinition) {
 	var enums []EnumDefinition
 	var rest []TypeDefinition
 
@@ -280,47 +273,75 @@ func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinit
 		m[td.Name] = 1
 	}
 
-	// Now, go through all the enums, and figure out if we have conflicts with any others.
-	for i := range enums {
-		// Look through all other enums not compared so far.
-		// Make sure we don't compare against self.
-		e1 := enums[i]
-		for j := i + 1; j < len(enums); j++ {
-			e2 := enums[j]
+	// Detect conflicts between enums and force prefixing when needed.
+	// Optimized: Use hash-based approach instead of O(n²) comparison.
 
-			for e1key := range e1.GetValues() {
-				_, found := e2.GetValues()[e1key]
-				if found {
-					e1.PrefixTypeName = true
-					e2.PrefixTypeName = true
-					enums[i] = e1
-					enums[j] = e2
-					break
-				}
-			}
-		}
-
-		// now see if this enum conflicts with any type names.
-		for _, tp := range types {
-			// Skip over enums, since we've handled those above.
-			if len(tp.Schema.EnumValues) > 0 {
-				continue
-			}
-			_, found := e1.Schema.EnumValues[tp.Name]
-			if found {
-				e1.PrefixTypeName = true
-				enums[i] = e1
-			}
-		}
-
-		_, found := e1.GetValues()[e1.Name]
-		if found {
-			e1.PrefixTypeName = true
-			enums[i] = e1
+	// Build a map of enum value -> list of enum indices that have this value
+	// This allows O(n) conflict detection instead of O(n²)
+	valueToEnumIndices := make(map[string][]int)
+	for i, e := range enums {
+		for key := range e.Schema.EnumValues {
+			valueToEnumIndices[key] = append(valueToEnumIndices[key], i)
 		}
 	}
 
-	return enums, rest, m
+	// Mark enums with conflicting values (same value appears in multiple enums)
+	for _, indices := range valueToEnumIndices {
+		if len(indices) > 1 {
+			for _, idx := range indices {
+				enums[idx].PrefixTypeName = true
+			}
+		}
+	}
+
+	// Build a set of type names for O(1) lookup
+	typeNames := make(map[string]struct{}, len(types))
+	for _, tp := range types {
+		if len(tp.Schema.EnumValues) == 0 {
+			typeNames[tp.Name] = struct{}{}
+		}
+	}
+
+	// Check for conflicts with type names and self-conflicts
+	for i, e := range enums {
+		// Check for conflicts with type names
+		for key := range e.Schema.EnumValues {
+			if _, found := typeNames[key]; found {
+				enums[i].PrefixTypeName = true
+				break
+			}
+		}
+
+		// Check if enum value conflicts with its own type name
+		if _, found := e.Schema.EnumValues[e.Name]; found {
+			enums[i].PrefixTypeName = true
+		}
+	}
+
+	// Go through all enums, compute final Values and register in typeTracker.
+	for i := range enums {
+		e := enums[i]
+
+		// Compute final Values.
+		values := make([]EnumValue, 0, len(e.Schema.EnumValues))
+		for k, v := range e.Schema.EnumValues {
+			// Base name depends on prefix setting.
+			baseName := k
+			if e.PrefixTypeName {
+				baseName = e.Name + UppercaseFirstCharacter(k)
+			}
+			// Use typeTracker to handle conflicts with types and other enum constants.
+			name := options.typeTracker.generateUniqueName(baseName)
+			options.typeTracker.registerName(name)
+			values = append(values, EnumValue{Name: name, Value: v})
+		}
+		slices.SortFunc(values, func(a, b EnumValue) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		enums[i].Values = values
+	}
+
+	return enums, rest
 }
 
 // isComparableType checks if a Go type can be used as a constant or map key

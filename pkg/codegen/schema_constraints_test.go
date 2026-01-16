@@ -304,3 +304,104 @@ func TestInvalidConstraintsCodegen(t *testing.T) {
 		assert.Contains(t, combined, `validate:"omitempty,max=200,min=5"`)
 	})
 }
+
+func TestNewConstraints_NonStringFormats(t *testing.T) {
+	t.Run("date-time format with minLength should not have min validation tag", func(t *testing.T) {
+		minLn := int64(1)
+		schema := &base.Schema{
+			Type:      []string{"string"},
+			Format:    "date-time",
+			MinLength: &minLn,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// date-time format converts to time.Time in Go, so minLength validation
+		// doesn't make sense and should be ignored
+		assert.Equal(t, Constraints{
+			Nullable: ptr(true),
+		}, res)
+	})
+
+	t.Run("date format with minLength and maxLength should not have validation tags", func(t *testing.T) {
+		minLn := int64(1)
+		maxLn := int64(10)
+		schema := &base.Schema{
+			Type:      []string{"string"},
+			Format:    "date",
+			MinLength: &minLn,
+			MaxLength: &maxLn,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// date format converts to runtime.Date in Go, so minLength/maxLength validation
+		// doesn't make sense and should be ignored
+		assert.Equal(t, Constraints{
+			Nullable: ptr(true),
+		}, res)
+	})
+
+	t.Run("uuid format with minLength should not have min validation tag", func(t *testing.T) {
+		minLn := int64(36)
+		schema := &base.Schema{
+			Type:      []string{"string"},
+			Format:    "uuid",
+			MinLength: &minLn,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// uuid format converts to uuid.UUID in Go, so minLength validation
+		// doesn't make sense and should be ignored
+		assert.Equal(t, Constraints{
+			Nullable: ptr(true),
+		}, res)
+	})
+
+	t.Run("email format with minLength should still have min validation tag", func(t *testing.T) {
+		minLn := int64(5)
+		schema := &base.Schema{
+			Type:      []string{"string"},
+			Format:    "email",
+			MinLength: &minLn,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{})
+
+		// email format converts to runtime.Email which is a string type alias,
+		// so minLength validation should still work
+		assert.Equal(t, Constraints{
+			MinLength: &minLn,
+			Nullable:  ptr(true),
+			ValidationTags: []string{
+				"omitempty",
+				"min=5",
+			},
+		}, res)
+	})
+
+	t.Run("required date-time with minLength should only have required tag", func(t *testing.T) {
+		minLn := int64(1)
+		schema := &base.Schema{
+			Type:      []string{"string"},
+			Format:    "date-time",
+			MinLength: &minLn,
+			Required:  []string{"foo"},
+		}
+
+		res := newConstraints(schema, ConstraintsContext{
+			name:     "foo",
+			required: true,
+		})
+
+		// date-time format converts to time.Time in Go, so minLength validation
+		// doesn't make sense and should be ignored, but required should still work
+		assert.Equal(t, Constraints{
+			Required: ptr(true),
+			ValidationTags: []string{
+				"required",
+			},
+		}, res)
+	})
+}

@@ -126,7 +126,7 @@ func TestSingleElementUnionOptimization(t *testing.T) {
 		orderSchema := doc.Components.Schemas.Value("Order")
 		require.NotNil(t, orderSchema)
 
-		res, err := GenerateGoSchema(orderSchema, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"Order"}))
+		res, err := GenerateGoSchema(orderSchema, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"Order"}))
 		require.NoError(t, err)
 
 		// Should have a client property
@@ -162,7 +162,7 @@ func TestSingleElementUnionOptimization(t *testing.T) {
 		verificationSchema := doc.Components.Schemas.Value("Verification")
 		require.NotNil(t, verificationSchema)
 
-		res, err := GenerateGoSchema(verificationSchema, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"Verification"}))
+		res, err := GenerateGoSchema(verificationSchema, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"Verification"}))
 		require.NoError(t, err)
 
 		// Should have a verifier property
@@ -207,7 +207,7 @@ func TestSingleElementUnionOptimization(t *testing.T) {
 		mediaType := resp.Content.Value("application/json")
 		require.NotNil(t, mediaType)
 
-		res, err := GenerateGoSchema(mediaType.Schema, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"Response"}))
+		res, err := GenerateGoSchema(mediaType.Schema, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"Response"}))
 		require.NoError(t, err)
 
 		// Should be a direct reference to User, not a wrapper
@@ -234,7 +234,7 @@ func TestSingleElementUnionOptimization(t *testing.T) {
 		mediaType := resp.Content.Value("application/json")
 		require.NotNil(t, mediaType)
 
-		res, err := GenerateGoSchema(mediaType.Schema, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"Response"}))
+		res, err := GenerateGoSchema(mediaType.Schema, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"Response"}))
 		require.NoError(t, err)
 
 		// Should have created a wrapper with union
@@ -258,7 +258,7 @@ func TestSingleElementUnionOptimization(t *testing.T) {
 		mediaType := resp.Content.Value("application/json")
 		require.NotNil(t, mediaType)
 
-		res, err := GenerateGoSchema(mediaType.Schema, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"Response"}))
+		res, err := GenerateGoSchema(mediaType.Schema, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"Response"}))
 		require.NoError(t, err)
 
 		// Should have created a wrapper with union (Either type for 2 elements)

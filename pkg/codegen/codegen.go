@@ -26,7 +26,7 @@ type ParseContext struct {
 	UnionTypes      []TypeDefinition
 	Imports         []string
 	ResponseErrors  []string
-	TypeRegistry    TypeRegistry
+	TypeTracker     *TypeTracker
 }
 
 type operationsCollection struct {
@@ -90,7 +90,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		DefaultIntType:         cfg.Generate.DefaultIntType,
 		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
 		SkipValidation:         cfg.Generate.Validation.Skip,
-		currentTypes:           map[string]TypeDefinition{},
+		typeTracker:            newTypeTracker(),
 		visited:                map[string]bool{},
 		model:                  model,
 	}
@@ -135,7 +135,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		mergeImports(imprts, importRes)
 	}
 
-	enums, typeDefs, registry := filterOutEnums(typeDefs, parseOptions)
+	enums, typeDefs := filterOutEnums(typeDefs, parseOptions)
 
 	groupedTypeDefs := make(map[SpecLocation][]TypeDefinition)
 	var unionTypes []TypeDefinition
@@ -164,7 +164,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		}
 	}
 
-	respErrs, err := collectResponseErrors(responseErrors, typeDefs, enums)
+	respErrs, err := collectResponseErrors(responseErrors, parseOptions.typeTracker)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting response errors: %w", err)
 	}
@@ -176,7 +176,7 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 		UnionTypes:      unionTypes,
 		Imports:         importMap(imprts).GoImports(),
 		ResponseErrors:  respErrs,
-		TypeRegistry:    registry,
+		TypeTracker:     parseOptions.typeTracker,
 	}, nil
 }
 
@@ -309,7 +309,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 	// Deduplicate operation IDs and resolve RequestOptions name collisions
 	operations = deduplicateOperationIDs(operations)
-	operations = resolveRequestOptionsCollisions(operations, options.currentTypes)
+	operations = resolveRequestOptionsCollisions(operations, options.typeTracker)
 
 	allTypeDefs := extractAllTypeDefinitions(typeDefs)
 
@@ -323,7 +323,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 // resolveRequestOptionsCollisions checks if any operation's RequestOptions type name
 // would collide with existing component schemas, and renames the operation ID if needed.
-func resolveRequestOptionsCollisions(operations []OperationDefinition, currentTypes map[string]TypeDefinition) []OperationDefinition {
+func resolveRequestOptionsCollisions(operations []OperationDefinition, tracker *TypeTracker) []OperationDefinition {
 	result := make([]OperationDefinition, len(operations))
 
 	for i, op := range operations {
@@ -332,22 +332,8 @@ func resolveRequestOptionsCollisions(operations []OperationDefinition, currentTy
 			continue
 		}
 
-		// Check if the RequestOptions type name would collide
-		requestOptionsTypeName := UppercaseFirstCharacter(op.ID) + "RequestOptions"
-
-		if _, exists := currentTypes[requestOptionsTypeName]; exists {
-			// Collision detected - we need to find a new operation ID such that
-			// {newID}RequestOptions doesn't collide
-			// We'll try appending numbers until we find one that works
-			for suffix := 1; ; suffix++ {
-				newID := fmt.Sprintf("%s%d", op.ID, suffix)
-				newRequestOptionsTypeName := UppercaseFirstCharacter(newID) + "RequestOptions"
-				if _, exists := currentTypes[newRequestOptionsTypeName]; !exists {
-					op.ID = newID
-					break
-				}
-			}
-		}
+		// Check if the RequestOptions type name would collide and get a unique base name
+		op.ID = tracker.generateUniqueBaseName(UppercaseFirstCharacter(op.ID), "RequestOptions")
 
 		result[i] = op
 	}
@@ -438,26 +424,30 @@ func extractAllTypeDefinitions(types []TypeDefinition) []TypeDefinition {
 
 // collectResponseErrors collects the response errors from the type definitions.
 // We need non-alias types for the response errors, so we could generate Error function.
-func collectResponseErrors(errNames []string, types []TypeDefinition, enums []EnumDefinition) ([]string, error) {
-	tds := make(map[string]TypeDefinition)
-	for _, typeDef := range types {
-		tds[typeDef.Name] = typeDef
+func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, error) {
+	if len(errNames) == 0 {
+		return nil, nil
 	}
 
-	// Also add enum types to the map
-	for _, enumDef := range enums {
-		// Convert EnumDefinition to TypeDefinition for lookup
-		tds[enumDef.Name] = TypeDefinition{
-			Name:   enumDef.Name,
-			Schema: enumDef.Schema,
-		}
-	}
+	res := make([]string, 0, len(errNames))
+	visited := make(map[string]bool, 8) // reuse across iterations
 
-	var res []string
 	for _, errName := range errNames {
 		name := errName
+		// Clear visited map for reuse
+		for k := range visited {
+			delete(visited, k)
+		}
+
 		for {
-			typ, found := tds[name]
+			if visited[name] {
+				// Circular reference detected, use current name
+				res = append(res, name)
+				break
+			}
+			visited[name] = true
+
+			typ, found := tracker.LookupByName(name)
 			if !found {
 				return nil, fmt.Errorf("error finding type '%s'", name)
 			}
@@ -465,10 +455,12 @@ func collectResponseErrors(errNames []string, types []TypeDefinition, enums []En
 				res = append(res, name)
 				break
 			}
-			name = typ.Schema.RefType
-			if name == "" {
+			newName := typ.Schema.RefType
+			if newName == "" || newName == name {
+				res = append(res, name)
 				break
 			}
+			name = newName
 		}
 	}
 

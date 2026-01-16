@@ -115,6 +115,11 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 	isFloat := slices.Contains(schema.Type, "number")
 	isBoolean := slices.Contains(schema.Type, "boolean")
 	isString := slices.Contains(schema.Type, "string")
+
+	// Check if the string format converts to a non-string Go type.
+	// These formats do not support minLength/maxLength validation tags because
+	// the Go type is not a string (e.g., time.Time, uuid.UUID).
+	hasNonStringFormat := isString && (schema.Format == "date-time" || schema.Format == "date" || schema.Format == "uuid")
 	isArray := slices.Contains(schema.Type, "array")
 	isObject := schema.Type == nil || slices.Contains(schema.Type, "object")
 	var validationTags []string
@@ -227,7 +232,7 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 	var minLength *int64
 	// Only store minLength for strings and arrays
 	// For integers/numbers/booleans, minLength is invalid per OpenAPI spec - ignore it completely
-	if schema.MinLength != nil && (isString || isArray) {
+	if schema.MinLength != nil && (isString || isArray) && !hasNonStringFormat {
 		minLength = schema.MinLength
 		validationTags = append(validationTags, fmt.Sprintf("min=%d", *minLength))
 	}
@@ -235,7 +240,7 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 	var maxLength *int64
 	// Only store maxLength for strings and arrays
 	// For integers/numbers/booleans, maxLength is invalid per OpenAPI spec - ignore it completely
-	if schema.MaxLength != nil && (isString || isArray) {
+	if schema.MaxLength != nil && (isString || isArray) && !hasNonStringFormat {
 		maxLength = schema.MaxLength
 		validationTags = append(validationTags, fmt.Sprintf("max=%d", *maxLength))
 	}

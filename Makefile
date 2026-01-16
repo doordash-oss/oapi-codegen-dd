@@ -85,8 +85,8 @@ gosec: gosec-examples
 	gosec -exclude-dir=.data -exclude-dir=examples ./...
 
 check-fmt:
-	# for the root module, check if files are formatted
-	@UNFORMATTED=$$(find . -name '*.go' -not -path './.data/*' -not -path './examples/*' -exec gofmt -l {} \;); \
+	# for the root module, check if files are formatted (only pkg and cmd dirs)
+	@UNFORMATTED=$$(gofmt -l pkg cmd); \
 	if [ -n "$$UNFORMATTED" ]; then \
 		echo >&2 "ERROR: The following files are not formatted:"; \
 		echo "$$UNFORMATTED"; \

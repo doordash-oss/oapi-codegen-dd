@@ -1,0 +1,40 @@
+openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0"
+paths:
+  /zone:
+    get:
+      operationId: zone
+      responses:
+        "200":
+          $ref: "#/components/responses/OK"
+  /zones:
+    get:
+      operationId: getZones
+      responses:
+        "200":
+          $ref: "#/components/responses/Zone"
+components:
+  schemas:
+    Zone:
+      type: object
+      properties:
+        id:
+          type: string
+  responses:
+    OK:
+      description: OK response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+    Zone:
+      description: Zone response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Zone"

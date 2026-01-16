@@ -54,17 +54,13 @@ type ParseOptions struct {
 	SkipValidation         bool
 
 	// runtime options
-	currentTypes map[string]TypeDefinition
+	typeTracker  *TypeTracker
 	reference    string
 	path         []string
 	specLocation SpecLocation
 
 	// Track visited schema paths to prevent infinite recursion
 	visited map[string]bool
-
-	// naming parameters
-	baseName     string
-	nameSuffixes []string
 
 	// model is the high-level OpenAPI model, used to resolve $ref to mutated schemas
 	// instead of following stale low-level references
@@ -81,42 +77,17 @@ func (o ParseOptions) WithPath(path []string) ParseOptions {
 	return o
 }
 
-func (o ParseOptions) WithCurrentTypes(currentTypes map[string]TypeDefinition) ParseOptions {
-	o.currentTypes = currentTypes
-	return o
-}
-
-func (o ParseOptions) AddType(td TypeDefinition) ParseOptions {
-	o.currentTypes[td.Name] = td
-	return o
-}
-
-func (o ParseOptions) WithBaseName(baseName string) ParseOptions {
-	o.baseName = baseName
-	return o
-}
-
-func (o ParseOptions) WithNameSuffixes(suffixes []string) ParseOptions {
-	o.nameSuffixes = slices.Clone(suffixes)
-	return o
-}
-
 func (o ParseOptions) WithSpecLocation(specLocation SpecLocation) ParseOptions {
 	o.specLocation = specLocation
 	return o
 }
 
-func (o ParseOptions) WithModel(model *v3high.Document) ParseOptions {
-	o.model = model
-	return o
-}
-
 type EnumContext struct {
-	Enums        []EnumDefinition
-	Imports      []string
-	Config       Configuration
-	WithHeader   bool
-	TypeRegistry TypeRegistry
+	Enums       []EnumDefinition
+	Imports     []string
+	Config      Configuration
+	WithHeader  bool
+	TypeTracker *TypeTracker
 }
 
 // TplTypeContext is the context passed to templates to generate code for type definitions.
@@ -244,11 +215,11 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 
 	if len(p.ctx.Enums) > 0 {
 		out, err := p.ParseTemplates([]string{"enums.tmpl"}, EnumContext{
-			Enums:        p.ctx.Enums,
-			Imports:      p.ctx.Imports,
-			Config:       p.cfg,
-			WithHeader:   withHeader,
-			TypeRegistry: p.ctx.TypeRegistry,
+			Enums:       p.ctx.Enums,
+			Imports:     p.ctx.Imports,
+			Config:      p.cfg,
+			WithHeader:  withHeader,
+			TypeTracker: p.ctx.TypeTracker,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error generating code for type enums: %w", err)

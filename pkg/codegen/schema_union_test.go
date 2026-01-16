@@ -58,7 +58,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-1", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		// With single element oneOf, it should just return the User type directly
@@ -72,20 +72,21 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-2", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\"-\"`\n}", res.GoType)
 		assert.Equal(t, 1, len(res.AdditionalTypes))
 		assert.Equal(t, "User_OneOf", res.AdditionalTypes[0].Name)
 		assert.Equal(t, "struct {\nruntime.Either[User, string]\n}", res.AdditionalTypes[0].Schema.GoType)
+		assert.True(t, res.AdditionalTypes[0].Schema.IsUnionWrapper, "Union wrapper should have IsUnionWrapper=true")
 	})
 
 	t.Run("one-of 3 possible values", func(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-3", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{currentTypes: map[string]TypeDefinition{}}.WithPath([]string{"User"}))
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
 		require.NoError(t, err)
 
 		assert.Equal(t, "struct {\n    User_OneOf *User_OneOf`json:\"-\"`\n}", res.GoType)
@@ -97,6 +98,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		assert.Equal(t, "User", res.AdditionalTypes[0].Schema.UnionElements[0].TypeName)
 		assert.Equal(t, "Error", res.AdditionalTypes[0].Schema.UnionElements[1].TypeName)
 		assert.Equal(t, "string", res.AdditionalTypes[0].Schema.UnionElements[2].TypeName)
+		assert.True(t, res.AdditionalTypes[0].Schema.IsUnionWrapper, "Union wrapper should have IsUnionWrapper=true")
 	})
 }
 
