@@ -49,6 +49,8 @@ type GoSchema struct {
 
 	UnionElements []UnionElement
 	Discriminator *Discriminator
+	// True if this schema is a struct wrapper around a union (embedded Either or union field)
+	IsUnionWrapper bool
 
 	DefineViaAlias   bool
 	IsPrimitiveAlias bool
@@ -190,8 +192,8 @@ func (s GoSchema) NeedsValidation() bool {
 // ContainsUnions returns true if this schema or any of its nested schemas contain union types.
 // This is used to determine if we can use simple validate.Struct() or need custom validation logic.
 func (s GoSchema) ContainsUnions() bool {
-	// Direct check: is this schema itself a union?
-	if len(s.UnionElements) > 0 {
+	// Direct check: is this schema itself a union wrapper?
+	if s.IsUnionWrapper {
 		return true
 	}
 

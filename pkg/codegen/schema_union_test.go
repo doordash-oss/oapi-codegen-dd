@@ -79,6 +79,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		assert.Equal(t, 1, len(res.AdditionalTypes))
 		assert.Equal(t, "User_OneOf", res.AdditionalTypes[0].Name)
 		assert.Equal(t, "struct {\nruntime.Either[User, string]\n}", res.AdditionalTypes[0].Schema.GoType)
+		assert.True(t, res.AdditionalTypes[0].Schema.IsUnionWrapper, "Union wrapper should have IsUnionWrapper=true")
 	})
 
 	t.Run("one-of 3 possible values", func(t *testing.T) {
@@ -97,6 +98,7 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		assert.Equal(t, "User", res.AdditionalTypes[0].Schema.UnionElements[0].TypeName)
 		assert.Equal(t, "Error", res.AdditionalTypes[0].Schema.UnionElements[1].TypeName)
 		assert.Equal(t, "string", res.AdditionalTypes[0].Schema.UnionElements[2].TypeName)
+		assert.True(t, res.AdditionalTypes[0].Schema.IsUnionWrapper, "Union wrapper should have IsUnionWrapper=true")
 	})
 }
 

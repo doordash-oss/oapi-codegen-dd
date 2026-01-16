@@ -75,6 +75,7 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 
 		anyOfFields := genFieldsFromProperties(anyOfSchema.Properties, options)
 		anyOfSchema.GoType = anyOfSchema.createGoStruct(anyOfFields)
+		anyOfSchema.IsUnionWrapper = len(anyOfSchema.UnionElements) > 0
 
 		anyOfName := pathToTypeName(anyOfPath)
 		td := TypeDefinition{
@@ -111,6 +112,7 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 
 		oneOfFields := genFieldsFromProperties(oneOfSchema.Properties, options)
 		oneOfSchema.GoType = oneOfSchema.createGoStruct(oneOfFields)
+		oneOfSchema.IsUnionWrapper = len(oneOfSchema.UnionElements) > 0
 
 		oneOfName := pathToTypeName(oneOfPath)
 		td := TypeDefinition{
