@@ -33,11 +33,11 @@ func NewDefaultClient(baseURL string, opts ...runtime.APIClientOption) (*Client,
 // ClientInterface is the interface for the API client.
 type ClientInterface interface {
 	// CreatePayment Create a payment
-	CreatePayment(ctx context.Context, options *CreatePaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreatePaymentResponse, error)
+	CreatePayment(ctx context.Context, options *CreatePaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreatePaymentResponse2, error)
 }
 
 // CreatePayment Create a payment
-func (c *Client) CreatePayment(ctx context.Context, options *CreatePaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreatePaymentResponse, error) {
+func (c *Client) CreatePayment(ctx context.Context, options *CreatePaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*CreatePaymentResponse2, error) {
 	var err error
 	reqParams := runtime.RequestOptionsParameters{
 		RequestURL:  c.apiClient.GetBaseURL() + "/v1/payments",
@@ -51,13 +51,13 @@ func (c *Client) CreatePayment(ctx context.Context, options *CreatePaymentReques
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	responseParser := func(ctx context.Context, resp *runtime.Response) (*CreatePaymentResponse, error) {
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*CreatePaymentResponse2, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 201 {
 			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
 				runtime.WithStatusCode(resp.StatusCode))
 		}
-		target := new(CreatePaymentResponse)
+		target := new(CreatePaymentResponse2)
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -126,6 +126,8 @@ type Payment struct {
 }
 
 type CreatePaymentResponse1 = Payment
+
+type CreatePaymentResponse2 = CreatePaymentResponse
 
 // CreatePaymentRequest The `CreatePaymentRequest` object.
 type CreatePaymentRequest struct {

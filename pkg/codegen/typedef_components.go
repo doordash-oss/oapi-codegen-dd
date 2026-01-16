@@ -246,10 +246,14 @@ func getComponentResponses(responses *orderedmap.Map[string, *v3high.Response], 
 					return nil, fmt.Errorf("error generating Go type for (%s) in parameter %s: %w",
 						content.Schema.GetReference(), responseName, err)
 				}
+
 				renamed := schemaNameToTypeName(refType)
-				// typeDef.Name = renamed
-				typeDef.Schema.RefType = renamed
-				typeDef.Schema.DefineViaAlias = true
+				// Only set RefType if it's different from the type name to avoid self-reference.
+				// Self-referential RefType causes infinite recursion when processing schemas.
+				if renamed != goTypeName {
+					typeDef.Schema.RefType = renamed
+					typeDef.Schema.DefineViaAlias = true
+				}
 			}
 
 			// Register after setting RefType and DefineViaAlias so the tracker has the correct values
