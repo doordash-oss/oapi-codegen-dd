@@ -87,10 +87,12 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 			// for them, which will be based on the field names we followed
 			// to get to the type.
 			typeName := pathToTypeName(append(path, "Item"))
-			// Check if the type name already exists from a property type (e.g., a property named "item").
-			// Property types created by replaceInlineTypes have JsonName == "-".
-			// If collision is with a property type, generate a unique name with numeric suffix.
-			if existing, exists := options.typeTracker.LookupByName(typeName); exists && existing.JsonName == "-" {
+
+			// Check if the type name already exists.
+			// If it does, generate a unique name to avoid conflicts and overwrites.
+			// This handles cases like allOf with duplicate property names where each
+			// property has different enum values - we need separate types for each.
+			if options.typeTracker.Exists(typeName) {
 				typeName = options.typeTracker.generateUniqueName(typeName)
 			}
 

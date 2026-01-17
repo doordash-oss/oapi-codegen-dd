@@ -177,9 +177,16 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		// Don't pass reference for responses - we want actual types, not aliases
 		// This allows Error() methods to be generated on error response types
 		// Also set SpecLocationResponse so that writeOnly fields are not marked as required
+		// Include status code in path only for non-first responses to disambiguate
+		// nested types (like array items) when multiple responses have the same structure
+		pathParts := []string{operationID, typeSuffix}
+		isFirstOfKind := (isSuccess && status == fstSuccessCode) || (!isSuccess && status == fstErrorCode)
+		if !isFirstOfKind {
+			pathParts = append(pathParts, statusCode)
+		}
 		options = options.
 			WithReference("").
-			WithPath([]string{operationID, typeSuffix}).
+			WithPath(pathParts).
 			WithSpecLocation(SpecLocationResponse)
 		contentSchema, err := GenerateGoSchema(content.Schema, options)
 		if err != nil {

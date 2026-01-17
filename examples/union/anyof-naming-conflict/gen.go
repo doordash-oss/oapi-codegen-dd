@@ -24,7 +24,7 @@ func (r TestErrorResponse) Error() string {
 }
 
 type TestErrorResponseJSON struct {
-	Items *Test_ErrorResponse_Items1 `json:"items,omitempty"`
+	Items *Test_ErrorResponse_422_Items `json:"items,omitempty"`
 }
 
 type TypeA struct {
@@ -181,9 +181,9 @@ func (t *Test_ErrorResponse_Items_Item) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type Test_ErrorResponse_Items1 []Test_ErrorResponse_Items_Item
+type Test_ErrorResponse_422_Items []Test_ErrorResponse_422_Items_Item
 
-func (t Test_ErrorResponse_Items1) Validate() error {
+func (t Test_ErrorResponse_422_Items) Validate() error {
 	if t == nil {
 		return nil
 	}
@@ -199,6 +199,59 @@ func (t Test_ErrorResponse_Items1) Validate() error {
 		return nil
 	}
 	return errors
+}
+
+type Test_ErrorResponse_422_Items_Item struct {
+	Test_ErrorResponse_422_Items_AnyOf *Test_ErrorResponse_422_Items_AnyOf `json:"-"`
+}
+
+func (t Test_ErrorResponse_422_Items_Item) Validate() error {
+	var errors runtime.ValidationErrors
+	if t.Test_ErrorResponse_422_Items_AnyOf != nil {
+		if v, ok := any(t.Test_ErrorResponse_422_Items_AnyOf).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append("Test_ErrorResponse_422_Items_AnyOf", err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+func (t Test_ErrorResponse_422_Items_Item) MarshalJSON() ([]byte, error) {
+	var parts []json.RawMessage
+
+	{
+		b, err := runtime.MarshalJSON(t.Test_ErrorResponse_422_Items_AnyOf)
+		if err != nil {
+			return nil, fmt.Errorf("Test_ErrorResponse_422_Items_AnyOf marshal: %w", err)
+		}
+		parts = append(parts, b)
+	}
+
+	return runtime.CoalesceOrMerge(parts...)
+}
+
+func (t *Test_ErrorResponse_422_Items_Item) UnmarshalJSON(data []byte) error {
+	trim := bytes.TrimSpace(data)
+	if bytes.Equal(trim, []byte("null")) {
+		return nil
+	}
+	if len(trim) == 0 {
+		return fmt.Errorf("empty JSON input")
+	}
+
+	if t.Test_ErrorResponse_422_Items_AnyOf == nil {
+		t.Test_ErrorResponse_422_Items_AnyOf = &Test_ErrorResponse_422_Items_AnyOf{}
+	}
+
+	if err := runtime.UnmarshalJSON(data, t.Test_ErrorResponse_422_Items_AnyOf); err != nil {
+		return fmt.Errorf("Test_ErrorResponse_422_Items_AnyOf unmarshal: %w", err)
+	}
+
+	return nil
 }
 
 func UnmarshalAs[T any](v json.RawMessage) (T, error) {
@@ -247,6 +300,24 @@ type Test_ErrorResponse_Items_AnyOf struct {
 }
 
 func (t *Test_ErrorResponse_Items_AnyOf) Validate() error {
+	if t.IsA() {
+		if v, ok := any(t.A).(runtime.Validator); ok {
+			return v.Validate()
+		}
+	}
+	if t.IsB() {
+		if v, ok := any(t.B).(runtime.Validator); ok {
+			return v.Validate()
+		}
+	}
+	return nil
+}
+
+type Test_ErrorResponse_422_Items_AnyOf struct {
+	runtime.Either[TypeA, TypeB]
+}
+
+func (t *Test_ErrorResponse_422_Items_AnyOf) Validate() error {
 	if t.IsA() {
 		if v, ok := any(t.A).(runtime.Validator); ok {
 			return v.Validate()

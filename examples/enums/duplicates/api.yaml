@@ -1,0 +1,72 @@
+openapi: 3.0.0
+info:
+  description: ""
+  title: Email Activity (beta)
+  version: 1.0.0
+externalDocs:
+  url: https://sendgrid.com/docs/API_Reference/Web_API_v3/index.html
+paths:
+  "/messages/{msg_id}":
+    get:
+      description: Get message activity
+      operationId: get-msg_id
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/email-activity-response-common-fields"
+                  - properties:
+                      events:
+                        description: List of events related to email message
+                        items:
+                          properties:
+                            bounce_type:
+                              description: Use to distinguish between types of bounces
+                              enum:
+                                - soft
+                                - hard
+                              type: string
+                          title: Event
+                          type: object
+                        type: array
+                    type: object
+                properties:
+                  events:
+                    description: List of events related to email message
+                    items:
+                      properties:
+                        bounce_type:
+                          description: Use to distinguish between types of bounces
+                          enum:
+                            - bounced
+                            - blocked
+                            - expired
+                          type: string
+                      title: Event
+                      type: object
+                    type: array
+                  status:
+                    description: Quick summary of the status of a message
+                    enum:
+                      - processed
+                      - not delivered
+                      - delivered
+                    type: string
+                title: Message
+                type: object
+          description: ""
+components:
+  schemas:
+    email-activity-response-common-fields:
+      properties:
+        status:
+          description: The message's status.
+          enum:
+            - processed
+            - delivered
+            - not delivered
+          type: string
+      title: Email Activity Response Common Fields
+      type: object
