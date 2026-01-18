@@ -331,10 +331,11 @@ func enhanceSchemaWithAdditionalProperties(out GoSchema, schema *base.Schema, op
 			}
 
 			typeDef := TypeDefinition{
-				Name:         typeName,
-				JsonName:     strings.Join(append(path, "AdditionalProperties"), "."),
-				Schema:       additionalSchema,
-				SpecLocation: SpecLocationUnion,
+				Name:           typeName,
+				JsonName:       strings.Join(append(path, "AdditionalProperties"), "."),
+				Schema:         additionalSchema,
+				SpecLocation:   SpecLocationUnion,
+				NeedsMarshaler: needsMarshaler(additionalSchema),
 			}
 			options.typeTracker.register(typeDef, addPropsRef)
 			additionalSchema.RefType = typeName

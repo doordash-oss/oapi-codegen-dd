@@ -3,6 +3,7 @@
 package gen
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -343,6 +344,40 @@ func (p Pick1_AdditionalProperties) Validate() error {
 		return nil
 	}
 	return errors
+}
+
+func (p Pick1_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	var parts []json.RawMessage
+
+	{
+		b, err := runtime.MarshalJSON(p.Pick1_AdditionalProperties_OneOf)
+		if err != nil {
+			return nil, fmt.Errorf("Pick1_AdditionalProperties_OneOf marshal: %w", err)
+		}
+		parts = append(parts, b)
+	}
+
+	return runtime.CoalesceOrMerge(parts...)
+}
+
+func (p *Pick1_AdditionalProperties) UnmarshalJSON(data []byte) error {
+	trim := bytes.TrimSpace(data)
+	if bytes.Equal(trim, []byte("null")) {
+		return nil
+	}
+	if len(trim) == 0 {
+		return fmt.Errorf("empty JSON input")
+	}
+
+	if p.Pick1_AdditionalProperties_OneOf == nil {
+		p.Pick1_AdditionalProperties_OneOf = &Pick1_AdditionalProperties_OneOf{}
+	}
+
+	if err := runtime.UnmarshalJSON(data, p.Pick1_AdditionalProperties_OneOf); err != nil {
+		return fmt.Errorf("Pick1_AdditionalProperties_OneOf unmarshal: %w", err)
+	}
+
+	return nil
 }
 
 type UsersWithRequiredFields_AdditionalProperties struct {
