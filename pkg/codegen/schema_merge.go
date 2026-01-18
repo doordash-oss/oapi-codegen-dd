@@ -198,8 +198,40 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 
 	path := options.path
 
+	// Derive the current type's reference from the path (e.g., ["VendorDetails"] -> "#/components/schemas/VendorDetails")
+	var currentTypeRef string
+	if len(path) == 1 {
+		currentTypeRef = "#/components/schemas/" + path[0]
+	}
+
+	// Filter out discriminated unions that include the current type to avoid circular references.
+	// This handles patterns like:
+	//   CounterParty:
+	//     discriminator: { propertyName: type, mapping: { VENDOR: VendorDetails } }
+	//     oneOf: [VendorDetails, BookTransferDetails]
+	//   VendorDetails:
+	//     allOf: [CounterParty, ...]  # <- circular reference
+	// In this case, we should NOT embed CounterParty because it would create
+	// an infinite loop during JSON unmarshaling.
+	filteredAllOf := allOf
+	if currentTypeRef != "" {
+		filteredAllOf = make([]*base.SchemaProxy, 0, len(allOf))
+		for _, schemaProxy := range allOf {
+			if isDiscriminatedUnionWithChild(schemaProxy.Schema(), currentTypeRef) {
+				// Skip this parent type - it's a discriminated union that includes us
+				continue
+			}
+			filteredAllOf = append(filteredAllOf, schemaProxy)
+		}
+	}
+
+	// If all elements were filtered out, return empty schema
+	if len(filteredAllOf) == 0 {
+		return GoSchema{}, nil
+	}
+
 	allMergeable := true
-	for _, s := range allOf {
+	for _, s := range filteredAllOf {
 		if containsUnion(s.Schema()) {
 			allMergeable = false
 			break
@@ -213,7 +245,7 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		var refCount int
 		var metadataOnlyCount int
 
-		for _, schemaProxy := range allOf {
+		for _, schemaProxy := range filteredAllOf {
 			s := schemaProxy.Schema()
 			ref := schemaProxy.GetReference()
 
@@ -227,13 +259,13 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 
 		// If we have exactly one $ref and the rest are metadata-only schemas,
 		// use the reference directly
-		if refCount == 1 && refCount+metadataOnlyCount == len(allOf) {
+		if refCount == 1 && refCount+metadataOnlyCount == len(filteredAllOf) {
 			return GenerateGoSchema(refSchema, options.WithReference(refSchema.GetReference()))
 		}
 
 		var merged *base.Schema
 		var lastRef string
-		for _, schemaProxy := range allOf {
+		for _, schemaProxy := range filteredAllOf {
 			s := schemaProxy.Schema()
 			ref := schemaProxy.GetReference()
 
@@ -270,7 +302,7 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		additionalTypes []TypeDefinition
 	)
 
-	for i, schemaProxy := range allOf {
+	for i, schemaProxy := range filteredAllOf {
 		subPath := append(path, fmt.Sprintf("allOf_%d", i))
 		ref := schemaProxy.GoLow().GetReference()
 		if ref != "" {
@@ -584,4 +616,40 @@ func mergeNullable(a, b *bool) *bool {
 	}
 	// If both are nil or false, return nil (default behavior)
 	return nil
+}
+
+// isDiscriminatedUnionWithChild checks if a schema is a discriminated union (oneOf with discriminator)
+// that includes the given childRef in its oneOf elements.
+// This is used to detect circular allOf patterns like:
+//
+//	CounterParty:
+//	  discriminator: { propertyName: type, mapping: { VENDOR: VendorDetails } }
+//	  oneOf: [VendorDetails, BookTransferDetails]
+//	VendorDetails:
+//	  allOf: [CounterParty, ...]  # <- circular reference
+//
+// In this case, VendorDetails should NOT embed CounterParty because it would create
+// an infinite loop during JSON unmarshaling.
+func isDiscriminatedUnionWithChild(schema *base.Schema, childRef string) bool {
+	if schema == nil || schema.Discriminator == nil {
+		return false
+	}
+
+	// Check if any oneOf element references the child
+	for _, element := range schema.OneOf {
+		if element.GetReference() == childRef {
+			return true
+		}
+	}
+
+	// Also check the discriminator mapping
+	if schema.Discriminator.Mapping != nil {
+		for _, mappedRef := range schema.Discriminator.Mapping.FromOldest() {
+			if mappedRef == childRef {
+				return true
+			}
+		}
+	}
+
+	return false
 }

@@ -14,6 +14,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/pb33f/libopenapi"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -563,5 +565,137 @@ components:
 		// Should generate a proper array type
 		assert.Contains(t, combined, "Tags")
 		assert.Contains(t, combined, "[]string")
+	})
+}
+
+func TestCircularAllOfWithDiscriminatedUnion(t *testing.T) {
+	// This tests the fix for circular allOf patterns where:
+	// - CounterParty is a discriminated union (oneOf with discriminator)
+	// - VendorDetails extends CounterParty via allOf
+	// - CounterParty's oneOf includes VendorDetails
+	// Without the fix, this would create an infinite loop during JSON unmarshaling
+	// because VendorDetails would embed CounterParty which contains VendorDetails.
+	contents, err := os.ReadFile("testdata/circular-allof-discriminator.yml")
+	require.NoError(t, err)
+
+	opts := Configuration{
+		PackageName: "testpkg",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	code, err := Generate(contents, opts)
+	require.NoError(t, err)
+	assert.NotEmpty(t, code)
+
+	combined := code.GetCombined()
+
+	// VendorDetails should NOT embed CounterParty (which would cause circular reference)
+	assert.NotContains(t, combined, "type VendorDetails struct {\n\tCounterParty")
+
+	// VendorDetails should have its own properties from the inline schema
+	assert.Contains(t, combined, "type VendorDetails struct")
+	assert.Contains(t, combined, "PaymentInstrumentID")
+
+	// BookTransferDetails should also NOT embed CounterParty
+	assert.NotContains(t, combined, "type BookTransferDetails struct {\n\tCounterParty")
+	assert.Contains(t, combined, "type BookTransferDetails struct")
+	assert.Contains(t, combined, "SourceAccountID")
+}
+
+func TestIsDiscriminatedUnionWithChild(t *testing.T) {
+	loadDoc := func(t *testing.T, contents []byte) *libopenapi.DocumentModel[v3.Document] {
+		t.Helper()
+		srcDoc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+		v3Model, err := srcDoc.BuildV3Model()
+		require.NoError(t, err)
+		return v3Model
+	}
+
+	t.Run("returns true when oneOf contains child ref", func(t *testing.T) {
+		contents := []byte(`
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Test
+paths: {}
+components:
+  schemas:
+    Parent:
+      discriminator:
+        propertyName: type
+        mapping:
+          CHILD: '#/components/schemas/Child'
+      oneOf:
+        - $ref: '#/components/schemas/Child'
+    Child:
+      type: object
+      properties:
+        name:
+          type: string
+`)
+		doc := loadDoc(t, contents)
+		parentSchema := doc.Model.Components.Schemas.GetOrZero("Parent").Schema()
+		result := isDiscriminatedUnionWithChild(parentSchema, "#/components/schemas/Child")
+		assert.True(t, result)
+	})
+
+	t.Run("returns false when oneOf does not contain child ref", func(t *testing.T) {
+		contents := []byte(`
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Test
+paths: {}
+components:
+  schemas:
+    Parent:
+      discriminator:
+        propertyName: type
+        mapping:
+          OTHER: '#/components/schemas/Other'
+      oneOf:
+        - $ref: '#/components/schemas/Other'
+    Other:
+      type: object
+      properties:
+        name:
+          type: string
+`)
+		doc := loadDoc(t, contents)
+		parentSchema := doc.Model.Components.Schemas.GetOrZero("Parent").Schema()
+		result := isDiscriminatedUnionWithChild(parentSchema, "#/components/schemas/Child")
+		assert.False(t, result)
+	})
+
+	t.Run("returns false when no discriminator", func(t *testing.T) {
+		contents := []byte(`
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Test
+paths: {}
+components:
+  schemas:
+    Parent:
+      oneOf:
+        - $ref: '#/components/schemas/Child'
+    Child:
+      type: object
+      properties:
+        name:
+          type: string
+`)
+		doc := loadDoc(t, contents)
+		parentSchema := doc.Model.Components.Schemas.GetOrZero("Parent").Schema()
+		result := isDiscriminatedUnionWithChild(parentSchema, "#/components/schemas/Child")
+		assert.False(t, result)
+	})
+
+	t.Run("returns false for nil schema", func(t *testing.T) {
+		result := isDiscriminatedUnionWithChild(nil, "#/components/schemas/Child")
+		assert.False(t, result)
 	})
 }
