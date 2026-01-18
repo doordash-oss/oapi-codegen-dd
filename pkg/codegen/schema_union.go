@@ -247,6 +247,7 @@ func isStricterElement(elem1, elem2 UnionElement) bool {
 // extractDiscriminatorValue attempts to extract the discriminator value from a schema.
 // It looks for the discriminator property and extracts its enum value.
 // Works for both inline and referenced schemas (references are resolved automatically).
+// Also handles allOf schemas by searching through all elements.
 // Returns empty string if the value cannot be determined.
 func extractDiscriminatorValue(element *base.SchemaProxy, discriminatorProp string) string {
 	if element == nil {
@@ -254,11 +255,42 @@ func extractDiscriminatorValue(element *base.SchemaProxy, discriminatorProp stri
 	}
 
 	schema := element.Schema()
-	if schema == nil || schema.Properties == nil {
+	if schema == nil {
 		return ""
 	}
 
-	// Look for the discriminator property in the schema
+	// Try to find the discriminator property directly in the schema
+	if value := extractDiscriminatorFromProperties(schema, discriminatorProp); value != "" {
+		return value
+	}
+
+	// If not found directly, search through allOf elements
+	for _, allOfElement := range schema.AllOf {
+		if allOfElement == nil {
+			continue
+		}
+		allOfSchema := allOfElement.Schema()
+		if allOfSchema == nil {
+			continue
+		}
+		if value := extractDiscriminatorFromProperties(allOfSchema, discriminatorProp); value != "" {
+			return value
+		}
+		// Recursively check nested allOf
+		if value := extractDiscriminatorValue(allOfElement, discriminatorProp); value != "" {
+			return value
+		}
+	}
+
+	return ""
+}
+
+// extractDiscriminatorFromProperties extracts the discriminator value from a schema's properties.
+func extractDiscriminatorFromProperties(schema *base.Schema, discriminatorProp string) string {
+	if schema.Properties == nil {
+		return ""
+	}
+
 	propProxy, found := schema.Properties.Get(discriminatorProp)
 	if !found || propProxy == nil {
 		return ""
