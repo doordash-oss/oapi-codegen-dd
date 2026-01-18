@@ -274,6 +274,11 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 	// Resolve the schema, preferring the mutated model for component references
 	schema := resolveSchema(schemaProxy, options.model)
 
+	// Handle case where schema resolution returns nil (malformed specs with empty property definitions)
+	if schema == nil {
+		return GoSchema{GoType: "any"}, nil
+	}
+
 	ref := options.reference
 
 	// Create a tracking key - prefer the schema's actual reference, then options.reference, then path
