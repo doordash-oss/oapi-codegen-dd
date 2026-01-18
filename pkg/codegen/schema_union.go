@@ -69,8 +69,10 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	}
 
 	// Early return for single element unions (no null involved)
-	// Skip this optimization if the single element is a self-reference (would create invalid recursive type alias)
-	if len(elements) == 1 {
+	// Skip this optimization if:
+	// - the single element is a self-reference (would create invalid recursive type alias)
+	// - there's a discriminator (implies polymorphism where child extends parent via allOf)
+	if len(elements) == 1 && discriminator == nil {
 		ref := elements[0].GoLow().GetReference()
 		if !isSelfReference(ref) {
 			opts := options.WithReference(ref).WithPath(options.path)
@@ -99,8 +101,10 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	}
 
 	// If after filtering we have only 1 element, return it as a nullable type
-	// Skip this optimization if the single element is a self-reference (would create invalid recursive type alias)
-	if len(nonNullElements) == 1 {
+	// Skip this optimization if:
+	// - the single element is a self-reference (would create invalid recursive type alias)
+	// - there's a discriminator (implies polymorphism where child extends parent via allOf)
+	if len(nonNullElements) == 1 && discriminator == nil {
 		ref := nonNullElements[0].GoLow().GetReference()
 		if !isSelfReference(ref) {
 			opts := options.WithReference(ref).WithPath(options.path)
