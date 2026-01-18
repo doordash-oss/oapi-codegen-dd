@@ -351,6 +351,15 @@ func filterOutEnums(types []TypeDefinition, options ParseOptions) ([]EnumDefinit
 	return enums, rest
 }
 
+// nonConstantTypes contains Go types that cannot be used as constants.
+// These are typically struct types, arrays, or other non-primitive types
+// that require runtime initialization.
+var nonConstantTypes = map[string]bool{
+	"time.Time":    true, // requires runtime initialization
+	"runtime.File": true, // struct type for binary file uploads
+	"uuid.UUID":    true, // [16]byte array type
+}
+
 // isComparableType checks if a Go type can be used as a constant or map key
 func isComparableType(schema GoSchema) bool {
 	// Arrays, slices, maps, and structs cannot be used as constants or map keys
@@ -364,15 +373,8 @@ func isComparableType(schema GoSchema) bool {
 		return false
 	}
 
-	// time.Time cannot be used as a constant (constants must be compile-time values)
-	// This handles cases where format: date-time is combined with enum values
-	if schema.GoType == "time.Time" {
-		return false
-	}
-
-	// runtime.File is a struct type used for binary file uploads
-	// It cannot be used as a constant
-	if schema.GoType == "runtime.File" {
+	// Check against known non-constant types
+	if nonConstantTypes[schema.GoType] {
 		return false
 	}
 
