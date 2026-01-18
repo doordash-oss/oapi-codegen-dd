@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -295,6 +296,21 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 
 	if slices.Contains(t, "null") {
 		return GoSchema{}, nil
+	}
+
+	// Handle unknown types gracefully by treating them as 'any'.
+	// This allows code generation to proceed for specs with non-standard types
+	// (e.g., "Timespan", "Guid", etc.) that are not valid OpenAPI types.
+	// The generated code will compile and work at runtime, though type safety is reduced.
+	if len(t) > 0 {
+		slog.Debug("unknown OpenAPI type, treating as 'any'", "type", t)
+		return GoSchema{
+			GoType:         "any",
+			DefineViaAlias: true,
+			Description:    schema.Description,
+			OpenAPISchema:  schema,
+			Constraints:    constraints,
+		}, nil
 	}
 
 	return GoSchema{}, fmt.Errorf("unhandled GoSchema type: %v", t)
