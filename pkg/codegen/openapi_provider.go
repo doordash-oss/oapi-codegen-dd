@@ -20,25 +20,7 @@ import (
 	"go.yaml.in/yaml/v4"
 )
 
-// SpecLimitationError represents a known limitation in spec processing
-type SpecLimitationError struct {
-	Message string
-	Details []string
-}
-
-func (e *SpecLimitationError) Error() string {
-	if len(e.Details) == 0 {
-		return e.Message
-	}
-	return fmt.Sprintf("%s: %s", e.Message, strings.Join(e.Details, ", "))
-}
-
 func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document, error) {
-	// Check for known spec limitations before processing
-	if err := validateSpecLimitations(docContents); err != nil {
-		return nil, err
-	}
-
 	doc, err := LoadDocumentFromContents(docContents)
 	if err != nil {
 		return nil, err
@@ -69,7 +51,6 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 func LoadDocumentFromContents(contents []byte) (libopenapi.Document, error) {
 	docConfig := &datamodel.DocumentConfiguration{
 		SkipCircularReferenceCheck: true,
-		ExcludeExtensionRefs:       true,
 	}
 	doc, err := libopenapi.NewDocumentWithConfiguration(contents, docConfig)
 	if err != nil {
@@ -138,46 +119,4 @@ func fixDocument(contents []byte, originalErr error, docConfig *datamodel.Docume
 	}
 
 	return result, nil
-}
-
-// validateSpecLimitations checks for known limitations in spec processing
-// and returns a clear error message if any are found.
-func validateSpecLimitations(contents []byte) error {
-	var doc map[string]any
-	if err := yaml.Unmarshal(contents, &doc); err != nil {
-		// Let the main parser handle YAML errors
-		return nil
-	}
-
-	// Check for x- prefixed parameter names in components/parameters
-	if xPrefixedParams := findXPrefixedParameters(doc); len(xPrefixedParams) > 0 {
-		return &SpecLimitationError{
-			Message: "spec contains parameter names starting with 'x-' which are treated as extensions by the parser and will be ignored",
-			Details: xPrefixedParams,
-		}
-	}
-
-	return nil
-}
-
-// findXPrefixedParameters finds parameter names in components/parameters that start with "x-"
-func findXPrefixedParameters(doc map[string]any) []string {
-	components, ok := doc["components"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	parameters, ok := components["parameters"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	var xPrefixedParams []string
-	for name := range parameters {
-		if strings.HasPrefix(strings.ToLower(name), "x-") {
-			xPrefixedParams = append(xPrefixedParams, name)
-		}
-	}
-
-	return xPrefixedParams
 }
