@@ -233,8 +233,20 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	// Deduplicate union elements to avoid generating duplicate methods
 	outSchema.UnionElements = deduplicateUnionElements(outSchema.UnionElements)
 
-	if (outSchema.Discriminator != nil) && len(outSchema.Discriminator.Mapping) != len(elements) {
-		return GoSchema{}, ErrDiscriminatorNotAllMapped
+	// Verify that all union elements have at least one discriminator mapping.
+	// Note: Multiple discriminator values can map to the same schema (e.g., different event types
+	// mapping to the same event schema), so we check that all element types are covered,
+	// not that the mapping count equals the element count.
+	if outSchema.Discriminator != nil {
+		mappedTypes := make(map[string]bool)
+		for _, typeName := range outSchema.Discriminator.Mapping {
+			mappedTypes[typeName] = true
+		}
+		for _, elem := range outSchema.UnionElements {
+			if !mappedTypes[elem.TypeName] {
+				return GoSchema{}, ErrDiscriminatorNotAllMapped
+			}
+		}
 	}
 
 	return outSchema, nil

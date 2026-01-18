@@ -118,6 +118,23 @@ func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], o
 			goType.DefineViaAlias = true
 		}
 
+		// If the parameter's schema references a component schema, use that schema's type name
+		// instead of generating a new type for the parameter.
+		if ref != "" {
+			// Look up the actual registered name for the ref in the TypeTracker.
+			// This handles cases where the schema was renamed due to conflicts.
+			if registeredName, found := options.typeTracker.LookupByRef(ref); found {
+				goTypeName = registeredName
+			} else {
+				// Fall back to extracting the name from the ref path
+				refType, err := refPathToGoType(ref)
+				if err != nil {
+					return nil, fmt.Errorf("error generating Go type for (%s) in parameter %s: %w", ref, paramName, err)
+				}
+				goTypeName = schemaNameToTypeName(refType)
+			}
+		}
+
 		typeDef := TypeDefinition{
 			JsonName:         paramName,
 			Schema:           goType,
@@ -129,21 +146,6 @@ func getComponentParameters(params *orderedmap.Map[string, *v3high.Parameter], o
 		// Register with the original ref path so we can look it up later
 		paramRef := "#/components/parameters/" + paramName
 		options.typeTracker.register(typeDef, paramRef)
-
-		if ref != "" {
-			// Look up the actual registered name for the ref in the TypeTracker.
-			// This handles cases where the schema was renamed due to conflicts.
-			if registeredName, found := options.typeTracker.LookupByRef(ref); found {
-				typeDef.Name = registeredName
-			} else {
-				// Fall back to extracting the name from the ref path
-				refType, err := refPathToGoType(ref)
-				if err != nil {
-					return nil, fmt.Errorf("error generating Go type for (%s) in parameter %s: %w", ref, paramName, err)
-				}
-				typeDef.Name = schemaNameToTypeName(refType)
-			}
-		}
 
 		types = append(types, typeDef)
 	}

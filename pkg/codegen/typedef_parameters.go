@@ -143,10 +143,13 @@ func describeOperationParameters(params []*v3high.Parameter, options ParseOption
 	outParams := make([]ParameterDefinition, 0)
 	for _, param := range params {
 		schemaProxy := param.Schema
-		ref := ""
+		schemaRef := ""
 		if schemaProxy != nil {
-			ref = schemaProxy.GoLow().GetReference()
+			schemaRef = schemaProxy.GoLow().GetReference()
 		}
+
+		// Check if the parameter itself is a reference to a component parameter
+		paramRef := param.GoLow().GetReference()
 
 		inSuffix := "Param"
 		switch param.In {
@@ -176,14 +179,19 @@ func describeOperationParameters(params []*v3high.Parameter, options ParseOption
 			Schema:    goSchema,
 		}
 
-		// If this is a reference to a predefined type, simply use the reference
-		// name as the type. $ref: "#/components/schemas/custom_type" becomes "CustomType".
-		// However, for deep path references (e.g., #/paths/.../parameters/1/schema),
-		// GenerateGoSchema has already created the type definition, so we don't override it.
-		if ref != "" && isStandardComponentReference(ref) {
-			goType, err := refPathToGoType(ref)
+		// If the parameter references a component parameter, use the registered type name
+		if paramRef != "" && strings.HasPrefix(paramRef, "#/components/parameters/") {
+			if registeredName, found := options.typeTracker.LookupByRef(paramRef); found {
+				pd.Schema.GoType = registeredName
+			}
+		} else if schemaRef != "" && isStandardComponentReference(schemaRef) {
+			// If this is a reference to a predefined schema type, simply use the reference
+			// name as the type. $ref: "#/components/schemas/custom_type" becomes "CustomType".
+			// However, for deep path references (e.g., #/paths/.../parameters/1/schema),
+			// GenerateGoSchema has already created the type definition, so we don't override it.
+			goType, err := refPathToGoType(schemaRef)
 			if err != nil {
-				return nil, fmt.Errorf("error dereferencing (%s) for param (%s): %s", ref, param.Name, err)
+				return nil, fmt.Errorf("error dereferencing (%s) for param (%s): %s", schemaRef, param.Name, err)
 			}
 			pd.Schema.GoType = goType
 		}
