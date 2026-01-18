@@ -370,6 +370,12 @@ func isComparableType(schema GoSchema) bool {
 		return false
 	}
 
+	// runtime.File is a struct type used for binary file uploads
+	// It cannot be used as a constant
+	if schema.GoType == "runtime.File" {
+		return false
+	}
+
 	// Only primitive types (string, int, float, bool) can be used as enum constants
 	return true
 }
