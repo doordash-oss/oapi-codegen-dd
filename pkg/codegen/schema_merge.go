@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -447,14 +448,16 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	// For Enums, do we union, or intersect? This is a bit vague. I choose to be more permissive and union.
 	result.Enum = append(s1.Enum, s2.Enum...)
 
-	// not clear how to handle two different defaults.
-	if s1.Default != nil || s2.Default != nil {
-		return nil, ErrMergingSchemasWithDifferentDefaults
-	}
-	if s1.Default != nil {
+	// Handle defaults: error only if both have different defaults
+	if s1.Default != nil && s2.Default != nil {
+		// Both have defaults - check if they're the same
+		if !reflect.DeepEqual(s1.Default, s2.Default) {
+			return nil, ErrMergingSchemasWithDifferentDefaults
+		}
 		result.Default = s1.Default
-	}
-	if s2.Default != nil {
+	} else if s1.Default != nil {
+		result.Default = s1.Default
+	} else if s2.Default != nil {
 		result.Default = s2.Default
 	}
 
