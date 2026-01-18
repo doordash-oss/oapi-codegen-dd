@@ -187,6 +187,12 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 				outSchema.Discriminator.Mapping[discriminatorValue] = elementSchema.GoType
 			}
 		}
+		// Skip struct{} elements - they have no data to marshal/unmarshal
+		// and would generate invalid method names like AsStruct{}()
+		if elementSchema.GoType == "struct{}" {
+			continue
+		}
+
 		outSchema.UnionElements = append(outSchema.UnionElements, UnionElement{
 			TypeName: elementSchema.GoType,
 			Schema:   elementSchema,

@@ -619,6 +619,15 @@ func printSummary(total int, results []testResult) {
 	}
 
 	fmt.Fprintln(os.Stderr, strings.Repeat("═", 80))
+
+	// Print simple list of all failed specs at the very end for easy copying
+	if len(failed) > 0 {
+		fmt.Fprintln(os.Stderr, "\n📋 FAILED SPECS LIST:")
+		for _, r := range failed {
+			fmt.Fprintf(os.Stderr, "  %s\n", r.name)
+		}
+		fmt.Fprintln(os.Stderr)
+	}
 }
 
 func formatNumber(n int) string {
