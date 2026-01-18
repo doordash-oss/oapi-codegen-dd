@@ -109,8 +109,21 @@ func extractExtensions(schemaExtensions *orderedmap.Map[string, *yaml.Node]) map
 				case yaml.ScalarNode:
 					seq[i] = n.Value
 				case yaml.MappingNode:
-					mKey, mValue := n.Content[0].Value, n.Content[1].Value
-					seq[i] = keyValue[string, string]{mKey, mValue}
+					// Handle mapping nodes - could have multiple key-value pairs
+					if len(n.Content) >= 2 {
+						// For simple single key-value mappings, use keyValue
+						if len(n.Content) == 2 {
+							mKey, mValue := n.Content[0].Value, n.Content[1].Value
+							seq[i] = keyValue[string, string]{mKey, mValue}
+						} else {
+							// For complex mappings with multiple keys, create a map
+							m := make(map[string]string)
+							for j := 0; j < len(n.Content)-1; j += 2 {
+								m[n.Content[j].Value] = n.Content[j+1].Value
+							}
+							seq[i] = m
+						}
+					}
 				}
 			}
 			res[extType] = seq
