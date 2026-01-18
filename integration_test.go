@@ -31,7 +31,7 @@ import (
 
 const (
 	// Maximum number of errors to display in summary
-	showMaxErrors = 10
+	showMaxErrors = 50
 
 	// Default maximum concurrency for parallel test execution
 	defaultMaxConcurrency = 50
@@ -40,10 +40,10 @@ const (
 	specTimeout = 5 * time.Minute
 
 	// Maximum number of error lines to show per failure
-	maxErrorLines = 10
+	maxErrorLines = 15
 
 	// Maximum length of error line before truncation
-	maxErrorLineLength = 120
+	maxErrorLineLength = 200
 )
 
 var (

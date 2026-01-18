@@ -34,6 +34,7 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -472,8 +473,16 @@ func typeNamePrefixInternal(name string, handleDigits bool) (prefix string) {
 	for _, r := range name {
 		switch r {
 		case '$':
-			if len(name) == 1 {
+			if utf8.RuneCountInString(name) == 1 {
 				return "DollarSign"
+			}
+		case '£':
+			if utf8.RuneCountInString(name) == 1 {
+				return "PoundSign"
+			}
+		case '€':
+			if utf8.RuneCountInString(name) == 1 {
+				return "EuroSign"
 			}
 		case '-':
 			prefix += "Minus"

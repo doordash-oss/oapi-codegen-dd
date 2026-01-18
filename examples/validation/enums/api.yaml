@@ -1,0 +1,48 @@
+openapi: 3.0.0
+info:
+  title: Enums
+  description: An example of enum types with edge cases
+  version: 1.0.0
+
+paths:
+
+components:
+  schemas:
+    Response:
+      type: object
+      required:
+        - status
+        - unit
+      properties:
+        status:
+          $ref: '#/components/schemas/Status'
+        unit:
+          $ref: '#/components/schemas/IndicatorUnit'
+        nullableStatus:
+          $ref: '#/components/schemas/NullableStatus'
+
+    Status:
+      type: string
+      enum:
+        - ACTIVE
+        - INACTIVE
+        - PENDING
+
+    IndicatorUnit:
+      type: string
+      description: A numeric unit for an indicator - includes empty string
+      enum:
+        - ''
+        - "%"
+        - "£"
+        - "€€"
+        - "€"
+        - "pp"
+
+    NullableStatus:
+      type: string
+      nullable: true
+      enum:
+        - ACTIVE
+        - INACTIVE
+        - null

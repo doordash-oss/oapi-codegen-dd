@@ -169,6 +169,13 @@ func sanitizeEnumNames(enumNames, enumValues []string) map[string]string {
 		n, v := p[0], p[1]
 		sanitized := sanitizeGoIdentity(schemaNameToTypeName(n))
 
+		// If sanitized is empty (all chars were special chars that got stripped),
+		// use "Empty" as the base name. The duplicate handling below will add
+		// numeric suffixes if there are multiple such values.
+		if sanitized == "" {
+			sanitized = "Value"
+		}
+
 		if _, dup := dupCheck[sanitized]; !dup {
 			sanitizedDeDup[sanitized] = v
 		} else {
