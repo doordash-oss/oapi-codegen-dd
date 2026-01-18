@@ -155,12 +155,15 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 
 		if discriminator != nil {
 			// Explicit mapping.
+			// Note: We don't break after finding a match because the same reference
+			// can appear multiple times in the oneOf with different discriminator values.
+			// For example, TextValue might be mapped by both "text" and "filterable-text".
 			var mapped bool
 			for k, v := range discriminator.Mapping.FromOldest() {
 				if v == element.GetReference() {
 					outSchema.Discriminator.Mapping[k] = elementSchema.GoType
 					mapped = true
-					break
+					// Don't break - continue to find all mappings for this reference
 				}
 			}
 			// Implicit mapping.
