@@ -58,7 +58,8 @@ func TestGenerateGoSchema_generateUnion(t *testing.T) {
 		doc := loadUnionDocument(t)
 		getUser := getOperationResponse(t, doc, "/one-of-1", "get")
 
-		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"User"}))
+		// Use a path that doesn't match the referenced schema name to avoid self-reference detection
+		res, err := GenerateGoSchema(getUser, ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"GetUserResponse"}))
 		require.NoError(t, err)
 
 		// With single element oneOf, it should just return the User type directly

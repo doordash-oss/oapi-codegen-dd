@@ -52,11 +52,31 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 		}
 	}
 
+	// isSelfReference checks if a schema reference points to the current schema being defined.
+	// This prevents generating invalid recursive type aliases like "type Foo = Foo".
+	isSelfReference := func(ref string) bool {
+		if ref == "" {
+			return false
+		}
+		// Construct the current schema's reference from the path if options.reference is empty
+		// This handles component schemas where the schema itself doesn't have a reference
+		// The path may be ["SchemaName", "oneOf"] so we check the first element
+		currentRef := options.reference
+		if currentRef == "" && len(options.path) >= 1 {
+			currentRef = "#/components/schemas/" + options.path[0]
+		}
+		return currentRef != "" && ref == currentRef
+	}
+
 	// Early return for single element unions (no null involved)
+	// Skip this optimization if the single element is a self-reference (would create invalid recursive type alias)
 	if len(elements) == 1 {
 		ref := elements[0].GoLow().GetReference()
-		opts := options.WithReference(ref).WithPath(options.path)
-		return GenerateGoSchema(elements[0], opts)
+		if !isSelfReference(ref) {
+			opts := options.WithReference(ref).WithPath(options.path)
+			return GenerateGoSchema(elements[0], opts)
+		}
+		// Fall through to create a proper union wrapper for self-references
 	}
 
 	// Filter out null types from union elements
@@ -79,17 +99,21 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 	}
 
 	// If after filtering we have only 1 element, return it as a nullable type
+	// Skip this optimization if the single element is a self-reference (would create invalid recursive type alias)
 	if len(nonNullElements) == 1 {
 		ref := nonNullElements[0].GoLow().GetReference()
-		opts := options.WithReference(ref).WithPath(options.path)
-		schema, err := GenerateGoSchema(nonNullElements[0], opts)
-		if err != nil {
-			return GoSchema{}, err
+		if !isSelfReference(ref) {
+			opts := options.WithReference(ref).WithPath(options.path)
+			schema, err := GenerateGoSchema(nonNullElements[0], opts)
+			if err != nil {
+				return GoSchema{}, err
+			}
+			if hasNull {
+				schema.Constraints.Nullable = ptr(true)
+			}
+			return schema, nil
 		}
-		if hasNull {
-			schema.Constraints.Nullable = ptr(true)
-		}
-		return schema, nil
+		// Fall through to create a proper union wrapper for self-references
 	}
 
 	// Use the filtered elements for union generation
