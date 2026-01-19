@@ -317,6 +317,70 @@ components:
 		episodeValue := extractDiscriminatorValue(schema.OneOf[1], "type")
 		assert.Equal(t, "episode", episodeValue, "Should extract 'episode' from EpisodeObject's type enum")
 	})
+
+	t.Run("extracts discriminator value from const property", func(t *testing.T) {
+		// This tests the fix for specs that use const instead of enum for discriminator values
+		// (common in OpenAPI 3.1 specs like Fordefi)
+		yamlContent := `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: test
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/OrganizationKeyset'
+                  - $ref: '#/components/schemas/UserKeyset'
+                discriminator:
+                  propertyName: scope
+components:
+  schemas:
+    OrganizationKeyset:
+      type: object
+      properties:
+        scope:
+          const: organization
+        name:
+          type: string
+    UserKeyset:
+      type: object
+      properties:
+        scope:
+          const: user
+        name:
+          type: string
+`
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
+		require.NoError(t, err)
+
+		v3Model, err := srcDoc.BuildV3Model()
+		require.NoError(t, err)
+
+		doc := v3Model.Model
+		schemaProxy := getOperationResponse(t, doc, "/test", "get")
+		require.NotNil(t, schemaProxy)
+
+		schema := schemaProxy.Schema()
+		require.NotNil(t, schema)
+		require.NotNil(t, schema.OneOf)
+		require.Len(t, schema.OneOf, 2)
+
+		// Test extracting discriminator value from OrganizationKeyset with const
+		orgValue := extractDiscriminatorValue(schema.OneOf[0], "scope")
+		assert.Equal(t, "organization", orgValue, "Should extract 'organization' from OrganizationKeyset's scope const")
+
+		// Test extracting discriminator value from UserKeyset with const
+		userValue := extractDiscriminatorValue(schema.OneOf[1], "scope")
+		assert.Equal(t, "user", userValue, "Should extract 'user' from UserKeyset's scope const")
+	})
 }
 
 func TestDeduplicateUnionElements_StricterWins(t *testing.T) {

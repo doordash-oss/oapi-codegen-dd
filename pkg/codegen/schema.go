@@ -548,6 +548,25 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 
 	// GoSchema type and format, eg. string / binary
 	t := schema.Type
+
+	// Handle const values without explicit type - infer type from the const value
+	// This is common in OpenAPI 3.1 specs where discriminator properties use const
+	// e.g., scope: { const: "organization" } should be treated as a string
+	if t == nil && schema.Const != nil {
+		// Infer type from const value - treat as string since const values are typically strings
+		// in discriminator contexts
+		constraints := newConstraints(schema, ConstraintsContext{
+			specLocation: options.specLocation,
+		})
+		return GoSchema{
+			GoType:         "string",
+			DefineViaAlias: true,
+			Description:    schema.Description,
+			OpenAPISchema:  schema,
+			Constraints:    constraints,
+		}, nil
+	}
+
 	// Handle objects and empty schemas first as a special case
 	if t == nil || slices.Contains(t, "object") {
 		res, err := createObjectSchema(schema, options)

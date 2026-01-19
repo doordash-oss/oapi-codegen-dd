@@ -326,6 +326,7 @@ func extractDiscriminatorValue(element *base.SchemaProxy, discriminatorProp stri
 }
 
 // extractDiscriminatorFromProperties extracts the discriminator value from a schema's properties.
+// It checks both enum values (single-value enum) and const values.
 func extractDiscriminatorFromProperties(schema *base.Schema, discriminatorProp string) string {
 	if schema.Properties == nil {
 		return ""
@@ -337,7 +338,17 @@ func extractDiscriminatorFromProperties(schema *base.Schema, discriminatorProp s
 	}
 
 	propSchema := propProxy.Schema()
-	if propSchema == nil || len(propSchema.Enum) == 0 {
+	if propSchema == nil {
+		return ""
+	}
+
+	// Check for const value first (OpenAPI 3.1 style)
+	if propSchema.Const != nil {
+		return propSchema.Const.Value
+	}
+
+	// Fall back to enum value (OpenAPI 3.0 style)
+	if len(propSchema.Enum) == 0 {
 		return ""
 	}
 
