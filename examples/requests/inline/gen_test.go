@@ -23,7 +23,7 @@ func createProcessPaymentBody(t *testing.T, dVal runtime.Either[dA, dB]) Process
 		},
 	}
 
-	d := &ProcessPaymentBody_D1{
+	d := &ProcessPaymentBody_D{
 		ProcessPaymentBody_D_AllOf0: &ProcessPaymentBody_D_AllOf0{
 			ProcessPaymentBody_D_AllOf0_OneOf: &ProcessPaymentBody_D_AllOf0_OneOf{
 				dVal,

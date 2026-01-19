@@ -146,9 +146,9 @@ func (w WebLink) Validate() error {
 }
 
 type Collaboration struct {
-	ID   string               `json:"id" validate:"required"`
-	Item *Collaboration_Item1 `json:"item,omitempty"`
-	Role *CollaborationRole   `json:"role,omitempty"`
+	ID   string              `json:"id" validate:"required"`
+	Item *Collaboration_Item `json:"item,omitempty"`
+	Role *CollaborationRole  `json:"role,omitempty"`
 }
 
 func (c Collaboration) Validate() error {
@@ -174,59 +174,6 @@ func (c Collaboration) Validate() error {
 		return nil
 	}
 	return errors
-}
-
-type Collaboration_Item1 struct {
-	Collaboration_Item_AllOf0 *Collaboration_Item_AllOf0 `json:"-"`
-}
-
-func (c Collaboration_Item1) Validate() error {
-	var errors runtime.ValidationErrors
-	if c.Collaboration_Item_AllOf0 != nil {
-		if v, ok := any(c.Collaboration_Item_AllOf0).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				errors = errors.Append("Collaboration_Item_AllOf0", err)
-			}
-		}
-	}
-	if len(errors) == 0 {
-		return nil
-	}
-	return errors
-}
-
-func (c Collaboration_Item1) MarshalJSON() ([]byte, error) {
-	var parts []json.RawMessage
-
-	{
-		b, err := runtime.MarshalJSON(c.Collaboration_Item_AllOf0)
-		if err != nil {
-			return nil, fmt.Errorf("Collaboration_Item_AllOf0 marshal: %w", err)
-		}
-		parts = append(parts, b)
-	}
-
-	return runtime.CoalesceOrMerge(parts...)
-}
-
-func (c *Collaboration_Item1) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if c.Collaboration_Item_AllOf0 == nil {
-		c.Collaboration_Item_AllOf0 = &Collaboration_Item_AllOf0{}
-	}
-
-	if err := runtime.UnmarshalJSON(data, c.Collaboration_Item_AllOf0); err != nil {
-		return fmt.Errorf("Collaboration_Item_AllOf0 unmarshal: %w", err)
-	}
-
-	return nil
 }
 
 type Collaboration_Item struct {

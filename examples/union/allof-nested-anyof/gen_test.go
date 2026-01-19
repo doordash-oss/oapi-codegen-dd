@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createOrderProduct(t *testing.T) Order_Product1 {
+func createOrderProduct(t *testing.T) Order_Product {
 	t.Helper()
-	return Order_Product1{
+	return Order_Product{
 		Order_Product_AllOf0: &Order_Product_AllOf0{
 			Order_Product_AllOf0_AnyOf: &Order_Product_AllOf0_AnyOf{
 				runtime.NewEitherFromB[VariantA, VariantB](VariantB{
@@ -27,7 +27,7 @@ func createOrderProduct(t *testing.T) Order_Product1 {
 	}
 }
 
-func TestOrder_Product1_MarshalJSON(t *testing.T) {
+func TestOrder_Product_MarshalJSON(t *testing.T) {
 	obj := createOrderProduct(t)
 
 	expectedJSON := `
@@ -42,12 +42,12 @@ func TestOrder_Product1_MarshalJSON(t *testing.T) {
 	require.JSONEq(t, expectedJSON, string(res))
 }
 
-func TestOrder_Product1_UnmarshalJSON(t *testing.T) {
+func TestOrder_Product_UnmarshalJSON(t *testing.T) {
 	inputJSON := `{
 		"country": "DE",
 		"weight": 12.32
 	}`
-	var obj Order_Product1
+	var obj Order_Product
 	err := json.Unmarshal([]byte(inputJSON), &obj)
 	require.NoError(t, err)
 

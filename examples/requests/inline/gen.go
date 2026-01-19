@@ -12,10 +12,10 @@ import (
 )
 
 type ProcessPaymentBody struct {
-	A *string                `json:"a,omitempty"`
-	B *string                `json:"b,omitempty"`
-	C *ProcessPaymentBody_C  `json:"c,omitempty"`
-	D *ProcessPaymentBody_D1 `json:"d,omitempty"`
+	A *string               `json:"a,omitempty"`
+	B *string               `json:"b,omitempty"`
+	C *ProcessPaymentBody_C `json:"c,omitempty"`
+	D *ProcessPaymentBody_D `json:"d,omitempty"`
 }
 
 func (p ProcessPaymentBody) Validate() error {
@@ -88,59 +88,6 @@ func (p *ProcessPaymentBody_C) UnmarshalJSON(data []byte) error {
 
 	if err := runtime.UnmarshalJSON(data, p.ProcessPaymentBody_C_OneOf); err != nil {
 		return fmt.Errorf("ProcessPaymentBody_C_OneOf unmarshal: %w", err)
-	}
-
-	return nil
-}
-
-type ProcessPaymentBody_D1 struct {
-	ProcessPaymentBody_D_AllOf0 *ProcessPaymentBody_D_AllOf0 `json:"-"`
-}
-
-func (p ProcessPaymentBody_D1) Validate() error {
-	var errors runtime.ValidationErrors
-	if p.ProcessPaymentBody_D_AllOf0 != nil {
-		if v, ok := any(p.ProcessPaymentBody_D_AllOf0).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				errors = errors.Append("ProcessPaymentBody_D_AllOf0", err)
-			}
-		}
-	}
-	if len(errors) == 0 {
-		return nil
-	}
-	return errors
-}
-
-func (p ProcessPaymentBody_D1) MarshalJSON() ([]byte, error) {
-	var parts []json.RawMessage
-
-	{
-		b, err := runtime.MarshalJSON(p.ProcessPaymentBody_D_AllOf0)
-		if err != nil {
-			return nil, fmt.Errorf("ProcessPaymentBody_D_AllOf0 marshal: %w", err)
-		}
-		parts = append(parts, b)
-	}
-
-	return runtime.CoalesceOrMerge(parts...)
-}
-
-func (p *ProcessPaymentBody_D1) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if p.ProcessPaymentBody_D_AllOf0 == nil {
-		p.ProcessPaymentBody_D_AllOf0 = &ProcessPaymentBody_D_AllOf0{}
-	}
-
-	if err := runtime.UnmarshalJSON(data, p.ProcessPaymentBody_D_AllOf0); err != nil {
-		return fmt.Errorf("ProcessPaymentBody_D_AllOf0 unmarshal: %w", err)
 	}
 
 	return nil

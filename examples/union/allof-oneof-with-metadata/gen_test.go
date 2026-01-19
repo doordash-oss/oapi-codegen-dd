@@ -23,7 +23,7 @@ func TestCollaboration_AllOfWithMetadata(t *testing.T) {
 		err := itemOneOf.FromFile(file)
 		require.NoError(t, err)
 
-		item := &Collaboration_Item1{
+		item := &Collaboration_Item{
 			Collaboration_Item_AllOf0: &Collaboration_Item_AllOf0{
 				Collaboration_Item_AllOf0_OneOf: itemOneOf,
 			},

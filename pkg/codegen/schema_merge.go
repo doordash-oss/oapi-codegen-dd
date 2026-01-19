@@ -431,15 +431,8 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 
 	out.GoType = out.createGoStruct(genFieldsFromProperties(out.Properties, options))
 
-	td := TypeDefinition{
-		Name:             pathToTypeName(path),
-		Schema:           out,
-		SpecLocation:     SpecLocationUnion,
-		NeedsMarshaler:   needsMarshaler(out),
-		HasSensitiveData: hasSensitiveData(out),
-	}
-	options.typeTracker.register(td, "")
-	out.AdditionalTypes = append(out.AdditionalTypes, td)
+	// Don't create a type definition here - let the caller handle it via replaceInlineTypes.
+	// We just need to pass along the additional types from the allOf elements.
 	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
 
 	return out, nil
