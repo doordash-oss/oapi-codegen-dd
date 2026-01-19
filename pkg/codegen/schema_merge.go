@@ -156,23 +156,6 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 	return out, nil
 }
 
-func containsUnion(schema *base.Schema) bool {
-	if schema == nil {
-		return false
-	}
-
-	if len(schema.AnyOf) > 0 || len(schema.OneOf) > 0 {
-		return true
-	}
-
-	for _, s := range schema.AllOf {
-		if containsUnion(s.Schema()) {
-			return true
-		}
-	}
-	return false
-}
-
 // isMetadataOnlySchema checks if a schema contains only metadata fields
 // (description, title, examples, etc.) and no actual type/property definitions
 func isMetadataOnlySchema(schema *base.Schema) bool {
@@ -245,9 +228,35 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		return GoSchema{}, nil
 	}
 
+	// First, resolve all elements to determine if they result in unions.
+	// A single-element oneOf/anyOf flattens to just that element, so we need
+	// to check the resolved result, not the raw schema.
+	type resolvedElement struct {
+		schemaProxy *base.SchemaProxy
+		resolved    GoSchema
+		subPath     []string
+		isUnion     bool
+	}
+	resolvedElements := make([]resolvedElement, 0, len(filteredAllOf))
+
+	for i, schemaProxy := range filteredAllOf {
+		subPath := append(path, fmt.Sprintf("allOf_%d", i))
+		resolved, err := GenerateGoSchema(schemaProxy, options.WithPath(subPath))
+		if err != nil {
+			return GoSchema{}, fmt.Errorf("error resolving allOf[%d]: %w", i, err)
+		}
+		resolvedElements = append(resolvedElements, resolvedElement{
+			schemaProxy: schemaProxy,
+			resolved:    resolved,
+			subPath:     subPath,
+			isUnion:     isResolvedUnion(resolved),
+		})
+	}
+
+	// Check if all resolved elements are mergeable (no unions)
 	allMergeable := true
-	for _, s := range filteredAllOf {
-		if containsUnion(s.Schema()) {
+	for _, elem := range resolvedElements {
+		if elem.isUnion {
 			allMergeable = false
 			break
 		}
@@ -289,8 +298,25 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 				lastRef = ref
 			}
 
+			// If this is a single-element oneOf/anyOf, resolve it to get the actual schema.
+			// A single-element union flattens to just that element.
+			schemaToMerge := s
+			if s != nil {
+				if len(s.OneOf) == 1 && len(s.AnyOf) == 0 {
+					schemaToMerge = s.OneOf[0].Schema()
+					if r := s.OneOf[0].GetReference(); r != "" {
+						lastRef = r
+					}
+				} else if len(s.AnyOf) == 1 && len(s.OneOf) == 0 {
+					schemaToMerge = s.AnyOf[0].Schema()
+					if r := s.AnyOf[0].GetReference(); r != "" {
+						lastRef = r
+					}
+				}
+			}
+
 			var err error
-			merged, err = mergeOpenapiSchemas(merged, s)
+			merged, err = mergeOpenapiSchemas(merged, schemaToMerge)
 			if err != nil {
 				return GoSchema{}, fmt.Errorf("error merging schemas for allOf: %w at path %v", err, path)
 			}
@@ -305,20 +331,24 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		// If we have a reference from one of the allOf elements and the merged schema
 		// has no properties (i.e., it's a simple reference), use the reference.
 		// This handles cases like allOf with a description-only schema and a $ref.
-		if lastRef != "" && merged.Properties == nil {
+		if lastRef != "" && (merged == nil || merged.Properties == nil) {
 			opts = options.WithReference(lastRef)
 		}
 
 		return GenerateGoSchema(schemaProxy, opts)
 	}
 
+	// Use the already-resolved elements from above
 	var (
 		out             GoSchema
 		additionalTypes []TypeDefinition
 	)
 
-	for i, schemaProxy := range filteredAllOf {
-		subPath := append(path, fmt.Sprintf("allOf_%d", i))
+	for _, elem := range resolvedElements {
+		schemaProxy := elem.schemaProxy
+		resolved := elem.resolved
+		subPath := elem.subPath
+
 		ref := schemaProxy.GoLow().GetReference()
 		if ref != "" {
 			typeName, err := refPathToGoType(ref)
@@ -328,13 +358,6 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 
 			// For path-based references (not component refs), we need to ensure the type is generated
 			if !isStandardComponentReference(ref) {
-				// Generate the schema to create type definitions for path-based references
-				opts := options.WithReference(ref).WithPath(subPath)
-				resolved, err := GenerateGoSchema(schemaProxy, opts)
-				if err != nil {
-					return GoSchema{}, fmt.Errorf("error resolving allOf[%d] path reference %s: %w", i, ref, err)
-				}
-
 				// Check if the type definition for the schema itself exists in additionalTypes
 				typeExists := false
 				for _, at := range resolved.AdditionalTypes {
@@ -347,7 +370,6 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 				// If the type doesn't exist, we need to create it
 				if !typeExists && resolved.TypeDecl() != typeName {
 					// The resolved schema has a different type name, so we need to create an alias or copy
-					// For now, let's create a type definition with the expected name
 					td := TypeDefinition{
 						Name:             typeName,
 						Schema:           resolved,
@@ -374,15 +396,14 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 			continue
 		}
 
-		// not a $ref - resolve as usual
-		schema := schemaProxy.Schema()
-		resolved, err := createFromCombinator(schema, options.WithPath(subPath))
-		if err != nil {
-			return GoSchema{}, fmt.Errorf("error resolving allOf[%d]: %w", i, err)
+		// Skip empty/zero schemas (e.g., schemas with only metadata)
+		if resolved.IsZero() {
+			continue
 		}
 
-		// Skip empty/zero schemas (e.g., schemas with properties but no type)
-		if resolved.IsZero() {
+		// Skip metadata-only schemas that resolve to empty structs
+		// These are schemas with only description/title but no actual type definition
+		if isMetadataOnlySchema(schemaProxy.Schema()) {
 			continue
 		}
 
@@ -393,13 +414,18 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 			Constraints: Constraints{Nullable: ptr(true)},
 		})
 
-		additionalTypes = append(additionalTypes, TypeDefinition{
+		td := TypeDefinition{
 			Name:             fieldName,
 			Schema:           resolved,
 			SpecLocation:     SpecLocationUnion,
 			NeedsMarshaler:   needsMarshaler(resolved),
 			HasSensitiveData: hasSensitiveData(resolved),
-		})
+		}
+		// Register allOf element types with the type tracker so they can be looked up
+		if options.typeTracker != nil {
+			options.typeTracker.register(td, "")
+		}
+		additionalTypes = append(additionalTypes, td)
 		additionalTypes = append(additionalTypes, resolved.AdditionalTypes...)
 	}
 
@@ -679,4 +705,40 @@ func hasPrimitiveType(types []string) bool {
 		}
 	}
 	return false
+}
+
+// isResolvedUnion checks if a resolved GoSchema represents or contains a union type.
+// This includes:
+// - Direct unions (UnionElements with more than one non-null element)
+// - Union wrappers (structs that wrap a union type)
+// - Schemas with properties that contain unions
+// - Schemas with AdditionalTypes that are union wrappers
+func isResolvedUnion(schema GoSchema) bool {
+	// Check if this schema is a union wrapper
+	if schema.IsUnionWrapper {
+		return true
+	}
+
+	// Check if this schema contains unions (recursively checks properties)
+	if schema.ContainsUnions() {
+		return true
+	}
+
+	// Check if any additional types are union wrappers
+	// This handles the case where an anyOf/oneOf creates a wrapper struct
+	// with a property that references the union type in AdditionalTypes
+	for _, at := range schema.AdditionalTypes {
+		if at.Schema.IsUnionWrapper {
+			return true
+		}
+	}
+
+	// Check direct union elements
+	nonNullCount := 0
+	for _, elem := range schema.UnionElements {
+		if elem.TypeName != "nil" {
+			nonNullCount++
+		}
+	}
+	return nonNullCount > 1
 }
