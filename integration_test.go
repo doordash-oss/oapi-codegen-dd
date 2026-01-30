@@ -794,7 +794,7 @@ func (c *ResultCache) Save() error {
 		return err
 	}
 
-	return os.WriteFile(c.path, data, 0644)
+	return os.WriteFile(c.path, data, 0600)
 }
 
 // Clear removes all cached entries
