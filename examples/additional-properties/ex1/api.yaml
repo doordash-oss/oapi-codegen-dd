@@ -8,6 +8,11 @@ components:
       type: array
       additionalProperties: true
 
+    optional-items:
+      additionalProperties:
+        type: string
+        nullable: true
+
     location:
       type: object
       additionalProperties: true

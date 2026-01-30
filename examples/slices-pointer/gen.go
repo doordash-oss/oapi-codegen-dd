@@ -35,7 +35,7 @@ type Data map[string]any
 type User struct {
 	Payments Payments       `json:"payments,omitempty"`
 	Data     Data           `json:"data,omitempty"`
-	Prefs    []string       `json:"prefs,omitempty"`
+	Prefs    []*string      `json:"prefs,omitempty"`
 	Address  map[string]any `json:"address,omitempty"`
 }
 

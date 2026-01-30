@@ -13,6 +13,8 @@ import (
 
 type Items []any
 
+type OptionalItems map[string]*string
+
 type Location map[string]any
 
 type Users map[string]User
@@ -125,13 +127,13 @@ func (r ReferenceWithRequiredExtra) MarshalJSON() ([]byte, error) {
 }
 
 type RouteWithOptionalExtra struct {
-	Index                *Route           `json:"index,omitempty"`
-	AdditionalProperties map[string]Route `json:"-"`
+	Index                *Route            `json:"index,omitempty"`
+	AdditionalProperties map[string]*Route `json:"-"`
 }
 
 // Getter for additional properties for RouteWithOptionalExtra. Returns the specified
 // element and whether it was found
-func (r RouteWithOptionalExtra) Get(fieldName string) (value Route, found bool) {
+func (r RouteWithOptionalExtra) Get(fieldName string) (value *Route, found bool) {
 	if r.AdditionalProperties != nil {
 		value, found = r.AdditionalProperties[fieldName]
 	}
@@ -139,9 +141,9 @@ func (r RouteWithOptionalExtra) Get(fieldName string) (value Route, found bool) 
 }
 
 // Setter for additional properties for RouteWithOptionalExtra
-func (r *RouteWithOptionalExtra) Set(fieldName string, value Route) {
+func (r *RouteWithOptionalExtra) Set(fieldName string, value *Route) {
 	if r.AdditionalProperties == nil {
-		r.AdditionalProperties = make(map[string]Route)
+		r.AdditionalProperties = make(map[string]*Route)
 	}
 	r.AdditionalProperties[fieldName] = value
 }
@@ -160,9 +162,9 @@ func (r *RouteWithOptionalExtra) UnmarshalJSON(data []byte) error {
 		delete(object, "index")
 	}
 	if len(object) != 0 {
-		r.AdditionalProperties = make(map[string]Route)
+		r.AdditionalProperties = make(map[string]*Route)
 		for fieldName, fieldBuf := range object {
-			var fieldVal Route
+			var fieldVal *Route
 			if err := json.Unmarshal(fieldBuf, &fieldVal); err != nil {
 				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
 			}

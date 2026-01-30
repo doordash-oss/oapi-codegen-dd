@@ -170,6 +170,11 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 			elemType = arrayType.GoType
 		}
 
+		// Add pointer prefix if the array items are explicitly nullable
+		if schemaValueIsPointer(&arrayType) {
+			elemType = "*" + strings.TrimPrefix(elemType, "*")
+		}
+
 		return GoSchema{
 			GoType:          "[]" + elemType,
 			ArrayType:       &arrayType,

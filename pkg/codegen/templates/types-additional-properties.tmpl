@@ -20,7 +20,7 @@ limitations under the License.
 {{ $args := . }}
 {{ $td := $args.typeDef }}
 {{ $alias := $args.alias }}
-{{ $addType := $td.Schema.AdditionalPropertiesType.TypeDecl }}
+{{ $addType := $td.Schema.AdditionalPropertiesType.TypeDeclWithNullable }}
 {{ $typeSchemaMap := $args.typeSchemaMap }}
 
 // Getter for additional properties for {{$td.Name}}. Returns the specified

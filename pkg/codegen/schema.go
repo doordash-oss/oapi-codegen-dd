@@ -75,6 +75,20 @@ func (s GoSchema) TypeDecl() string {
 	return s.GoType
 }
 
+// TypeDeclWithNullable returns the type declaration with a pointer prefix if the schema
+// is explicitly nullable (via nullable: true or type includes "null").
+// This is used for additionalProperties value types where we need to represent null values.
+func (s GoSchema) TypeDeclWithNullable() string {
+	typeDef := s.TypeDecl()
+
+	// Check if the value type should be a pointer (nullable)
+	if additionalPropertiesValueIsPointer(&s) {
+		return "*" + strings.TrimPrefix(typeDef, "*")
+	}
+
+	return typeDef
+}
+
 func (s GoSchema) IsZero() bool {
 	return s.TypeDecl() == ""
 }
@@ -686,7 +700,53 @@ func additionalPropertiesType(schema GoSchema) string {
 		addPropsType = schema.AdditionalPropertiesType.RefType
 	}
 
+	// Check if the value type should be a pointer (nullable)
+	// Similar logic to Property.IsPointerType() but for map values
+	if additionalPropertiesValueIsPointer(schema.AdditionalPropertiesType) {
+		addPropsType = "*" + strings.TrimPrefix(addPropsType, "*")
+	}
+
 	return addPropsType
+}
+
+// schemaValueIsPointer returns true if a schema's value type should be a pointer.
+// This is used for additionalProperties values and array items where we need to
+// represent null values explicitly. Similar to Property.IsPointerType() but for
+// non-property contexts.
+func schemaValueIsPointer(schema *GoSchema) bool {
+	if schema == nil {
+		return false
+	}
+
+	typeDef := schema.GoType
+	if schema.RefType != "" {
+		typeDef = schema.RefType
+	}
+
+	// Arrays and maps are already reference types, don't need pointers
+	if strings.HasPrefix(typeDef, "[]") || strings.HasPrefix(typeDef, "map[") {
+		return false
+	}
+
+	// Check if the OpenAPI schema explicitly has nullable: true or type includes "null"
+	if schema.OpenAPISchema != nil {
+		// Check for OpenAPI 3.1 style: type: ["string", "null"]
+		if slices.Contains(schema.OpenAPISchema.Type, "null") {
+			return true
+		}
+
+		// Check for OpenAPI 3.0 style: nullable: true
+		if schema.OpenAPISchema.Nullable != nil && *schema.OpenAPISchema.Nullable {
+			return true
+		}
+	}
+
+	return false
+}
+
+// additionalPropertiesValueIsPointer is an alias for schemaValueIsPointer for backward compatibility.
+func additionalPropertiesValueIsPointer(schema *GoSchema) bool {
+	return schemaValueIsPointer(schema)
 }
 
 func schemaHasAdditionalProperties(schema *base.Schema) bool {
