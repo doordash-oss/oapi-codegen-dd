@@ -19,7 +19,7 @@ on:
       max_concurrency:
         description: 'Max concurrency for integration tests'
         type: number
-        default: 10
+        default: 5
 
 jobs:
   build-ci:
@@ -129,9 +129,9 @@ jobs:
           if [ -n "${{ inputs.spec }}" ]; then
             make test-integration SPEC="${{ inputs.spec }}"
           else
-            INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=60m .
+            INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=55m .
           fi
-        timeout-minutes: 65
+        timeout-minutes: 60
 
       - name: Debug cache before save
         if: always()
