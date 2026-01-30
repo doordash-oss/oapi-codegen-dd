@@ -106,9 +106,10 @@ func TestIntegration(t *testing.T) {
 		return
 	}
 
-	// Load cache (unless disabled via INTEGRATION_NO_CACHE=1 or CLEAR_CACHE=1)
+	// Load cache (unless disabled via INTEGRATION_NO_CACHE=1)
 	var cache *ResultCache
-	useCache := os.Getenv("INTEGRATION_NO_CACHE") == ""
+	noCache := os.Getenv("INTEGRATION_NO_CACHE") != ""
+	useCache := !noCache
 	if useCache {
 		var err error
 		cache, err = NewResultCache(projectRoot)
