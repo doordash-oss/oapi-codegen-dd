@@ -37,7 +37,7 @@ const (
 	defaultMaxConcurrency = 10
 
 	// Timeout for each spec's operations (generate, build, etc.)
-	specTimeout = 10 * time.Minute
+	specTimeout = 15 * time.Minute
 
 	// Maximum number of error lines to show per failure
 	maxErrorLines = 15
