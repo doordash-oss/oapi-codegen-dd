@@ -19,7 +19,7 @@ on:
       max_concurrency:
         description: 'Max concurrency for integration tests'
         type: number
-        default: 50
+        default: 10
 
 jobs:
   build-ci:
