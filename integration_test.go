@@ -50,6 +50,9 @@ const (
 
 	// CacheFileName is the name of the cache file
 	cacheFileName = ".integration-cache.json"
+
+	// CacheTTL is how long a cached result is valid
+	cacheTTL = 60 * time.Minute
 )
 
 var (
@@ -106,10 +109,10 @@ func TestIntegration(t *testing.T) {
 		return
 	}
 
-	// Load cache (unless disabled via INTEGRATION_NO_CACHE=1)
+	// Load cache (unless disabled via INTEGRATION_NO_CACHE=1 or running single spec)
 	var cache *ResultCache
-	noCache := os.Getenv("INTEGRATION_NO_CACHE") != ""
-	useCache := !noCache
+	singleSpec := len(specPaths) == 1
+	useCache := os.Getenv("INTEGRATION_NO_CACHE") == "" && !singleSpec
 	if useCache {
 		var err error
 		cache, err = NewResultCache(projectRoot)
@@ -744,7 +747,7 @@ func hashSpec(specPath string) (string, error) {
 		return "", err
 	}
 	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:8]), nil // Use first 8 bytes for shorter hash
+	return hex.EncodeToString(hash[:8]), nil // 8 bytes = 16 hex chars
 }
 
 // IsCached checks if a spec has a valid cached passing result
@@ -754,6 +757,11 @@ func (c *ResultCache) IsCached(specPath string) bool {
 
 	entry, ok := c.Entries[specPath]
 	if !ok || !entry.Passed {
+		return false
+	}
+
+	// Check if cache entry is too old
+	if time.Since(entry.TestedAt) > cacheTTL {
 		return false
 	}
 

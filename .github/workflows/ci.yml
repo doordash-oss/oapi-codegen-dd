@@ -110,9 +110,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .integration-cache.json
-          key: integration-cache-${{ github.ref_name }}
+          key: integration-cache-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            integration-cache-
+            integration-cache-${{ github.ref_name }}-
 
       - name: Debug cache restore
         run: |
