@@ -1,0 +1,54 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Query explode=false example
+  description: Tests form style with explode=false (like Stripe's expand parameter)
+paths:
+  /charges/{id}:
+    get:
+      operationId: getCharge
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          style: simple
+        - description: Specifies which fields in the response should be expanded.
+          in: query
+          name: expand
+          required: false
+          schema:
+            items:
+              type: string
+            type: array
+          style: form
+          explode: false
+        - description: Filter by status values
+          in: query
+          name: status
+          required: false
+          schema:
+            items:
+              type: string
+            type: array
+          style: form
+          explode: true
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Charge'
+components:
+  schemas:
+    Charge:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          type: integer
+        currency:
+          type: string

@@ -69,15 +69,21 @@ func (c *{{$clientName}}) {{$op.ID}}(ctx context.Context{{ if $op.HasRequestOpti
     {{- $hasQueryParams := false -}}
     {{- if and $op.Query $op.Query.Encoding }}
         {{- range $key, $value := $op.Query.Encoding }}
-            {{ if and (not $hasQueryParams) $value.Style (ne $value.Style "form") (ne $value.Explode nil) }}
+            {{- /* Include encoding if: style is non-default (not form or empty), OR explode=false (non-default for query) */ -}}
+            {{- $hasNonDefaultExplode := and (ne $value.Explode nil) (eq (deref $value.Explode) false) -}}
+            {{- $hasNonDefaultStyle := and $value.Style (ne $value.Style "form") -}}
+            {{ if and (not $hasQueryParams) (or $hasNonDefaultStyle $hasNonDefaultExplode) }}
                 {{ $hasQueryParams = true }}
             {{ end }}
         {{- end }}
         {{- if $hasQueryParams }}
             queryEncoding := map[string]runtime.QueryEncoding{
                 {{- range $key, $value := $op.Query.Encoding }}
-                    {{- if and $value.Style (ne $value.Style "form") (ne $value.Explode nil) }}
-                        "{{$key}}": {Style:"{{$value.Style}}", {{- if ne $value.Explode nil }}Explode: &[]bool{ {{$value.Explode}} }[0],{{- end }}},
+                    {{- /* Include encoding if: style is non-default (not form or empty), OR explode=false (non-default for query) */ -}}
+                    {{- $hasNonDefaultExplode := and (ne $value.Explode nil) (eq (deref $value.Explode) false) -}}
+                    {{- $hasNonDefaultStyle := and $value.Style (ne $value.Style "form") -}}
+                    {{- if or $hasNonDefaultStyle $hasNonDefaultExplode }}
+                        "{{$key}}": {Style:"{{if $value.Style}}{{$value.Style}}{{else}}form{{end}}", {{- if ne $value.Explode nil }}Explode: &[]bool{ {{deref $value.Explode}} }[0],{{- end }}},
                     {{- end }}
                 {{- end }}
             }

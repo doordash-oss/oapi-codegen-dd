@@ -44,6 +44,7 @@ var TemplateFunctions = template.FuncMap{
 		return append(slice, val)
 	},
 	"filterOmitEmpty": filterOmitEmpty,
+	"deref":           derefBool,
 }
 
 // uppercaseFirstCharacter Uppercases the first character in a string.
@@ -141,4 +142,12 @@ func filterOmitEmpty(tags []string) []string {
 		}
 	}
 	return result
+}
+
+// derefBool dereferences a *bool pointer, returning false if nil.
+func derefBool(p *bool) bool {
+	if p == nil {
+		return false
+	}
+	return *p
 }
