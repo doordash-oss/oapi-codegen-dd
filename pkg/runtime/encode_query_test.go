@@ -33,13 +33,19 @@ func TestEncodeQueryFields_Arrays(t *testing.T) {
 			name:     "form explode=false",
 			data:     map[string]any{"expand": []string{"a", "b"}},
 			enc:      map[string]QueryEncoding{"expand": {Style: "form", Explode: b(false)}},
-			expected: "expand=a%2Cb",
+			expected: "expand=a,b", // Delimiter comma should NOT be encoded per OpenAPI spec
+		},
+		{
+			name:     "form explode=false with comma in value",
+			data:     map[string]any{"expand": []string{"a", "b", "c,d"}},
+			enc:      map[string]QueryEncoding{"expand": {Style: "form", Explode: b(false)}},
+			expected: "expand=a,b,c%2Cd", // Delimiter commas unescaped, comma in value escaped
 		},
 		{
 			name:     "spaceDelimited",
 			data:     map[string]any{"expand": []string{"a", "b"}},
 			enc:      map[string]QueryEncoding{"expand": {Style: "spaceDelimited"}},
-			expected: "expand=a+b",
+			expected: "expand=a%20b", // Space delimiter encoded as %20
 		},
 		{
 			name:     "pipeDelimited",
@@ -96,13 +102,13 @@ func TestEncodeQueryFields_Objects(t *testing.T) {
 			name:     "form explode=false",
 			data:     map[string]any{"color": map[string]any{"R": "100", "G": "200", "B": "150"}},
 			enc:      map[string]QueryEncoding{"color": {Style: "form", Explode: b(false)}},
-			expected: "color=B%2C150%2CG%2C200%2CR%2C100",
+			expected: "color=B,150,G,200,R,100", // Delimiter commas should NOT be encoded per OpenAPI spec
 		},
 		{
 			name:     "spaceDelimited",
 			data:     map[string]any{"color": map[string]any{"R": "100", "G": "200", "B": "150"}},
 			enc:      map[string]QueryEncoding{"color": {Style: "spaceDelimited"}},
-			expected: "color=B+150+G+200+R+100",
+			expected: "color=B%20150%20G%20200%20R%20100", // Space delimiter encoded as %20
 		},
 		{
 			name:     "pipeDelimited",

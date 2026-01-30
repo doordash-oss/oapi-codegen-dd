@@ -22,6 +22,15 @@ type QueryEncoding struct {
 	Explode *bool
 }
 
+// queryPair represents a key-value pair for query string encoding.
+// If preEncoded is true, the value is already properly encoded and should not
+// be encoded again by url.Values.Encode().
+type queryPair struct {
+	key        string
+	value      string
+	preEncoded bool
+}
+
 // EncodeQueryFields builds a query string for query params per OAS 3.1 style matrix.
 //
 // Arrays (name=expand, vals=[a,b]):
@@ -51,7 +60,7 @@ func EncodeQueryFields(data any, encoding map[string]QueryEncoding) (string, err
 	}
 	sort.Strings(keys)
 
-	var pairs [][2]string
+	var pairs []queryPair
 
 	for _, name := range keys {
 		val := m[name]
@@ -79,30 +88,35 @@ func EncodeQueryFields(data any, encoding map[string]QueryEncoding) (string, err
 			case "form":
 				if explode {
 					for _, k := range propKeys {
-						pairs = append(pairs, [2]string{k, obj[k]})
+						pairs = append(pairs, queryPair{key: k, value: obj[k]})
 					}
 				} else {
-					seq := make([]string, 0, len(propKeys)*2)
-					for _, k := range propKeys {
-						seq = append(seq, k, obj[k])
-					}
-					pairs = append(pairs, [2]string{name, strings.Join(seq, ",")})
+					// For explode=false, we need to encode each value individually,
+					// then join with unescaped comma delimiter.
+					// This ensures commas within values are escaped, but delimiter commas are not.
+					pairs = append(pairs, queryPair{
+						key:        name,
+						value:      joinWithDelimiter(flattenMap(propKeys, obj), ","),
+						preEncoded: true,
+					})
 				}
 			case "spacedelimited":
-				seq := make([]string, 0, len(propKeys)*2)
-				for _, k := range propKeys {
-					seq = append(seq, k, obj[k])
-				}
-				pairs = append(pairs, [2]string{name, strings.Join(seq, " ")})
+				// Space delimiter should be encoded as %20
+				pairs = append(pairs, queryPair{
+					key:        name,
+					value:      joinWithDelimiter(flattenMap(propKeys, obj), "%20"),
+					preEncoded: true,
+				})
 			case "pipedelimited":
-				seq := make([]string, 0, len(propKeys)*2)
-				for _, k := range propKeys {
-					seq = append(seq, k, obj[k])
-				}
-				pairs = append(pairs, [2]string{name, strings.Join(seq, "|")})
+				// Pipe delimiter should be encoded as %7C
+				pairs = append(pairs, queryPair{
+					key:        name,
+					value:      joinWithDelimiter(flattenMap(propKeys, obj), "%7C"),
+					preEncoded: true,
+				})
 			case "deepobject":
 				for _, k := range propKeys {
-					pairs = append(pairs, [2]string{name + "[" + k + "]", obj[k]})
+					pairs = append(pairs, queryPair{key: name + "[" + k + "]", value: obj[k]})
 				}
 			default:
 				return "", fmt.Errorf("param %q: unsupported style %q for object", name, style)
@@ -120,46 +134,101 @@ func EncodeQueryFields(data any, encoding map[string]QueryEncoding) (string, err
 			if isArray {
 				if explode {
 					for _, v := range ss {
-						pairs = append(pairs, [2]string{name, v})
+						pairs = append(pairs, queryPair{key: name, value: v})
 					}
 				} else {
-					pairs = append(pairs, [2]string{name, strings.Join(ss, ",")})
+					// For explode=false, we need to encode each value individually,
+					// then join with unescaped comma delimiter.
+					// This ensures commas within values are escaped, but delimiter commas are not.
+					pairs = append(pairs, queryPair{
+						key:        name,
+						value:      joinWithDelimiter(ss, ","),
+						preEncoded: true,
+					})
 				}
 			} else {
-				pairs = append(pairs, [2]string{name, ss[0]})
+				pairs = append(pairs, queryPair{key: name, value: ss[0]})
 			}
 		case "spacedelimited":
 			if isArray {
-				pairs = append(pairs, [2]string{name, strings.Join(ss, " ")})
+				// Space delimiter should be encoded as %20
+				pairs = append(pairs, queryPair{
+					key:        name,
+					value:      joinWithDelimiter(ss, "%20"),
+					preEncoded: true,
+				})
 			} else {
-				pairs = append(pairs, [2]string{name, ss[0]})
+				pairs = append(pairs, queryPair{key: name, value: ss[0]})
 			}
 		case "pipedelimited":
 			if isArray {
-				pairs = append(pairs, [2]string{name, strings.Join(ss, "|")})
+				// Pipe delimiter should be encoded as %7C
+				pairs = append(pairs, queryPair{
+					key:        name,
+					value:      joinWithDelimiter(ss, "%7C"),
+					preEncoded: true,
+				})
 			} else {
-				pairs = append(pairs, [2]string{name, ss[0]})
+				pairs = append(pairs, queryPair{key: name, value: ss[0]})
 			}
 		case "deepobject":
 			// Not defined for arrays in OAS. Custom bracketed repeat as discussed.
 			br := name + "[]"
 			if isArray {
 				for _, v := range ss {
-					pairs = append(pairs, [2]string{br, v})
+					pairs = append(pairs, queryPair{key: br, value: v})
 				}
 			} else {
-				pairs = append(pairs, [2]string{br, ss[0]})
+				pairs = append(pairs, queryPair{key: br, value: ss[0]})
 			}
 		default:
 			return "", fmt.Errorf("param %q: unsupported style %q", name, style)
 		}
 	}
 
-	values := url.Values{}
-	for _, kv := range pairs {
-		values.Add(kv[0], kv[1])
+	return buildQueryString(pairs), nil
+}
+
+// joinWithDelimiter encodes each value individually and joins them with the given delimiter.
+// The delimiter is NOT encoded, allowing for proper OpenAPI style serialization.
+func joinWithDelimiter(values []string, delimiter string) string {
+	encoded := make([]string, len(values))
+	for i, v := range values {
+		encoded[i] = url.QueryEscape(v)
 	}
-	return values.Encode(), nil
+	return strings.Join(encoded, delimiter)
+}
+
+// flattenMap flattens a map into a slice of alternating keys and values.
+func flattenMap(keys []string, m map[string]string) []string {
+	result := make([]string, 0, len(keys)*2)
+	for _, k := range keys {
+		result = append(result, k, m[k])
+	}
+	return result
+}
+
+// buildQueryString builds a query string from pairs, handling pre-encoded values correctly.
+func buildQueryString(pairs []queryPair) string {
+	if len(pairs) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for _, p := range pairs {
+		encodedKey := url.QueryEscape(p.key)
+		var encodedValue string
+		if p.preEncoded {
+			encodedValue = p.value
+		} else {
+			encodedValue = url.QueryEscape(p.value)
+		}
+		parts = append(parts, encodedKey+"="+encodedValue)
+	}
+
+	// Sort for consistent output (matching url.Values.Encode() behavior)
+	sort.Strings(parts)
+	return strings.Join(parts, "&")
 }
 
 func defaultExplode(style string, ptr *bool) bool {
