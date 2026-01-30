@@ -269,6 +269,17 @@ func TestIntegration(t *testing.T) {
 					hasFailures = true
 				}
 				mu.Unlock()
+
+				// Update cache immediately after each spec (survives timeout)
+				if cache != nil {
+					if result.passed {
+						cache.MarkPassed(name)
+					} else {
+						cache.MarkFailed(name)
+					}
+					// Best effort, ignore errors
+					_ = cache.Save()
+				}
 			}()
 
 			// Helper to record failure
@@ -429,20 +440,8 @@ output:
 	<-progressDone
 	fmt.Fprintf(os.Stderr, "\r✅ Progress: %d/%d completed%-80s\n\n", total, total, "")
 
-	// Update cache with results
 	if cache != nil {
-		for _, r := range results {
-			if r.passed {
-				cache.MarkPassed(r.name)
-			} else {
-				cache.MarkFailed(r.name)
-			}
-		}
-		if err := cache.Save(); err != nil {
-			fmt.Fprintf(os.Stderr, "⚠️  Failed to save cache: %v\n", err)
-		} else {
-			fmt.Fprintf(os.Stderr, "💾 Cache saved (%d entries)\n", cache.Size())
-		}
+		fmt.Fprintf(os.Stderr, "💾 Cache has %d entries\n", cache.Size())
 	}
 
 	// Print summary

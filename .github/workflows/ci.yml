@@ -76,6 +76,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 65
     # Run on: merge_group (merge queue), push to main, or manual trigger with run_integration=true
     if: github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_integration)
     steps:
