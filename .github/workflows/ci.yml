@@ -1,18 +1,28 @@
-name: Build project
-on: [ push, pull_request ]
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      run_integration:
+        description: 'Run integration tests'
+        type: boolean
+        default: true
+      spec:
+        description: 'Specific spec to test (e.g., 3.0/misc/stripe.com.yml)'
+        type: string
+        required: false
+      max_concurrency:
+        description: 'Max concurrency for integration tests'
+        type: number
+        default: 50
+
 jobs:
-  build:
-    name: Build
+  build-ci:
+    name: Build CI
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      # perform matrix testing to give us an earlier insight into issues with different versions of supported major versions of Go
-      matrix:
-        version:
-        - "1.21"
-        - "1.22"
-        - "1.23"
-        - "1.24"
     steps:
       - name: Check out source code
         uses: actions/checkout@v4
@@ -20,27 +30,72 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.version }}
+          go-version: "1.25.3"
+          cache: true
 
-      - name: Test
-        run: make test
-        env:
-          # A combination of our GitHub Actions setup, with the Go toolchain, leads to inconsistencies in calling `go env`, in particular with Go 1.21, where having (the default) `GOTOOLCHAIN=auto` results in build failures
-          GOTOOLCHAIN: local
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
-      - name: Build
-        run: go build ./cmd/oapi-codegen
+      - name: Download Go modules
+        run: go mod download
 
-  results:
-    if: ${{ always() }}
+      - name: Run build-ci
+        run: make build-ci
+        timeout-minutes: 30
+
+  test-ci:
+    name: Test CI
     runs-on: ubuntu-latest
-    name: Check build results
-    needs: [build]
     steps:
-      - run: |
-          result="${{ needs.build.result }}"
-          if [[ $result == "success" || $result == "skipped" ]]; then
-            exit 0
-          else
+      - name: Check out source code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache: true
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Run generate and check for uncommitted changes
+        run: |
+          make generate
+          if ! git diff --exit-code; then
+            echo "ERROR: make generate produced uncommitted changes"
+            echo "Please run 'make generate' locally and commit the changes"
             exit 1
           fi
+
+      - name: Run test-ci
+        run: make test-ci
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch' || inputs.run_integration
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache: true
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Fetch specs
+        run: make fetch-specs
+
+      - name: Run integration tests
+        run: |
+          if [ -n "${{ inputs.spec }}" ]; then
+            make test-integration SPEC="${{ inputs.spec }}"
+          else
+            INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=15m .
+          fi
+        timeout-minutes: 20
