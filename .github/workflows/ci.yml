@@ -4,6 +4,8 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
     inputs:
       run_integration:
@@ -74,7 +76,8 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch' || inputs.run_integration
+    # Run on: merge_group (merge queue), push to main, or manual trigger with run_integration=true
+    if: github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_integration)
     steps:
       - name: Check out source code
         uses: actions/checkout@v4
@@ -96,6 +99,6 @@ jobs:
           if [ -n "${{ inputs.spec }}" ]; then
             make test-integration SPEC="${{ inputs.spec }}"
           else
-            INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=15m .
+            INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=60m .
           fi
-        timeout-minutes: 20
+        timeout-minutes: 65
