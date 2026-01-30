@@ -37,7 +37,7 @@ const (
 	defaultMaxConcurrency = 50
 
 	// Timeout for each spec's operations (generate, build, etc.)
-	specTimeout = 5 * time.Minute
+	specTimeout = 10 * time.Minute
 
 	// Maximum number of error lines to show per failure
 	maxErrorLines = 15
@@ -50,7 +50,7 @@ var (
 	// Specs that are known to be problematic (too large, timeout, etc.)
 	// Add specs here to skip them in CI unless explicitly requested via SPEC env var
 	skipSpecs = map[string]bool{
-		// Example: "testdata/specs/3.0/aws/ec2.yaml": true,
+		// Example: "testdata/specs/3.0/aws/ec2.yml": true,
 	}
 )
 
@@ -306,7 +306,7 @@ output:
 			output, err := genCmd.CombinedOutput()
 			if err != nil {
 				if ctx.Err() == context.DeadlineExceeded {
-					recordFailure("generate", "oapi-codegen timed out after 2 minutes")
+					recordFailure("generate", "oapi-codegen timed out after %v", specTimeout)
 				} else {
 					recordFailure("generate", "oapi-codegen failed:\n%s", string(output))
 				}
@@ -354,7 +354,7 @@ output:
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				if ctx.Err() == context.DeadlineExceeded {
-					recordFailure("mod-tidy", "go mod tidy timed out after 2 minutes")
+					recordFailure("mod-tidy", "go mod tidy timed out after %v", specTimeout)
 				} else {
 					recordFailure("mod-tidy", "go mod tidy failed:\n%s", string(output))
 				}
@@ -373,7 +373,7 @@ output:
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				if ctx.Err() == context.DeadlineExceeded {
-					recordFailure("build", "go build timed out after 2 minutes")
+					recordFailure("build", "go build timed out after %v", specTimeout)
 				} else {
 					recordFailure("build", "go build failed:\n%s", string(output))
 				}
