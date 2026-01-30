@@ -9,3 +9,4 @@ gosec-report*.json
 testdata/specs*/**/*
 .sandbox/
 examples/stash/**/*
+.integration-cache.json
