@@ -37,10 +37,10 @@ const (
 	showMaxErrors = 50
 
 	// Default maximum concurrency for parallel test execution
-	defaultMaxConcurrency = 10
+	defaultMaxConcurrency = 5
 
 	// Timeout for each spec's operations (generate, build, etc.)
-	specTimeout = 15 * time.Minute
+	specTimeout = 5 * time.Minute
 
 	// Maximum number of error lines to show per failure
 	maxErrorLines = 15
