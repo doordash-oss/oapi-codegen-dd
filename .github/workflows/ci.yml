@@ -97,8 +97,8 @@ jobs:
           restore-keys: |
             go-build-integration-${{ runner.os }}-
 
-      - name: Cache integration test results
-        uses: actions/cache@v4
+      - name: Restore integration test cache
+        uses: actions/cache/restore@v4
         with:
           path: .integration-cache.json
           key: integration-cache-${{ github.run_id }}-${{ github.run_attempt }}
@@ -120,3 +120,10 @@ jobs:
             INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=60m .
           fi
         timeout-minutes: 65
+
+      - name: Save integration test cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .integration-cache.json
+          key: integration-cache-${{ github.run_id }}-${{ github.run_attempt }}
