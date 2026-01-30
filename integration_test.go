@@ -121,12 +121,17 @@ func TestIntegration(t *testing.T) {
 			} else {
 				fmt.Fprintf(os.Stderr, "🗑️  Cache cleared\n")
 			}
-		} else if cache.Size() > 0 {
-			originalCount := len(specs)
-			specs = cache.FilterUncached(specs)
-			skipped := originalCount - len(specs)
-			if skipped > 0 {
-				fmt.Fprintf(os.Stderr, "📦 Skipping %d cached passing specs (%d remaining)\n", skipped, len(specs))
+		} else {
+			fmt.Fprintf(os.Stderr, "📦 Loaded cache with %d entries\n", cache.Size())
+			if cache.Size() > 0 {
+				originalCount := len(specs)
+				specs = cache.FilterUncached(specs)
+				skipped := originalCount - len(specs)
+				if skipped > 0 {
+					fmt.Fprintf(os.Stderr, "📦 Skipping %d cached passing specs (%d remaining)\n", skipped, len(specs))
+				} else {
+					fmt.Fprintf(os.Stderr, "📦 No specs matched cache (paths or hashes may differ)\n")
+				}
 			}
 		}
 	}

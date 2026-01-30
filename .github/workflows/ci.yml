@@ -98,12 +98,25 @@ jobs:
             go-build-integration-${{ runner.os }}-
 
       - name: Restore integration test cache
+        id: cache-restore
         uses: actions/cache/restore@v4
         with:
           path: .integration-cache.json
           key: integration-cache-${{ github.ref_name }}
           restore-keys: |
             integration-cache-
+
+      - name: Debug cache restore
+        run: |
+          echo "Cache hit: ${{ steps.cache-restore.outputs.cache-hit }}"
+          echo "Cache key: ${{ steps.cache-restore.outputs.cache-primary-key }}"
+          echo "Cache matched key: ${{ steps.cache-restore.outputs.cache-matched-key }}"
+          if [ -f .integration-cache.json ]; then
+            echo "Cache file exists, size: $(wc -c < .integration-cache.json) bytes"
+            echo "Entries: $(grep -c '"passed": true' .integration-cache.json || echo 0)"
+          else
+            echo "Cache file does not exist"
+          fi
 
       - name: Download Go modules
         run: go mod download
@@ -119,6 +132,16 @@ jobs:
             INTEGRATION_MAX_CONCURRENCY=${{ inputs.max_concurrency }} go test -v -tags=integration -count=1 -timeout=60m .
           fi
         timeout-minutes: 65
+
+      - name: Debug cache before save
+        if: always()
+        run: |
+          if [ -f .integration-cache.json ]; then
+            echo "Cache file exists, size: $(wc -c < .integration-cache.json) bytes"
+            echo "Entries: $(grep -c '"passed": true' .integration-cache.json || echo 0)"
+          else
+            echo "Cache file does not exist - nothing to save"
+          fi
 
       - name: Save integration test cache
         uses: actions/cache/save@v4
