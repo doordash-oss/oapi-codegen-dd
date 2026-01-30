@@ -101,9 +101,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .integration-cache.json
-          key: integration-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          key: integration-cache-${{ github.ref_name }}
           restore-keys: |
-            integration-cache-${{ github.run_id }}-
             integration-cache-
 
       - name: Download Go modules
@@ -126,4 +125,4 @@ jobs:
         if: always()
         with:
           path: .integration-cache.json
-          key: integration-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          key: integration-cache-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
