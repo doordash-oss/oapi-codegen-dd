@@ -9,7 +9,6 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v4 v4.0.0-rc.3
 	golang.org/x/tools v0.39.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -28,4 +27,5 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
