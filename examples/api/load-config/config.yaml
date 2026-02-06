@@ -1,0 +1,21 @@
+package: myapi
+copyright-header: "Copyright 2024 My Company. All rights reserved."
+
+output:
+  directory: "."
+  use-single-file: true
+  filename: "generated.go"
+
+generate:
+  client: true
+  default-int-type: "int64"
+  always-prefix-enum-values: true
+  validation:
+    skip: false
+    simple: false
+    response: true
+
+client:
+  name: "MyAPIClient"
+  timeout: 30s
+

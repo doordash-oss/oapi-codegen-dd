@@ -1,0 +1,86 @@
+site_name: "Oapi-Codegen Documentation"
+repo_url: https://github.com/doordash-oss/oapi-codegen-dd
+watch:
+  - docs
+  - examples
+theme:
+  custom_dir: docs/assets
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    #- header.autohide
+  font:
+    code: Roboto Mono
+    text: Roboto
+  locale: en
+  logo: images/logo.png
+  favicon: images/favicon.ico
+  name: material
+  icon:
+    annotation: material/plus-circle
+  palette:
+    - accent: indigo
+      primary: blue
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - accent: red
+      primary: black
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+plugins:
+  - search:
+markdown_extensions:
+  - admonition
+  - abbr
+  - attr_list
+  - def_list
+  - footnotes
+  - meta
+  - md_in_html
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.details
+  - pymdownx.snippets:
+      base_path: ["examples"]
+  - toc:
+      permalink: true
+
+extra:
+  generator: false
+extra_css:
+  - css/extra.css
+extra_javascript:
+  - js/extra.js
+nav:
+  - Get Started:
+      - 'Welcome': 'index.md'
+      - 'Migrate from v2': 'migrate-from-v2.md'
+  - 'Configuration': 'configuration.md'
+  - 'Validation': 'validation.md'
+  - 'Union Types': 'union-types.md'
+  - 'Additional Properties': 'additional-properties.md'
+  - 'API': 'api.md'
+  - Extensions:
+      - 'Overview': 'extensions.md'
+      - 'x-go-type': 'extensions/x-go-type.md'
+      - 'x-go-type-skip-optional-pointer': 'extensions/x-go-type-skip-optional-pointer.md'
+      - 'x-go-name': 'extensions/x-go-name.md'
+      - 'x-go-type-name': 'extensions/x-go-type-name.md'
+      - 'x-oapi-codegen-only-honour-go-name': 'extensions/x-oapi-codegen-only-honour-go-name.md'
+      - 'x-omitempty': 'extensions/x-omitempty.md'
+      - 'x-go-json-ignore': 'extensions/x-go-json-ignore.md'
+      - 'x-oapi-codegen-extra-tags': 'extensions/x-oapi-codegen-extra-tags.md'
+      - 'x-sensitive-data': 'extensions/x-sensitive-data.md'
+      - 'x-enum-names': 'extensions/x-enum-names.md'
+      - 'x-deprecated-reason': 'extensions/x-deprecated-reason.md'

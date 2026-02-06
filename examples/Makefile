@@ -17,7 +17,7 @@ tidy-ci:
 	tidied -verbose
 
 gosec:
-	gosec ./...
+	gosec -exclude-dir=api ./...
 
 check-fmt:
 	# check if files are formatted

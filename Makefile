@@ -98,3 +98,15 @@ check-fmt:
 build-ci: check-fmt lint-ci gosec
 
 test-ci: test
+
+@PHONY: docs-install
+docs-install:
+	@brew install mkdocs-material
+
+@PHONY: docs-serve
+docs-serve:
+	@mkdocs serve
+
+@PHONY: docs-deploy
+docs-deploy:
+	@mkdocs gh-deploy --force

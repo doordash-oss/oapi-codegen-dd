@@ -1,0 +1,37 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Simple API Example
+paths:
+  /users:
+    post:
+      summary: Create a user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - name
+        - active
+      properties:
+        name:
+          type: string
+        active:
+          type: boolean
+          description: Whether the user is active
+        verified:
+          type: boolean
+          description: Optional boolean field
+

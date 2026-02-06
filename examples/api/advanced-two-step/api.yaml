@@ -1,0 +1,44 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Advanced API Example
+paths:
+  /users:
+    get:
+      summary: List users
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      summary: Create a user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
