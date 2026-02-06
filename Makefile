@@ -106,7 +106,3 @@ docs-install:
 @PHONY: docs-serve
 docs-serve:
 	@mkdocs serve
-
-@PHONY: docs-deploy
-docs-deploy:
-	@mkdocs gh-deploy --force
