@@ -193,6 +193,9 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		responseErrors []string
 	)
 
+	// Track seen operation IDs to deduplicate inline before generating param types
+	seenOperationIDs := make(map[string]int)
+
 	for path, pathItem := range model.Paths.PathItems.FromOldest() {
 		// These are parameters defined for all methods on a given path. They
 		// are shared by all methods.
@@ -210,6 +213,16 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 			operationID, err := createOperationID(method, path, operation.OperationId)
 			if err != nil {
 				return nil, fmt.Errorf("error creating operation ID: %w", err)
+			}
+
+			// Deduplicate operation ID inline before generating param types
+			// This ensures each operation gets unique type names for path/query params
+			if count, exists := seenOperationIDs[operationID]; exists {
+				count++
+				seenOperationIDs[operationID] = count
+				operationID = fmt.Sprintf("%s_%d", operationID, count)
+			} else {
+				seenOperationIDs[operationID] = 0
 			}
 
 			// These are parameters defined for the specific path method that we're iterating over.
@@ -308,8 +321,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		}
 	}
 
-	// Deduplicate operation IDs and resolve RequestOptions name collisions
-	operations = deduplicateOperationIDs(operations)
+	// Resolve RequestOptions name collisions (operation IDs already deduplicated inline)
 	operations = resolveRequestOptionsCollisions(operations, options.typeTracker)
 
 	allTypeDefs := extractAllTypeDefinitions(typeDefs)
@@ -335,30 +347,6 @@ func resolveRequestOptionsCollisions(operations []OperationDefinition, tracker *
 
 		// Check if the RequestOptions type name would collide and get a unique base name
 		op.ID = tracker.generateUniqueBaseName(UppercaseFirstCharacter(op.ID), "RequestOptions")
-
-		result[i] = op
-	}
-
-	return result
-}
-
-// deduplicateOperationIDs ensures all operation IDs are unique by appending a suffix to duplicates
-func deduplicateOperationIDs(operations []OperationDefinition) []OperationDefinition {
-	seen := make(map[string]int) // map of operation ID to count
-	result := make([]OperationDefinition, len(operations))
-
-	for i, op := range operations {
-		originalID := op.ID
-		count, exists := seen[originalID]
-
-		if exists {
-			// This is a duplicate, append a suffix
-			count++
-			seen[originalID] = count
-			op.ID = fmt.Sprintf("%s_%d", originalID, count)
-		} else {
-			seen[originalID] = 0
-		}
 
 		result[i] = op
 	}
