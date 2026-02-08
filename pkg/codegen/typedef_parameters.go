@@ -121,8 +121,39 @@ func (pd ParameterDefinition) GoName() string {
 	return schemaNameToTypeName(goName)
 }
 
-func (pd ParameterDefinition) IndirectOptional() bool {
-	return !pd.Required && !pd.Schema.SkipOptionalPointer
+// IsPointerType returns true if this parameter's field in the generated struct is a pointer.
+// This matches the logic used in generateParamsTypes() when creating Property objects.
+func (pd ParameterDefinition) IsPointerType() bool {
+	typeDef := pd.Schema.TypeDecl()
+
+	// Arrays and maps are not pointers
+	if strings.HasPrefix(typeDef, "map[") || strings.HasPrefix(typeDef, "[]") {
+		return false
+	}
+
+	// Check x-go-type-skip-optional-pointer extension
+	skipOptionalPointer := pd.Schema.SkipOptionalPointer
+	if pd.Spec != nil {
+		exts := extractExtensions(pd.Spec.Extensions)
+		if extension, ok := exts[extPropGoTypeSkipOptionalPointer]; ok {
+			if skip, err := parseBooleanValue(extension); err == nil {
+				skipOptionalPointer = skip
+			}
+		}
+	}
+
+	if skipOptionalPointer {
+		return false
+	}
+
+	// Check if the parameter has a schema - if not, Nullable won't be set
+	// and the field won't be a pointer (matches newConstraints behavior)
+	if pd.Spec == nil || pd.Spec.Schema == nil {
+		return false
+	}
+
+	// A parameter is a pointer if it's not required (nullable = !required in newConstraints)
+	return !pd.Required
 }
 
 type ParameterDefinitions []ParameterDefinition

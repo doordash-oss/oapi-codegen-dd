@@ -126,7 +126,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     return
                 }
             {{- end }}
-            {{- if and .IndirectOptional (not (hasPrefix .Schema.TypeDecl "map[")) (not (hasPrefix .Schema.TypeDecl "[]")) }}
+            {{- if .IsPointerType }}
                 queryParams.{{ .GoName }} = &{{ $paramVar }}
             {{- else }}
                 queryParams.{{ .GoName }} = {{ $paramVar }}
@@ -155,7 +155,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 return
             }
         {{- end }}
-        {{- if .IndirectOptional }}
+        {{- if .IsPointerType }}
             headerParams.{{ .GoName }} = &{{ $paramVar }}
         {{- else }}
             headerParams.{{ .GoName }} = {{ $paramVar }}
