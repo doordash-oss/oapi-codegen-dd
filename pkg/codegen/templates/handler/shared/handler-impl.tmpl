@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,21 +24,21 @@ limitations under the License.
 package {{ $config.PackageName }}
 
 import (
-    "context"
-    {{- range $config.AdditionalImports}}
-    {{.Alias}} "{{.Package}}"
-    {{- end}}
+	"context"
+	{{- range $config.AdditionalImports}}
+	{{.Alias}} "{{.Package}}"
+	{{- end}}
 )
 
 // {{ $handlerName }} handles API requests.
 // Implement the interface methods to handle each operation.
 type {{ $handlerName }} struct {
-    // Add your dependencies here (database, services, etc.)
+	// Add your dependencies here (database, services, etc.)
 }
 
 // New{{ $handlerName }} creates a new {{ $handlerName }}.
 func New{{ $handlerName }}() *{{ $handlerName }} {
-    return &{{ $handlerName }}{}
+	return &{{ $handlerName }}{}
 }
 
 // Ensure {{ $handlerName }} implements {{ $handlerName }}Interface.
@@ -49,31 +49,31 @@ var _ {{ $handlerName }}Interface = (*{{ $handlerName }})(nil)
 {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
 {{- if $op.HasRequestOptions }}
 func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}HandlerRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
-    // TODO: Implement your business logic here
-    {{- if $op.Response.Success }}
-    {{- if $op.Response.Success.IsRaw }}
-    return New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
-    {{- else }}
-    {{- $bodyType := $op.Response.Success.ResponseName -}}
-    {{- if eq $bodyType "struct{}" }}
-    return New{{ $op.ID | ucFirst }}ResponseData(nil), nil
-    {{- else }}
-    {{- if $modelsPrefix }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
-    return New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
-    {{- end }}
-    {{- end }}
-    {{- else }}
-    return nil
-    {{- end }}
+	// TODO: Implement your business logic here
+	{{- if $op.Response.Success }}
+	{{- if $op.Response.Success.IsRaw }}
+	return New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
+	{{- else }}
+	{{- $bodyType := $op.Response.Success.ResponseName -}}
+	{{- if eq $bodyType "struct{}" }}
+	return New{{ $op.ID | ucFirst }}ResponseData(nil), nil
+	{{- else }}
+	{{- if $modelsPrefix }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
+	return New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
+	{{- end }}
+	{{- end }}
+	{{- else }}
+	return nil
+	{{- end }}
 }
 {{- else }}
 func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
-    // TODO: Implement your business logic here
-    {{- if $op.Response.Success }}
-    return New{{ $op.ID | ucFirst }}ResponseData(new({{ $modelsPrefix }}{{ $op.Response.Success.ResponseName }})), nil
-    {{- else }}
-    return nil
-    {{- end }}
+	// TODO: Implement your business logic here
+	{{- if $op.Response.Success }}
+	return New{{ $op.ID | ucFirst }}ResponseData(new({{ $modelsPrefix }}{{ $op.Response.Success.ResponseName }})), nil
+	{{- else }}
+	return nil
+	{{- end }}
 }
 {{- end }}
 {{ end }}
