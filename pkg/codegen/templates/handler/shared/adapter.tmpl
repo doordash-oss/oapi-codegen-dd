@@ -33,6 +33,16 @@ func NewHTTPAdapter(impl {{ $handlerName }}Interface) *HTTPAdapter {
     return &HTTPAdapter{impl: impl}
 }
 
+// returnParseError writes a 400 Bad Request response if err is not nil.
+// Returns true if an error was written (caller should return), false otherwise.
+func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
+    if err != nil {
+        http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
+        return true
+    }
+    return false
+}
+
 // HTTP handler adapters - parse request, call interface, write response
 {{ range $operations }}{{ $op := . }}
 func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +56,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     // Parse path parameters
     pathParams := &{{ $modelsPrefix }}{{ $op.PathParams.Name }}{}
     {{- range $op.PathParams.Schema.Properties }}
-        {{- $paramVar := .GoVariableName }}
+        {{- $paramVar := printf "pathParam%s" .GoName }}
         {{ $paramVar }}Str := {{template "get-path-param" .JsonFieldName}}
         {{- if eq .Schema.TypeDecl "string" }}
             {{- if .IsPointerType }}
@@ -63,8 +73,11 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         pathParams.{{ .GoName }} = {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- end }}
         {{- else }}
-        {{/* Other types (int, uuid.UUID, etc.) - use ParseString with format hint */}}
-        {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+            {{/* Other types (int, uuid.UUID, etc.) - use ParseString with format hint */}}
+            {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+            if returnParseError(w, "{{ .JsonFieldName }}", err) {
+                return
+            }
             {{- if .IsPointerType }}
         pathParams.{{ .GoName }} = &{{ $paramVar }}
             {{- else }}
@@ -79,7 +92,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     queryParams := &{{ $modelsPrefix }}{{ $op.Query.Name }}{}
     query := r.URL.Query()
     {{- range $op.Query.Params }}
-        {{- $paramVar := .GoVariableName }}
+        {{- $paramVar := printf "queryParam%s" .GoName }}
         {{- if .Schema.ArrayType }}
             {{/* Array query params: use query["key"] to get all values */}}
             if values, ok := query["{{ .ParamName }}"]; ok {
@@ -93,24 +106,32 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     }
                     queryParams.{{ .GoName }} = result
                 {{- else }}
-                    queryParams.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ .Schema.ArrayType.Format }}"{{- end }})
+                    parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ .Schema.ArrayType.Format }}"{{- end }})
+                    if returnParseError(w, "{{ .ParamName }}", err) {
+                        return
+                    }
+                    queryParams.{{ .GoName }} = parsed
                 {{- end }}
             }
         {{- else }}
-            {{ $paramVar }}Str := query.Get("{{ .ParamName }}")
+            if {{ $paramVar }}Str := query.Get("{{ .ParamName }}"); {{ $paramVar }}Str != "" {
             {{- if eq .Schema.TypeDecl "string" }}
-            {{ $paramVar }} := {{ $paramVar }}Str
+                {{ $paramVar }} := {{ $paramVar }}Str
             {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
-            {{/* String-based enum type - use type conversion */}}
-            {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+                {{/* String-based enum type - use type conversion */}}
+                {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- else }}
-            {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+                {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+                if returnParseError(w, "{{ .ParamName }}", err) {
+                    return
+                }
             {{- end }}
             {{- if and .IndirectOptional (not (hasPrefix .Schema.TypeDecl "map[")) (not (hasPrefix .Schema.TypeDecl "[]")) }}
                 queryParams.{{ .GoName }} = &{{ $paramVar }}
             {{- else }}
                 queryParams.{{ .GoName }} = {{ $paramVar }}
             {{- end }}
+            }
         {{- end }}
     {{- end }}
     opts.Query = queryParams
@@ -121,15 +142,18 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     headerParams := &{{ $modelsPrefix }}{{ $op.Header.TypeDef.Name }}{}
     headers := r.Header
     {{- range $op.Header.Params }}
-    {{- $paramVar := .GoVariableName }}
+    {{- $paramVar := printf "headerParam%s" .GoName }}
     if headerValues := headers[http.CanonicalHeaderKey("{{ .ParamName }}")]; len(headerValues) > 0 {
         {{- if eq .Schema.TypeDecl "string" }}
-        {{ $paramVar }} := headerValues[0]
+            {{ $paramVar }} := headerValues[0]
         {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
-        {{/* String-based enum type - use type conversion */}}
-        {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}(headerValues[0])
+            {{/* String-based enum type - use type conversion */}}
+            {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}(headerValues[0])
         {{- else }}
-        {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+            {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+            if returnParseError(w, "{{ .ParamName }}", err) {
+                return
+            }
         {{- end }}
         {{- if .IndirectOptional }}
             headerParams.{{ .GoName }} = &{{ $paramVar }}
@@ -265,9 +289,11 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 if err != nil {
     code := http.StatusInternalServerError
     {{- if $op.Response.Error }}
-    if _, ok := err.(*{{ $modelsPrefix }}{{ $op.Response.Error.ResponseName }}); ok {
-        code = {{ $op.Response.Error.StatusCode }}
-    }
+        {{- if not (or $op.Response.Error.Schema.DefineViaAlias $op.Response.Error.Schema.IsAnyType) }}
+            if _, ok := err.(*{{ $modelsPrefix }}{{ $op.Response.Error.ResponseName }}); ok {
+                code = {{ $op.Response.Error.StatusCode }}
+            }
+        {{- end }}
     {{- end }}
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(code)

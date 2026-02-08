@@ -22,6 +22,16 @@ func NewHTTPAdapter(impl HandlerInterface) *HTTPAdapter {
 	return &HTTPAdapter{impl: impl}
 }
 
+// returnParseError writes a 400 Bad Request response if err is not nil.
+// Returns true if an error was written (caller should return), false otherwise.
+func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
+		return true
+	}
+	return false
+}
+
 // HTTP handler adapters - parse request, call interface, write response
 
 func (h *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -76,17 +86,21 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	queryParams := &types.ListUsersQuery{}
 	query := r.URL.Query()
-	limitStr := query.Get("limit")
-	limit, _ := runtime.ParseString[int](limitStr)
-	queryParams.Limit = &limit
+	if queryParamLimitStr := query.Get("limit"); queryParamLimitStr != "" {
+		queryParamLimit, err := runtime.ParseString[int](queryParamLimitStr)
+		if returnParseError(w, "limit", err) {
+			return
+		}
+		queryParams.Limit = &queryParamLimit
+	}
 	opts.Query = queryParams
 
 	// Parse header parameters
 	headerParams := &types.ListUsersHeaders{}
 	headers := r.Header
 	if headerValues := headers[http.CanonicalHeaderKey("X-Request-ID")]; len(headerValues) > 0 {
-		xrequestId := headerValues[0]
-		headerParams.XRequestID = xrequestId
+		headerParamXRequestID := headerValues[0]
+		headerParams.XRequestID = headerParamXRequestID
 	}
 	opts.Header = headerParams
 
@@ -161,9 +175,6 @@ func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.impl.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*types.CreateUserErrorResponse); ok {
-			code = 400
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -276,8 +287,8 @@ func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetUserPath{}
-	iDStr := r.PathValue("id")
-	pathParams.ID = iDStr
+	pathParamIDStr := r.PathValue("id")
+	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -290,9 +301,6 @@ func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.impl.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*types.GetUserErrorResponse); ok {
-			code = 404
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -337,8 +345,8 @@ func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.DeleteUserPath{}
-	iDStr := r.PathValue("id")
-	pathParams.ID = iDStr
+	pathParamIDStr := r.PathValue("id")
+	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -391,8 +399,8 @@ func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetUserAvatarPath{}
-	iDStr := r.PathValue("id")
-	pathParams.ID = iDStr
+	pathParamIDStr := r.PathValue("id")
+	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -457,8 +465,8 @@ func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.UploadUserAvatarPath{}
-	iDStr := r.PathValue("id")
-	pathParams.ID = iDStr
+	pathParamIDStr := r.PathValue("id")
+	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 	// Parse request body
 	defer r.Body.Close()
@@ -824,8 +832,8 @@ func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByTypePath{}
-	pTypeStr := r.PathValue("type")
-	pathParams.Type = pTypeStr
+	pathParamTypeStr := r.PathValue("type")
+	pathParams.Type = pathParamTypeStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -883,9 +891,10 @@ func (h *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	queryParams := &types.SearchQuery{}
 	query := r.URL.Query()
-	qStr := query.Get("q")
-	q := qStr
-	queryParams.Q = q
+	if queryParamQStr := query.Get("q"); queryParamQStr != "" {
+		queryParamQ := queryParamQStr
+		queryParams.Q = queryParamQ
+	}
 	opts.Query = queryParams
 
 	// Validate request
@@ -1052,14 +1061,26 @@ func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if values, ok := query["categoryIds"]; ok {
-		queryParams.CategoryIds, _ = runtime.ParseStringSlice[int](values)
+		parsed, err := runtime.ParseStringSlice[int](values)
+		if returnParseError(w, "categoryIds", err) {
+			return
+		}
+		queryParams.CategoryIds = parsed
 	}
-	minPriceStr := query.Get("minPrice")
-	minPrice, _ := runtime.ParseString[float32](minPriceStr)
-	queryParams.MinPrice = &minPrice
-	activeStr := query.Get("active")
-	active, _ := runtime.ParseString[bool](activeStr)
-	queryParams.Active = &active
+	if queryParamMinPriceStr := query.Get("minPrice"); queryParamMinPriceStr != "" {
+		queryParamMinPrice, err := runtime.ParseString[float32](queryParamMinPriceStr)
+		if returnParseError(w, "minPrice", err) {
+			return
+		}
+		queryParams.MinPrice = &queryParamMinPrice
+	}
+	if queryParamActiveStr := query.Get("active"); queryParamActiveStr != "" {
+		queryParamActive, err := runtime.ParseString[bool](queryParamActiveStr)
+		if returnParseError(w, "active", err) {
+			return
+		}
+		queryParams.Active = &queryParamActive
+	}
 	opts.Query = queryParams
 
 	// Validate request
@@ -1116,26 +1137,38 @@ func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetCategoryPath{}
-	categoryIDStr := r.PathValue("categoryId")
+	pathParamCategoryIDStr := r.PathValue("categoryId")
 
-	categoryID, _ := runtime.ParseString[int](categoryIDStr)
-	pathParams.CategoryID = categoryID
+	pathParamCategoryID, err := runtime.ParseString[int](pathParamCategoryIDStr)
+	if returnParseError(w, "categoryId", err) {
+		return
+	}
+	pathParams.CategoryID = pathParamCategoryID
 	opts.PathParams = pathParams
 
 	// Parse header parameters
 	headerParams := &types.GetCategoryHeaders{}
 	headers := r.Header
 	if headerValues := headers[http.CanonicalHeaderKey("X-Include-Products")]; len(headerValues) > 0 {
-		xincludeProducts, _ := runtime.ParseString[bool](headerValues[0])
-		headerParams.XIncludeProducts = &xincludeProducts
+		headerParamXIncludeProducts, err := runtime.ParseString[bool](headerValues[0])
+		if returnParseError(w, "X-Include-Products", err) {
+			return
+		}
+		headerParams.XIncludeProducts = &headerParamXIncludeProducts
 	}
 	if headerValues := headers[http.CanonicalHeaderKey("X-Max-Depth")]; len(headerValues) > 0 {
-		xmaxDepth, _ := runtime.ParseString[int](headerValues[0])
-		headerParams.XMaxDepth = &xmaxDepth
+		headerParamXMaxDepth, err := runtime.ParseString[int](headerValues[0])
+		if returnParseError(w, "X-Max-Depth", err) {
+			return
+		}
+		headerParams.XMaxDepth = &headerParamXMaxDepth
 	}
 	if headerValues := headers[http.CanonicalHeaderKey("X-Price-Threshold")]; len(headerValues) > 0 {
-		xpriceThreshold, _ := runtime.ParseString[float32](headerValues[0])
-		headerParams.XPriceThreshold = &xpriceThreshold
+		headerParamXPriceThreshold, err := runtime.ParseString[float32](headerValues[0])
+		if returnParseError(w, "X-Price-Threshold", err) {
+			return
+		}
+		headerParams.XPriceThreshold = &headerParamXPriceThreshold
 	}
 	opts.Header = headerParams
 
@@ -1193,14 +1226,20 @@ func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByStatusPath{}
-	activeStr := r.PathValue("active")
+	pathParamActiveStr := r.PathValue("active")
 
-	active, _ := runtime.ParseString[bool](activeStr)
-	pathParams.Active = active
-	ratingStr := r.PathValue("rating")
+	pathParamActive, err := runtime.ParseString[bool](pathParamActiveStr)
+	if returnParseError(w, "active", err) {
+		return
+	}
+	pathParams.Active = pathParamActive
+	pathParamRatingStr := r.PathValue("rating")
 
-	rating, _ := runtime.ParseString[float32](ratingStr)
-	pathParams.Rating = rating
+	pathParamRating, err := runtime.ParseString[float32](pathParamRatingStr)
+	if returnParseError(w, "rating", err) {
+		return
+	}
+	pathParams.Rating = pathParamRating
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -1257,10 +1296,10 @@ func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetUserPostPath{}
-	userIDStr := r.PathValue("userId")
-	pathParams.UserID = userIDStr
-	postIDStr := r.PathValue("postId")
-	pathParams.PostID = postIDStr
+	pathParamUserIDStr := r.PathValue("userId")
+	pathParams.UserID = pathParamUserIDStr
+	pathParamPostIDStr := r.PathValue("postId")
+	pathParams.PostID = pathParamPostIDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -1273,9 +1312,6 @@ func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.impl.GetUserPost(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*types.GetUserPostErrorResponse); ok {
-			code = 404
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -1337,9 +1373,6 @@ func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.impl.CreateOrder(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*types.CreateOrderErrorResponse); ok {
-			code = 400
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
