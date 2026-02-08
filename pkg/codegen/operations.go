@@ -33,7 +33,7 @@ type OperationDefinition struct {
 	Method      string
 	Path        string
 	PathParams  *TypeDefinition
-	Header      *TypeDefinition
+	Header      *RequestParametersDefinition
 	Query       *RequestParametersDefinition
 
 	TypeDefinitions []TypeDefinition

@@ -44,8 +44,8 @@ limitations under the License.
 
     {{ if $responseErrors }}
     {{- $isResponseError := index $responseErrors $td.Name }}
-    {{ if $isResponseError }}
-    {{ if and (not $td.IsAlias) (not $td.Schema.IsAnyType) }}
+    {{/* Error() method - only for non-aliases (aliases can't have methods) */}}
+    {{ if and $isResponseError (not $td.IsAlias) (not $td.Schema.IsAnyType) }}
     {{ $alias := $loc | fst | lower }}
     func ({{$alias}} {{$td.Name}}) Error() string {
         {{- if index $config.ErrorMapping $td.Name}}
@@ -54,7 +54,6 @@ limitations under the License.
         return "unmapped client error"
         {{ end -}}
     }
-    {{ end }}
     {{ end }}
     {{ end }}
 

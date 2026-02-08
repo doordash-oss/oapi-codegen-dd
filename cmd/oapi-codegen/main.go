@@ -29,6 +29,21 @@ const (
 	generatedFilePerm = 0644
 )
 
+// isScaffoldOnce checks if a file name matches any scaffold-once pattern.
+// For keys with "/" (like "/main"), it uses suffix matching.
+func isScaffoldOnce(name string) bool {
+	for key := range codegen.ScaffoldOnceFiles {
+		if strings.Contains(key, "/") {
+			if strings.HasSuffix(name, key) {
+				return true
+			}
+		} else if name == key {
+			return true
+		}
+	}
+	return false
+}
+
 var (
 	flagConfigFile string
 	flagPrintUsage bool
@@ -108,20 +123,45 @@ func main() {
 		}
 	}
 
+	if destFile == "" && destDir == "" {
+		fmt.Print(code.GetCombined())
+		return
+	}
+
+	dir := destDir
 	if destFile != "" {
-		err = os.WriteFile(destFile, []byte(code.GetCombined()), generatedFilePerm)
-		if err != nil {
+		dir = filepath.Dir(destFile)
+		if err = os.WriteFile(destFile, []byte(code.GetCombined()), generatedFilePerm); err != nil {
 			errExit("Error writing file: %v", err)
 		}
-	} else if destDir != "" {
-		for name, contents := range code {
-			err = os.WriteFile(filepath.Join(destDir, name+".go"), []byte(contents), generatedFilePerm)
-			if err != nil {
-				errExit("Error writing file: %v", err)
+	}
+
+	for name, contents := range code {
+		isScaffold := isScaffoldOnce(name)
+		if destFile != "" && !isScaffold {
+			continue
+		}
+
+		// Server files (e.g., "server/main") are written relative to cwd,
+		// not the handler output directory, since they're a separate main package.
+		outDir := dir
+		if strings.HasSuffix(name, "/main") {
+			outDir = "."
+		}
+		filePath := filepath.Join(outDir, name+".go")
+
+		if isScaffold && (cfg.Generate == nil || !cfg.Generate.OverwriteScaffolded) {
+			if _, err := os.Stat(filePath); err == nil {
+				continue
 			}
 		}
-	} else {
-		fmt.Print(code.GetCombined())
+
+		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			errExit("Error creating directory: %v", err)
+		}
+		if err = os.WriteFile(filePath, []byte(contents), generatedFilePerm); err != nil {
+			errExit("Error writing file: %v", err)
+		}
 	}
 }
 

@@ -1,0 +1,55 @@
+{{/*
+Copyright 2025 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/* Standard library http.ServeMux template blocks (Go 1.22+) */}}
+
+{{define "router-import"}}{{end}}
+
+{{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
+
+{{define "new-router"}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $handlerName := $config.Generate.Handler.Name -}}
+// NewRouter creates a new http.ServeMux with the given handler implementation.
+func NewRouter(impl {{ $handlerName }}Interface, opts ...RouterOption) *http.ServeMux {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    adapter := NewHTTPAdapter(impl)
+
+    mux := http.NewServeMux()
+
+    {{- range $operations }}{{ $op := . }}
+        mux.HandleFunc("{{ $op.Method }} {{ $op.Path }}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
+    {{- end }}
+
+    return mux
+}
+
+// applyMiddleware wraps a handler with the given middleware chain.
+func applyMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+    for i := len(middlewares) - 1; i >= 0; i-- {
+        h = middlewares[i](h)
+    }
+    return h.ServeHTTP
+}
+{{end}}
+
+{{template "handler/shared/handler.tmpl" .}}
+{{template "handler/shared/adapter.tmpl" .}}
+{{template "handler/shared/router.tmpl" .}}

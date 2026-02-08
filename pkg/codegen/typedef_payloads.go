@@ -97,8 +97,12 @@ func createBodyDefinition(operationID string, body *v3high.RequestBody, options 
 		tag = "Formdata"
 	case contentType == "text/plain":
 		tag = "Text"
+	case contentType == "text/html":
+		tag = "HTML"
 	default:
-		return nil, nil, nil
+		// For unsupported content types (XML, binary, etc.), create a "Raw" body definition.
+		// This ensures opts are generated so users can access RawRequest for custom parsing.
+		tag = "Raw"
 	}
 
 	bodyTypeName := operationID + "Body"

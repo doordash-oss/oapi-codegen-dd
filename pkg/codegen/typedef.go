@@ -59,58 +59,8 @@ func (t TypeDefinition) IsOptional() bool {
 func (t TypeDefinition) GetErrorResponse(errTypes map[string]string, alias string, typeSchemaMap map[string]GoSchema) string {
 	unknownRes := `return "unknown error"`
 
-	key := t.Name
-	path, ok := errTypes[key]
-	if !ok || path == "" {
-		return unknownRes
-	}
-
-	segments := parseErrorPath(path)
-
-	type pathEntry struct {
-		goName       string
-		prop         Property
-		isArrayIndex bool
-	}
-
-	var (
-		schema   = t.Schema
-		callPath []pathEntry
-	)
-
-	for _, seg := range segments {
-		found := false
-		for _, prop := range schema.Properties {
-			if prop.JsonFieldName == seg.propertyName {
-				callPath = append(callPath, pathEntry{
-					goName:       prop.GoName,
-					prop:         prop,
-					isArrayIndex: seg.isArrayIndex,
-				})
-				schema = prop.Schema
-
-				// If array access, get the element schema
-				if seg.isArrayIndex && schema.ArrayType != nil {
-					schema = *schema.ArrayType
-				}
-
-				// If the property references another type, resolve it
-				if schema.GoType != "" && len(schema.Properties) == 0 {
-					if resolvedSchema, ok := typeSchemaMap[schema.GoType]; ok {
-						schema = resolvedSchema
-					}
-				}
-
-				found = true
-				break
-			}
-		}
-		if !found {
-			return unknownRes
-		}
-	}
-
-	if len(callPath) == 0 {
+	fields := resolveErrorPath(t.Name, errTypes, t.Schema, typeSchemaMap)
+	if fields == nil {
 		return unknownRes
 	}
 
@@ -121,15 +71,13 @@ func (t TypeDefinition) GetErrorResponse(errTypes map[string]string, alias strin
 		varIndex = 0
 	)
 
-	for _, entry := range callPath {
+	for _, entry := range fields {
 		varName = fmt.Sprintf("res%d", varIndex)
 		code = append(code, fmt.Sprintf("%s := %s.%s", varName, prevVar, entry.goName))
 
-		isArray := entry.prop.Schema.ArrayType != nil
-
 		// For nullable non-array types, add nil check and dereference
 		// For arrays, we handle nil check in the array access section (via len check)
-		if entry.prop.Constraints.Nullable != nil && *entry.prop.Constraints.Nullable && !isArray {
+		if entry.isNullable && !entry.isArray {
 			code = append(code, fmt.Sprintf("if %s == nil { %s }", varName, unknownRes))
 
 			// Prepare for next access with dereference
@@ -179,4 +127,90 @@ func parseErrorPath(path string) []errorPathSegment {
 	}
 
 	return segments
+}
+
+// resolvedField contains all info needed for both Get and Set error response methods.
+type resolvedField struct {
+	goName        string
+	goType        string
+	containerType string // The type of the struct that contains this field (for nested struct literals)
+	isNullable    bool
+	isArray       bool
+	arrayType     string
+	isArrayIndex  bool
+	prop          Property
+}
+
+// resolveErrorPath traverses the schema following the error-mapping path and returns
+// resolved field info for each segment. Returns nil if path not found or invalid.
+func resolveErrorPath(typeName string, errTypes map[string]string, schema GoSchema, typeSchemaMap map[string]GoSchema) []resolvedField {
+	path, ok := errTypes[typeName]
+	if !ok || path == "" {
+		return nil
+	}
+
+	segments := parseErrorPath(path)
+	if len(segments) == 0 {
+		return nil
+	}
+
+	fields := make([]resolvedField, 0, len(segments))
+	// Track the current container type (the type of the struct we're looking at)
+	currentContainerType := typeName
+
+	for _, seg := range segments {
+		found := false
+		for _, prop := range schema.Properties {
+			if prop.JsonFieldName == seg.propertyName {
+				isNullable := prop.Constraints.Nullable != nil && *prop.Constraints.Nullable
+				isArray := prop.Schema.ArrayType != nil
+
+				f := resolvedField{
+					goName:        prop.GoName,
+					goType:        prop.Schema.GoType,
+					containerType: currentContainerType,
+					isNullable:    isNullable,
+					isArray:       isArray,
+					isArrayIndex:  seg.isArrayIndex,
+					prop:          prop,
+				}
+
+				if isArray && prop.Schema.ArrayType != nil {
+					f.arrayType = prop.Schema.ArrayType.GoType
+				}
+
+				fields = append(fields, f)
+				schema = prop.Schema
+
+				// If array access, get the element schema
+				if seg.isArrayIndex && schema.ArrayType != nil {
+					schema = *schema.ArrayType
+				}
+
+				// If the property references another type, resolve it
+				if schema.GoType != "" && len(schema.Properties) == 0 {
+					if resolvedSchema, ok := typeSchemaMap[schema.GoType]; ok {
+						// Update container type to the referenced type before resolving
+						currentContainerType = schema.GoType
+						schema = resolvedSchema
+					}
+				} else if schema.GoType != "" {
+					// The schema has properties already resolved - use its GoType
+					currentContainerType = schema.GoType
+				}
+
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil
+		}
+	}
+
+	if len(fields) == 0 {
+		return nil
+	}
+
+	return fields
 }

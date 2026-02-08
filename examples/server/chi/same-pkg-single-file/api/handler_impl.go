@@ -1,0 +1,163 @@
+// Package api This file is generated ONCE as a starting point and will NOT be overwritten.
+// Modify it freely to add your business logic.
+// To regenerate, delete this file or set output.scaffold-once-overwrite: true in config.
+package api
+
+import (
+    "context"
+)
+
+// Handler handles API requests.
+// Implement the interface methods to handle each operation.
+type Handler struct {
+    // Add your dependencies here (database, services, etc.)
+}
+
+// NewHandler creates a new Handler.
+func NewHandler() *Handler {
+    return &Handler{}
+}
+
+// Ensure Handler implements HandlerInterface.
+var _ HandlerInterface = (*Handler)(nil)
+
+// Interface method implementations - fill in your business logic
+
+// HealthCheck Health check endpoint
+func (h *Handler) HealthCheck(ctx context.Context) (*HealthCheckResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewHealthCheckResponseData(new(HealthCheckResponse)), nil
+}
+
+// ListUsers List all users
+func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersRequestOptions) (*ListUsersResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewListUsersResponseData(new(ListUsersResponse)), nil
+}
+
+// CreateUser Create a new user via JSON
+func (h *Handler) CreateUser(ctx context.Context, opts *CreateUserRequestOptions) (*CreateUserResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewCreateUserResponseData(new(CreateUserResponse)), nil
+}
+
+// ImportUsers Import users from CSV file
+func (h *Handler) ImportUsers(ctx context.Context, opts *ImportUsersRequestOptions) (*ImportUsersResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewImportUsersResponseData(new(ImportUsersResponse)), nil
+}
+
+// GetUser Get a user by ID
+func (h *Handler) GetUser(ctx context.Context, opts *GetUserRequestOptions) (*GetUserResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetUserResponseData(new(GetUserResponse)), nil
+}
+
+// DeleteUser Delete a user
+func (h *Handler) DeleteUser(ctx context.Context, opts *DeleteUserRequestOptions) (*DeleteUserResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewDeleteUserResponseData(nil), nil
+}
+
+// GetUserAvatar Get user avatar image
+func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarRequestOptions) (*GetUserAvatarResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetUserAvatarResponseData(new(GetUserAvatarResponse)), nil
+}
+
+// UploadUserAvatar Upload user avatar
+func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarRequestOptions) (*UploadUserAvatarResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewUploadUserAvatarResponseData(nil), nil
+}
+
+// SubmitContactForm Submit contact form
+func (h *Handler) SubmitContactForm(ctx context.Context, opts *SubmitContactFormRequestOptions) (*SubmitContactFormResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewSubmitContactFormResponseData(new(SubmitContactFormResponse)), nil
+}
+
+// CreateNote Create a note from plain text
+func (h *Handler) CreateNote(ctx context.Context, opts *CreateNoteRequestOptions) (*CreateNoteResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewCreateNoteResponseData(new(CreateNoteResponse)), nil
+}
+
+// ProcessXMLData Process XML data (demonstrates custom content type handling)
+func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataRequestOptions) (*ProcessXMLDataResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewProcessXMLDataResponseData([]byte("TODO: marshal response")), nil
+}
+
+// ExportData Export all data as binary archive
+func (h *Handler) ExportData(ctx context.Context) (*ExportDataResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewExportDataResponseData(new(ExportDataResponse)), nil
+}
+
+// GetOAuthToken Get OAuth token (form-encoded response)
+func (h *Handler) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenRequestOptions) (*GetOAuthTokenResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetOAuthTokenResponseData(new(GetOAuthTokenResponse)), nil
+}
+
+// GetItemsByType Get items by type (tests reserved Go keyword as path param)
+func (h *Handler) GetItemsByType(ctx context.Context, opts *GetItemsByTypeRequestOptions) (*GetItemsByTypeResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetItemsByTypeResponseData(new(GetItemsByTypeResponse)), nil
+}
+
+// Search Search with union type response (oneOf)
+func (h *Handler) Search(ctx context.Context, opts *SearchRequestOptions) (*SearchResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewSearchResponseData(new(SearchResponse)), nil
+}
+
+// GetStatus Get status (uses reusable response)
+func (h *Handler) GetStatus(ctx context.Context) (*GetStatusResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetStatusResponseData(new(GetStatusResponse)), nil
+}
+
+// UploadImage Upload image (wildcard content type)
+func (h *Handler) UploadImage(ctx context.Context, opts *UploadImageRequestOptions) (*UploadImageResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewUploadImageResponseData(new(UploadImageResponse)), nil
+}
+
+// ListProducts List products with various query param types
+func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsRequestOptions) (*ListProductsResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewListProductsResponseData(new(ListProductsResponse)), nil
+}
+
+// GetCategory Get a category by ID (integer path param)
+func (h *Handler) GetCategory(ctx context.Context, opts *GetCategoryRequestOptions) (*GetCategoryResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetCategoryResponseData(new(GetCategoryResponse)), nil
+}
+
+// GetItemsByStatus Get items by active status and rating (boolean + number path params)
+func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusRequestOptions) (*GetItemsByStatusResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetItemsByStatusResponseData(new(GetItemsByStatusResponse)), nil
+}
+
+// GetUserPost Get a specific post by a user
+func (h *Handler) GetUserPost(ctx context.Context, opts *GetUserPostRequestOptions) (*GetUserPostResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewGetUserPostResponseData(new(GetUserPostResponse)), nil
+}
+
+// CreateOrder Create an order (demonstrates typed error responses)
+func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderRequestOptions) (*CreateOrderResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewCreateOrderResponseData(new(CreateOrderResponse)), nil
+}
+
+// CreateCompany Create a company with nested address
+func (h *Handler) CreateCompany(ctx context.Context, opts *CreateCompanyRequestOptions) (*CreateCompanyResponseData, error) {
+    // TODO: Implement your business logic here
+    return NewCreateCompanyResponseData(new(CreateCompanyResponse)), nil
+}
+

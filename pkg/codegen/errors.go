@@ -31,4 +31,7 @@ var (
 	ErrDiscriminatorNotAllMapped                 = errors.New("discriminator: not all schemas were mapped")
 	ErrEmptySchema                               = errors.New("empty schema")
 	ErrEmptyReferencePath                        = errors.New("empty reference path")
+	ErrHandlerKindRequired                       = errors.New("handler kind is required")
+	ErrHandlerKindUnsupported                    = errors.New("unsupported handler kind")
+	ErrServerHandlerPackageRequired              = errors.New("server handler-package is required when server generation is enabled")
 )

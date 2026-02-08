@@ -10,7 +10,18 @@
 
 package codegen
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+// ScaffoldOnceFiles are files generated once and not overwritten on regeneration.
+// Users can modify these files freely. Keys with "/" are matched as suffixes.
+var ScaffoldOnceFiles = map[string]bool{
+	"handler_impl": true,
+	"middleware":   true,
+	"/main":        true,
+}
 
 // Configuration defines code generation customizations.
 // PackageName to generate the code under.
@@ -83,6 +94,15 @@ func (o Configuration) WithDefaults() Configuration {
 		// Fill in missing Generate fields from defaults
 		if o.Generate.DefaultIntType == "" {
 			o.Generate.DefaultIntType = defaults.Generate.DefaultIntType
+		}
+		// Fill in Handler defaults if Handler is configured
+		if o.Generate.Handler != nil {
+			if o.Generate.Handler.Name == "" {
+				o.Generate.Handler.Name = "Handler"
+			}
+			if o.Generate.Handler.Kind == "" {
+				o.Generate.Handler.Kind = HandlerKindChi
+			}
 		}
 	}
 
@@ -158,6 +178,29 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			}
 			if other.Generate.Validation.Response {
 				o.Generate.Validation.Response = other.Generate.Validation.Response
+			}
+
+			// Overwrite Handler options
+			if other.Generate.Handler != nil {
+				if o.Generate.Handler == nil {
+					o.Generate.Handler = other.Generate.Handler
+				} else {
+					if other.Generate.Handler.Name != "" {
+						o.Generate.Handler.Name = other.Generate.Handler.Name
+					}
+					if other.Generate.Handler.Kind != "" {
+						o.Generate.Handler.Kind = other.Generate.Handler.Kind
+					}
+					if other.Generate.Handler.ModelsPackageAlias != "" {
+						o.Generate.Handler.ModelsPackageAlias = other.Generate.Handler.ModelsPackageAlias
+					}
+					if other.Generate.Handler.Validation.Request {
+						o.Generate.Handler.Validation.Request = other.Generate.Handler.Validation.Request
+					}
+					if other.Generate.Handler.Validation.Response {
+						o.Generate.Handler.Validation.Response = other.Generate.Handler.Validation.Response
+					}
+				}
 			}
 		}
 	}
@@ -242,6 +285,14 @@ type GenerateOptions struct {
 	// Client specifies whether to generate a client. Defaults to false.
 	Client bool `yaml:"client"`
 
+	// Models specifies whether to generate model types. Defaults to true.
+	// Set to false when models are generated in a separate package.
+	Models *bool `yaml:"models,omitempty"`
+
+	// Handler specifies options for handler/server code generation.
+	// If nil, no handler code is generated.
+	Handler *HandlerOptions `yaml:"handler,omitempty"`
+
 	// OmitDescription specifies whether to omit schema description from the spec in the generated code. Defaults to false.
 	OmitDescription bool `yaml:"omit-description"`
 
@@ -253,6 +304,10 @@ type GenerateOptions struct {
 
 	// Validation specifies options for Validate() method generation.
 	Validation ValidationOptions `yaml:"validation"`
+
+	// OverwriteScaffolded forces regeneration of scaffold-once files (e.g., handler_impl, middleware).
+	// Normally these files are only generated if they don't exist. Defaults to false.
+	OverwriteScaffolded bool `yaml:"overwrite-scaffolded"`
 }
 
 type ValidationOptions struct {
@@ -277,6 +332,102 @@ type Output struct {
 type Client struct {
 	Name    string        `yaml:"name"`
 	Timeout time.Duration `yaml:"timeout"`
+}
+
+// HandlerKind specifies the router/framework to generate handler code for.
+type HandlerKind string
+
+const (
+	// HandlerKindChi generates handlers for the chi router.
+	HandlerKindChi HandlerKind = "chi"
+	// HandlerKindStdHTTP generates handlers for Go's standard library http.ServeMux (Go 1.22+).
+	HandlerKindStdHTTP HandlerKind = "std-http"
+)
+
+// IsValid returns true if the handler kind is a supported value.
+func (k HandlerKind) IsValid() bool {
+	switch k {
+	case HandlerKindChi, HandlerKindStdHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
+// HandlerOptions specifies options for handler/server code generation.
+type HandlerOptions struct {
+	// Name is the name of the handler interface. Defaults to "Handler".
+	Name string `yaml:"name"`
+
+	// Kind specifies the router/framework to generate for. Defaults to "chi".
+	// Supported values: "chi"
+	Kind HandlerKind `yaml:"kind"`
+
+	// ModelsPackageAlias is the package alias to prefix model types with.
+	// If empty, models are assumed to be in the same package.
+	// Example: "models" will generate "models.User" instead of "User".
+	ModelsPackageAlias string `yaml:"models-package-alias"`
+
+	// Validation specifies options for request/response validation in handlers.
+	Validation HandlerValidation `yaml:"validation"`
+
+	// Server specifies options for generating a runnable server main.go.
+	// If nil, no server is generated.
+	Server *ServerOptions `yaml:"server"`
+}
+
+// ServerOptions specifies options for generating a runnable server main.go.
+type ServerOptions struct {
+	// Directory is the directory to generate the server main.go in.
+	// Defaults to "server".
+	Directory string `yaml:"directory"`
+
+	// Port is the port the server listens on. Defaults to 8080.
+	Port int `yaml:"port"`
+
+	// HandlerPackage is the full import path of the handler package.
+	// Required when server generation is enabled.
+	HandlerPackage string `yaml:"handler-package"`
+}
+
+// WithDefaults returns a copy of ServerOptions with default values applied.
+func (o ServerOptions) WithDefaults() ServerOptions {
+	if o.Directory == "" {
+		o.Directory = "server"
+	}
+	if o.Port == 0 {
+		o.Port = 8080
+	}
+	return o
+}
+
+// Validate returns an error if the server options are invalid.
+func (o ServerOptions) Validate() error {
+	if o.HandlerPackage == "" {
+		return ErrServerHandlerPackageRequired
+	}
+	return nil
+}
+
+// Validate returns an error if the handler options are invalid.
+func (o HandlerOptions) Validate() error {
+	if o.Kind == "" {
+		return ErrHandlerKindRequired
+	}
+	if !o.Kind.IsValid() {
+		return fmt.Errorf("%w: %q", ErrHandlerKindUnsupported, o.Kind)
+	}
+	return nil
+}
+
+// HandlerValidation specifies validation options for handlers.
+type HandlerValidation struct {
+	// Request enables validation of incoming requests. Defaults to false.
+	Request bool `yaml:"request"`
+
+	// Response enables validation of outgoing responses. Defaults to false.
+	// Useful for contract testing.
+	Response bool `yaml:"response"`
 }
 
 // NewDefaultConfiguration creates a new default Configuration.

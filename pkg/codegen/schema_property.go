@@ -36,6 +36,11 @@ func (p Property) IsEqual(other Property) bool {
 		p.Constraints.IsEqual(other.Constraints)
 }
 
+// IsFile returns true if this property is a file type (format: binary).
+func (p Property) IsFile() bool {
+	return p.Schema.GoType == "runtime.File"
+}
+
 func (p Property) GoTypeDef() string {
 	typeDef := p.Schema.TypeDecl()
 

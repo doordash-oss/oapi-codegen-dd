@@ -1,0 +1,61 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $modelsPrefix := "" -}}
+{{- if $config.Generate.Handler.ModelsPackageAlias }}{{ $modelsPrefix = printf "%s." $config.Generate.Handler.ModelsPackageAlias }}{{ end -}}
+{{- template "response-data-header" $ }}
+
+{{ range $operations }}{{ $op := . }}
+{{- if $op.Response.Success }}
+{{- $bodyType := $op.Response.Success.ResponseName -}}
+{{- if and $modelsPrefix (ne $bodyType "struct{}") }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
+{{- $isRawResponse := $op.Response.Success.IsRaw }}
+// {{ $op.ID | ucFirst }}ResponseData wraps the success response with optional headers and status override.
+type {{ $op.ID | ucFirst }}ResponseData struct {
+{{- if $isRawResponse }}
+    // Body contains pre-marshaled bytes for custom content types.
+    // Set Content-Type via Headers.
+    Body    []byte
+{{- else }}
+    Body    *{{ $bodyType }}
+{{- end }}
+    Headers http.Header
+    Status  int // 0 = use default ({{ $op.Response.SuccessStatusCode }})
+}
+
+// New{{ $op.ID | ucFirst }}ResponseData creates a new {{ $op.ID | ucFirst }}ResponseData with the given body.
+{{- if $isRawResponse }}
+func New{{ $op.ID | ucFirst }}ResponseData(body []byte) *{{ $op.ID | ucFirst }}ResponseData {
+{{- else }}
+func New{{ $op.ID | ucFirst }}ResponseData(body *{{ $bodyType }}) *{{ $op.ID | ucFirst }}ResponseData {
+{{- end }}
+    return &{{ $op.ID | ucFirst }}ResponseData{Body: body}
+}
+
+// WithHeaders sets custom headers on the response.
+func (r *{{ $op.ID | ucFirst }}ResponseData) WithHeaders(h http.Header) *{{ $op.ID | ucFirst }}ResponseData {
+    r.Headers = h
+    return r
+}
+
+// WithStatus overrides the default status code.
+func (r *{{ $op.ID | ucFirst }}ResponseData) WithStatus(code int) *{{ $op.ID | ucFirst }}ResponseData {
+    r.Status = code
+    return r
+}
+{{- end }}
+{{ end }}

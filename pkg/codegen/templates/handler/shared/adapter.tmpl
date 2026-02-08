@@ -1,0 +1,289 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $handlerName := $config.Generate.Handler.Name -}}
+{{- $modelsPrefix := "" -}}
+{{- if $config.Generate.Handler.ModelsPackageAlias }}{{ $modelsPrefix = printf "%s." $config.Generate.Handler.ModelsPackageAlias }}{{ end -}}
+{{- $validateRequest := $config.Generate.Handler.Validation.Request -}}
+{{- $validateResponse := $config.Generate.Handler.Validation.Response -}}
+{{- template "handler-header" $ }}
+
+// HTTPAdapter adapts the {{ $handlerName }}Interface to HTTP handlers.
+// This struct is generated and should not be modified.
+type HTTPAdapter struct {
+    impl {{ $handlerName }}Interface
+}
+
+// NewHTTPAdapter creates a new HTTPAdapter wrapping the given implementation.
+func NewHTTPAdapter(impl {{ $handlerName }}Interface) *HTTPAdapter {
+    return &HTTPAdapter{impl: impl}
+}
+
+// HTTP handler adapters - parse request, call interface, write response
+{{ range $operations }}{{ $op := . }}
+func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+{{- if $op.HasRequestOptions }}
+    opts := &{{ $op.ID | ucFirst }}RequestOptions{}
+    opts.RawRequest = r
+{{- end }}
+
+{{ if $op.PathParams }}
+    // Parse path parameters
+    pathParams := &{{ $modelsPrefix }}{{ $op.PathParams.Name }}{}
+    {{- range $op.PathParams.Schema.Properties }}
+        {{- $paramVar := .JsonFieldName }}
+        {{ $paramVar }}Str := {{template "get-path-param" .JsonFieldName}}
+        pathParams.{{ .GoName }}, _ = runtime.ParseString[{{ .Schema.GoType }}]({{ $paramVar }}Str)
+    {{- end }}
+    opts.PathParams = pathParams
+{{- end }}
+{{- if $op.Query }}
+    // Parse query parameters
+    queryParams := &{{ $modelsPrefix }}{{ $op.Query.Name }}{}
+    query := r.URL.Query()
+    {{- range $op.Query.Params }}
+        {{- $paramVar := .ParamName }}
+        {{- if .Schema.ArrayType }}
+            {{/* Array query params: use query["key"] to get all values */}}
+            if values, ok := query["{{ .ParamName }}"]; ok {
+                {{- if eq .Schema.ArrayType.GoType "string" }}
+                    queryParams.{{ .GoName }} = values
+                {{- else }}
+                    queryParams.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.GoType }}](values)
+                {{- end }}
+            }
+        {{- else }}
+            {{ $paramVar }}Str := query.Get("{{ .ParamName }}")
+            {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.GoType }}]({{ $paramVar }}Str)
+            {{- if .IndirectOptional }}
+                queryParams.{{ .GoName }} = &{{ $paramVar }}
+            {{- else }}
+                queryParams.{{ .GoName }} = {{ $paramVar }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+    opts.Query = queryParams
+{{- end }}
+{{- if $op.Header }}
+
+    // Parse header parameters
+    headerParams := &{{ $modelsPrefix }}{{ $op.Header.TypeDef.Name }}{}
+    headers := r.Header
+    {{- range $op.Header.Params }}
+    {{- $paramVar := .GoVariableName }}
+    if headerValues := headers[http.CanonicalHeaderKey("{{ .ParamName }}")]; len(headerValues) > 0 {
+        {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.GoType }}](headerValues[0])
+        {{- if .IndirectOptional }}
+            headerParams.{{ .GoName }} = &{{ $paramVar }}
+        {{- else }}
+            headerParams.{{ .GoName }} = {{ $paramVar }}
+        {{- end }}
+    }
+    {{- end }}
+    opts.Header = headerParams
+{{- end }}
+{{- if $op.Body }}
+    // Parse request body
+    defer r.Body.Close()
+    {{- if or (eq $op.Body.ContentType "application/json") (hasSuffix $op.Body.ContentType "+json") }}
+    var body {{ $modelsPrefix }}{{ $op.Body.Name }}
+    if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    opts.Body = &body
+    {{- else if eq $op.Body.ContentType "application/x-www-form-urlencoded" }}
+    var body {{ $modelsPrefix }}{{ $op.Body.Name }}
+    formBytes, err := io.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    jsonBytes, err := runtime.ConvertFormFields(formBytes)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    if err := json.Unmarshal(jsonBytes, &body); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    opts.Body = &body
+    {{- else if or (eq $op.Body.ContentType "text/plain") (eq $op.Body.ContentType "text/html") }}
+    bodyBytes, err := io.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    body := {{ $modelsPrefix }}{{ $op.Body.Name }}(string(bodyBytes))
+    opts.Body = &body
+    {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
+    if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    var body {{ $modelsPrefix }}{{ $op.Body.Name }}
+    {{- range $op.Body.Schema.Properties }}
+        {{- if .IsFile }}
+            if fileHeaders := r.MultipartForm.File["{{ .JsonFieldName }}"]; len(fileHeaders) > 0 {
+                body.{{ .GoName }}.InitFromMultipart(fileHeaders[0])
+            }
+        {{- else }}
+            if values := r.MultipartForm.Value["{{ .JsonFieldName }}"]; len(values) > 0 {
+                {{- if eq .Schema.GoType "bool" }}
+                body.{{ .GoName }}{{ if .IsPointerType }} = new(bool); *body.{{ .GoName }}{{ end }} = values[0] == "true"
+                {{- else if eq .Schema.GoType "int" }}
+                if v, err := strconv.Atoi(values[0]); err == nil {
+                    body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
+                }
+                {{- else if eq .Schema.GoType "int64" }}
+                if v, err := strconv.ParseInt(values[0], 10, 64); err == nil {
+                    body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
+                }
+                {{- else if eq .Schema.GoType "float64" }}
+                if v, err := strconv.ParseFloat(values[0], 64); err == nil {
+                    body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
+                }
+                {{- else }}
+                {{- if .IsPointerType }}
+                body.{{ .GoName }} = &values[0]
+                {{- else }}
+                body.{{ .GoName }} = values[0]
+                {{- end }}
+                {{- end }}
+            }
+        {{- end }}
+    {{- end }}
+    opts.Body = &body
+    {{- end }}
+{{- end }}
+
+{{- if $validateRequest }}
+{{- if $op.HasRequestOptions }}
+
+    // Validate request
+    if err := opts.Validate(); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+{{- end }}
+{{- end }}
+
+// Call business logic
+{{- if $op.HasRequestOptions }}
+    {{- if $op.Response.Success }}
+        resp, err := h.impl.{{ $op.ID }}(ctx, opts)
+    {{- else }}
+        err := h.impl.{{ $op.ID }}(ctx, opts)
+    {{- end }}
+{{- else }}
+    {{- if $op.Response.Success }}
+        resp, err := h.impl.{{ $op.ID }}(ctx)
+    {{- else }}
+        err := h.impl.{{ $op.ID }}(ctx)
+    {{- end }}
+{{- end }}
+if err != nil {
+    code := http.StatusInternalServerError
+    {{- if $op.Response.Error }}
+    if _, ok := err.(*{{ $modelsPrefix }}{{ $op.Response.Error.ResponseName }}); ok {
+        code = {{ $op.Response.Error.StatusCode }}
+    }
+    {{- end }}
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(code)
+    _ = json.NewEncoder(w).Encode(err)
+    return
+}
+
+{{- if $op.Response.Success }}
+    {{ if $validateResponse }}
+        // Validate response
+        if resp != nil && resp.Body != nil {
+            if v, ok := any(resp.Body).(runtime.Validator); ok {
+                if err := v.Validate(); err != nil {
+                    http.Error(w, "internal validation error", http.StatusInternalServerError)
+                    return
+                }
+            }
+        }
+    {{- end }}
+
+    // Apply custom headers from response
+    if resp != nil && resp.Headers != nil {
+        for k, v := range resp.Headers {
+            for _, val := range v {
+                w.Header().Add(k, val)
+            }
+        }
+    }
+
+    // Determine status code
+    status := {{ $op.Response.SuccessStatusCode }}
+    if resp != nil && resp.Status != 0 {
+        status = resp.Status
+    }
+
+    {{- if eq $op.Response.SuccessStatusCode 204 }}
+        w.WriteHeader(status)
+    {{- else if $op.Response.Success.ContentType }}
+        w.Header().Set("Content-Type", "{{ $op.Response.Success.ContentType }}")
+    {{- if or (eq $op.Response.Success.ContentType "application/json") (hasSuffix $op.Response.Success.ContentType "+json") }}
+        w.WriteHeader(status)
+        if resp != nil && resp.Body != nil {
+            _ = json.NewEncoder(w).Encode(resp.Body)
+        }
+    {{- else if or (eq $op.Response.Success.ContentType "text/plain") (eq $op.Response.Success.ContentType "text/html") }}
+        w.WriteHeader(status)
+        if resp != nil && resp.Body != nil {
+            _, _ = fmt.Fprintf(w, "%v", *resp.Body)
+        }
+    {{- else if eq $op.Response.Success.ContentType "application/octet-stream" }}
+        if resp != nil && resp.Body != nil {
+            data, err := resp.Body.Bytes()
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            w.WriteHeader(status)
+            _, _ = w.Write(data)
+        } else {
+            w.WriteHeader(status)
+        }
+    {{- else if eq $op.Response.Success.ContentType "application/x-www-form-urlencoded" }}
+        w.WriteHeader(status)
+        if resp != nil && resp.Body != nil {
+            formData, err := runtime.EncodeFormFields(resp.Body, nil)
+            if err == nil {
+                _, _ = w.Write([]byte(formData))
+            }
+        }
+    {{- else }}
+        w.WriteHeader(status)
+        if resp != nil && resp.Body != nil {
+            _, _ = w.Write(resp.Body)
+        }
+    {{- end }}
+    {{- else }}
+    w.WriteHeader(status)
+    {{- end }}
+{{- else }}
+    w.WriteHeader(http.StatusOK)
+{{- end }}
+}
+{{ end }}

@@ -203,7 +203,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 		for method, operation := range pathItem.GetOperations().FromOldest() {
 			var (
-				headerDef     *TypeDefinition
+				headerDef     *RequestParametersDefinition
 				pathParamsDef *TypeDefinition
 			)
 
@@ -253,7 +253,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 			headerParams := filterParameterDefinitionByType(allParams, "header")
 			headerParamsDef, headerDefs, headerSchemas := generateParamsTypes(headerParams, operationID+"Headers", options)
 			if headerParamsDef != nil {
-				headerDef = &headerParamsDef.TypeDef
+				headerDef = headerParamsDef
 				typeDefs = append(typeDefs, headerDefs...)
 				if len(headerSchemas) > 0 {
 					importSchemas = append(importSchemas, headerSchemas...)
