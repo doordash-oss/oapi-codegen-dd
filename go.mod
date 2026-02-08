@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/go-playground/validator/v10 v10.28.0
+	github.com/google/uuid v1.6.0
 	github.com/iancoleman/strcase v0.3.0
 	github.com/pb33f/libopenapi v0.31.2
 	github.com/stretchr/testify v1.11.1

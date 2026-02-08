@@ -12,13 +12,55 @@ package runtime
 
 import (
 	"strconv"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 // ParseString parses a string into the target type T.
 // Supports all Go primitive types: int, int8, int16, int32, int64,
-// uint, uint8, uint16, uint32, uint64, float32, float64, bool, and string.
-func ParseString[T any](s string) (T, error) {
+// uint, uint8, uint16, uint32, uint64, float32, float64, bool, string,
+// as well as special types like uuid.UUID and time.Time when the appropriate
+// format hint is provided.
+//
+// The optional format parameter is the OpenAPI format (e.g., "uuid", "date-time", "date").
+func ParseString[T any](s string, format ...string) (T, error) {
 	var result T
+
+	// Check format hint first for special types
+	if len(format) > 0 {
+		switch format[0] {
+		case "uuid":
+			if p, ok := any(&result).(*uuid.UUID); ok {
+				v, err := uuid.Parse(s)
+				if err != nil {
+					return result, err
+				}
+				*p = v
+				return result, nil
+			}
+		case "date-time":
+			if p, ok := any(&result).(*time.Time); ok {
+				v, err := time.Parse(time.RFC3339, s)
+				if err != nil {
+					return result, err
+				}
+				*p = v
+				return result, nil
+			}
+		case "date":
+			if p, ok := any(&result).(*Date); ok {
+				v, err := time.Parse("2006-01-02", s)
+				if err != nil {
+					return result, err
+				}
+				*p = Date{Time: v}
+				return result, nil
+			}
+		}
+	}
+
+	// Fall back to type switch for primitives
 	switch p := any(&result).(type) {
 	case *int:
 		v, err := strconv.Atoi(s)
@@ -81,10 +123,11 @@ func ParseString[T any](s string) (T, error) {
 
 // ParseStringSlice parses a slice of strings into a slice of the target type T.
 // Returns an error if any value fails to parse.
-func ParseStringSlice[T any](values []string) ([]T, error) {
+// The optional format parameter is the OpenAPI format (e.g., "uuid", "date-time", "date").
+func ParseStringSlice[T any](values []string, format ...string) ([]T, error) {
 	result := make([]T, len(values))
 	for i, v := range values {
-		parsed, err := ParseString[T](v)
+		parsed, err := ParseString[T](v, format...)
 		if err != nil {
 			return nil, err
 		}

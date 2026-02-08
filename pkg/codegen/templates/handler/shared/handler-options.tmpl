@@ -25,8 +25,8 @@ limitations under the License.
 {{ $skipValidation := $.Config.Generate.Validation.Skip }}
 
 {{ if $op.HasRequestOptions }}
-// {{$op.ID | ucFirst}}RequestOptions holds all parameters for the {{$op.ID}} operation.
-type {{$op.ID | ucFirst}}RequestOptions struct {
+// {{$op.ID | ucFirst}}HandlerRequestOptions holds all parameters for the {{$op.ID}} operation.
+type {{$op.ID | ucFirst}}HandlerRequestOptions struct {
     {{ if $op.PathParams }}
     PathParams *{{$modelsPrefix}}{{$op.PathParams.Name}}
     {{end -}}
@@ -48,7 +48,7 @@ type {{$op.ID | ucFirst}}RequestOptions struct {
 
 {{ if not $skipValidation }}
 // Validate validates all the fields in the options.
-func (o *{{$op.ID | ucFirst}}RequestOptions) Validate() error {
+func (o *{{$op.ID | ucFirst}}HandlerRequestOptions) Validate() error {
     var errors runtime.ValidationErrors
 
     {{ if $op.PathParams }}

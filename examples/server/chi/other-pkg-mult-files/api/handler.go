@@ -10,47 +10,47 @@ type HandlerInterface interface {
 	// HealthCheck Health check endpoint
 	HealthCheck(ctx context.Context) (*HealthCheckResponseData, error)
 	// ListUsers List all users
-	ListUsers(ctx context.Context, opts *ListUsersRequestOptions) (*ListUsersResponseData, error)
+	ListUsers(ctx context.Context, opts *ListUsersHandlerRequestOptions) (*ListUsersResponseData, error)
 	// CreateUser Create a new user via JSON
-	CreateUser(ctx context.Context, opts *CreateUserRequestOptions) (*CreateUserResponseData, error)
+	CreateUser(ctx context.Context, opts *CreateUserHandlerRequestOptions) (*CreateUserResponseData, error)
 	// ImportUsers Import users from CSV file
-	ImportUsers(ctx context.Context, opts *ImportUsersRequestOptions) (*ImportUsersResponseData, error)
+	ImportUsers(ctx context.Context, opts *ImportUsersHandlerRequestOptions) (*ImportUsersResponseData, error)
 	// GetUser Get a user by ID
-	GetUser(ctx context.Context, opts *GetUserRequestOptions) (*GetUserResponseData, error)
+	GetUser(ctx context.Context, opts *GetUserHandlerRequestOptions) (*GetUserResponseData, error)
 	// DeleteUser Delete a user
-	DeleteUser(ctx context.Context, opts *DeleteUserRequestOptions) (*DeleteUserResponseData, error)
+	DeleteUser(ctx context.Context, opts *DeleteUserHandlerRequestOptions) (*DeleteUserResponseData, error)
 	// GetUserAvatar Get user avatar image
-	GetUserAvatar(ctx context.Context, opts *GetUserAvatarRequestOptions) (*GetUserAvatarResponseData, error)
+	GetUserAvatar(ctx context.Context, opts *GetUserAvatarHandlerRequestOptions) (*GetUserAvatarResponseData, error)
 	// UploadUserAvatar Upload user avatar
-	UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarRequestOptions) (*UploadUserAvatarResponseData, error)
+	UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarHandlerRequestOptions) (*UploadUserAvatarResponseData, error)
 	// SubmitContactForm Submit contact form
-	SubmitContactForm(ctx context.Context, opts *SubmitContactFormRequestOptions) (*SubmitContactFormResponseData, error)
+	SubmitContactForm(ctx context.Context, opts *SubmitContactFormHandlerRequestOptions) (*SubmitContactFormResponseData, error)
 	// CreateNote Create a note from plain text
-	CreateNote(ctx context.Context, opts *CreateNoteRequestOptions) (*CreateNoteResponseData, error)
+	CreateNote(ctx context.Context, opts *CreateNoteHandlerRequestOptions) (*CreateNoteResponseData, error)
 	// ProcessXMLData Process XML data (demonstrates custom content type handling)
-	ProcessXMLData(ctx context.Context, opts *ProcessXMLDataRequestOptions) (*ProcessXMLDataResponseData, error)
+	ProcessXMLData(ctx context.Context, opts *ProcessXMLDataHandlerRequestOptions) (*ProcessXMLDataResponseData, error)
 	// ExportData Export all data as binary archive
 	ExportData(ctx context.Context) (*ExportDataResponseData, error)
 	// GetOAuthToken Get OAuth token (form-encoded response)
-	GetOAuthToken(ctx context.Context, opts *GetOAuthTokenRequestOptions) (*GetOAuthTokenResponseData, error)
+	GetOAuthToken(ctx context.Context, opts *GetOAuthTokenHandlerRequestOptions) (*GetOAuthTokenResponseData, error)
 	// GetItemsByType Get items by type (tests reserved Go keyword as path param)
-	GetItemsByType(ctx context.Context, opts *GetItemsByTypeRequestOptions) (*GetItemsByTypeResponseData, error)
+	GetItemsByType(ctx context.Context, opts *GetItemsByTypeHandlerRequestOptions) (*GetItemsByTypeResponseData, error)
 	// Search Search with union type response (oneOf)
-	Search(ctx context.Context, opts *SearchRequestOptions) (*SearchResponseData, error)
+	Search(ctx context.Context, opts *SearchHandlerRequestOptions) (*SearchResponseData, error)
 	// GetStatus Get status (uses reusable response)
 	GetStatus(ctx context.Context) (*GetStatusResponseData, error)
 	// UploadImage Upload image (wildcard content type)
-	UploadImage(ctx context.Context, opts *UploadImageRequestOptions) (*UploadImageResponseData, error)
+	UploadImage(ctx context.Context, opts *UploadImageHandlerRequestOptions) (*UploadImageResponseData, error)
 	// ListProducts List products with various query param types
-	ListProducts(ctx context.Context, opts *ListProductsRequestOptions) (*ListProductsResponseData, error)
+	ListProducts(ctx context.Context, opts *ListProductsHandlerRequestOptions) (*ListProductsResponseData, error)
 	// GetCategory Get a category by ID (integer path param)
-	GetCategory(ctx context.Context, opts *GetCategoryRequestOptions) (*GetCategoryResponseData, error)
+	GetCategory(ctx context.Context, opts *GetCategoryHandlerRequestOptions) (*GetCategoryResponseData, error)
 	// GetItemsByStatus Get items by active status and rating (boolean + number path params)
-	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusRequestOptions) (*GetItemsByStatusResponseData, error)
+	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusHandlerRequestOptions) (*GetItemsByStatusResponseData, error)
 	// GetUserPost Get a specific post by a user
-	GetUserPost(ctx context.Context, opts *GetUserPostRequestOptions) (*GetUserPostResponseData, error)
+	GetUserPost(ctx context.Context, opts *GetUserPostHandlerRequestOptions) (*GetUserPostResponseData, error)
 	// CreateOrder Create an order (demonstrates typed error responses)
-	CreateOrder(ctx context.Context, opts *CreateOrderRequestOptions) (*CreateOrderResponseData, error)
+	CreateOrder(ctx context.Context, opts *CreateOrderHandlerRequestOptions) (*CreateOrderResponseData, error)
 	// CreateCompany Create a company with nested address
-	CreateCompany(ctx context.Context, opts *CreateCompanyRequestOptions) (*CreateCompanyResponseData, error)
+	CreateCompany(ctx context.Context, opts *CreateCompanyHandlerRequestOptions) (*CreateCompanyResponseData, error)
 }

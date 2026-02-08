@@ -38,7 +38,7 @@ func NewHTTPAdapter(impl {{ $handlerName }}Interface) *HTTPAdapter {
 func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
 {{- if $op.HasRequestOptions }}
-    opts := &{{ $op.ID | ucFirst }}RequestOptions{}
+    opts := &{{ $op.ID | ucFirst }}HandlerRequestOptions{}
     opts.RawRequest = r
 {{- end }}
 
@@ -46,9 +46,31 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     // Parse path parameters
     pathParams := &{{ $modelsPrefix }}{{ $op.PathParams.Name }}{}
     {{- range $op.PathParams.Schema.Properties }}
-        {{- $paramVar := .JsonFieldName }}
+        {{- $paramVar := .GoVariableName }}
         {{ $paramVar }}Str := {{template "get-path-param" .JsonFieldName}}
-        pathParams.{{ .GoName }}, _ = runtime.ParseString[{{ .Schema.GoType }}]({{ $paramVar }}Str)
+        {{- if eq .Schema.TypeDecl "string" }}
+            {{- if .IsPointerType }}
+        pathParams.{{ .GoName }} = &{{ $paramVar }}Str
+            {{- else }}
+        pathParams.{{ .GoName }} = {{ $paramVar }}Str
+            {{- end }}
+        {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
+        {{/* String-based enum type - use type conversion */}}
+            {{- if .IsPointerType }}
+        {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+        pathParams.{{ .GoName }} = &{{ $paramVar }}
+            {{- else }}
+        pathParams.{{ .GoName }} = {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+            {{- end }}
+        {{- else }}
+        {{/* Other types (int, uuid.UUID, etc.) - use ParseString with format hint */}}
+        {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+            {{- if .IsPointerType }}
+        pathParams.{{ .GoName }} = &{{ $paramVar }}
+            {{- else }}
+        pathParams.{{ .GoName }} = {{ $paramVar }}
+            {{- end }}
+        {{- end }}
     {{- end }}
     opts.PathParams = pathParams
 {{- end }}
@@ -57,20 +79,34 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     queryParams := &{{ $modelsPrefix }}{{ $op.Query.Name }}{}
     query := r.URL.Query()
     {{- range $op.Query.Params }}
-        {{- $paramVar := .ParamName }}
+        {{- $paramVar := .GoVariableName }}
         {{- if .Schema.ArrayType }}
             {{/* Array query params: use query["key"] to get all values */}}
             if values, ok := query["{{ .ParamName }}"]; ok {
-                {{- if eq .Schema.ArrayType.GoType "string" }}
+                {{- if eq .Schema.ArrayType.TypeDecl "string" }}
                     queryParams.{{ .GoName }} = values
+                {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
+                    {{/* String-based enum array - convert each element */}}
+                    result := make([]{{ $modelsPrefix }}{{ .Schema.ArrayType.TypeDecl }}, len(values))
+                    for i, v := range values {
+                        result[i] = {{ $modelsPrefix }}{{ .Schema.ArrayType.TypeDecl }}(v)
+                    }
+                    queryParams.{{ .GoName }} = result
                 {{- else }}
-                    queryParams.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.GoType }}](values)
+                    queryParams.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ .Schema.ArrayType.Format }}"{{- end }})
                 {{- end }}
             }
         {{- else }}
             {{ $paramVar }}Str := query.Get("{{ .ParamName }}")
-            {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.GoType }}]({{ $paramVar }}Str)
-            {{- if .IndirectOptional }}
+            {{- if eq .Schema.TypeDecl "string" }}
+            {{ $paramVar }} := {{ $paramVar }}Str
+            {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
+            {{/* String-based enum type - use type conversion */}}
+            {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+            {{- else }}
+            {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+            {{- end }}
+            {{- if and .IndirectOptional (not (hasPrefix .Schema.TypeDecl "map[")) (not (hasPrefix .Schema.TypeDecl "[]")) }}
                 queryParams.{{ .GoName }} = &{{ $paramVar }}
             {{- else }}
                 queryParams.{{ .GoName }} = {{ $paramVar }}
@@ -87,7 +123,14 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     {{- range $op.Header.Params }}
     {{- $paramVar := .GoVariableName }}
     if headerValues := headers[http.CanonicalHeaderKey("{{ .ParamName }}")]; len(headerValues) > 0 {
-        {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.GoType }}](headerValues[0])
+        {{- if eq .Schema.TypeDecl "string" }}
+        {{ $paramVar }} := headerValues[0]
+        {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
+        {{/* String-based enum type - use type conversion */}}
+        {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}(headerValues[0])
+        {{- else }}
+        {{ $paramVar }}, _ := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ .Schema.Format }}"{{- end }})
+        {{- end }}
         {{- if .IndirectOptional }}
             headerParams.{{ .GoName }} = &{{ $paramVar }}
         {{- else }}
@@ -125,50 +168,71 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     }
     opts.Body = &body
     {{- else if or (eq $op.Body.ContentType "text/plain") (eq $op.Body.ContentType "text/html") }}
-    bodyBytes, err := io.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    body := {{ $modelsPrefix }}{{ $op.Body.Name }}(string(bodyBytes))
-    opts.Body = &body
-    {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
-    if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    var body {{ $modelsPrefix }}{{ $op.Body.Name }}
-    {{- range $op.Body.Schema.Properties }}
-        {{- if .IsFile }}
-            if fileHeaders := r.MultipartForm.File["{{ .JsonFieldName }}"]; len(fileHeaders) > 0 {
-                body.{{ .GoName }}.InitFromMultipart(fileHeaders[0])
+        {{- if or (eq $op.Body.Schema.GoType "string") (eq $op.Body.Schema.TypeDecl "string") }}
+            bodyBytes, err := io.ReadAll(r.Body)
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
             }
+            body := {{ $modelsPrefix }}{{ $op.Body.Name }}(string(bodyBytes))
+            opts.Body = &body
         {{- else }}
-            if values := r.MultipartForm.Value["{{ .JsonFieldName }}"]; len(values) > 0 {
-                {{- if eq .Schema.GoType "bool" }}
-                body.{{ .GoName }}{{ if .IsPointerType }} = new(bool); *body.{{ .GoName }}{{ end }} = values[0] == "true"
-                {{- else if eq .Schema.GoType "int" }}
-                if v, err := strconv.Atoi(values[0]); err == nil {
-                    body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
-                }
-                {{- else if eq .Schema.GoType "int64" }}
-                if v, err := strconv.ParseInt(values[0], 10, 64); err == nil {
-                    body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
-                }
-                {{- else if eq .Schema.GoType "float64" }}
-                if v, err := strconv.ParseFloat(values[0], 64); err == nil {
-                    body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
-                }
-                {{- else }}
-                {{- if .IsPointerType }}
-                body.{{ .GoName }} = &values[0]
-                {{- else }}
-                body.{{ .GoName }} = values[0]
-                {{- end }}
-                {{- end }}
-            }
+        // text/plain body with non-string schema - skip body parsing
         {{- end }}
-    {{- end }}
+    {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
+        if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
+            http.Error(w, err.Error(), http.StatusBadRequest)
+            return
+        }
+        var body {{ $modelsPrefix }}{{ $op.Body.Name }}
+        {{- range $op.Body.Schema.Properties }}
+            {{- if .IsFile }}
+                if fileHeaders := r.MultipartForm.File["{{ .JsonFieldName }}"]; len(fileHeaders) > 0 {
+                    body.{{ .GoName }}.InitFromMultipart(fileHeaders[0])
+                }
+            {{- else }}
+                if values := r.MultipartForm.Value["{{ .JsonFieldName }}"]; len(values) > 0 {
+                    {{- if eq .Schema.GoType "bool" }}
+                    body.{{ .GoName }}{{ if .IsPointerType }} = new(bool); *body.{{ .GoName }}{{ end }} = values[0] == "true"
+                    {{- else if eq .Schema.GoType "int" }}
+                    if v, err := strconv.Atoi(values[0]); err == nil {
+                        body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
+                    }
+                    {{- else if eq .Schema.GoType "int64" }}
+                    if v, err := strconv.ParseInt(values[0], 10, 64); err == nil {
+                        body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
+                    }
+                    {{- else if eq .Schema.GoType "float64" }}
+                    if v, err := strconv.ParseFloat(values[0], 64); err == nil {
+                        body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
+                    }
+                    {{- else if .Schema.ArrayType }}
+                    {{/* Array type - assign all values */}}
+                    {{- if eq .Schema.ArrayType.GoType "string" }}
+                    body.{{ .GoName }} = values
+                    {{- else }}
+                    body.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values)
+                    {{- end }}
+                    {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
+                    {{/* String-based enum type - use type conversion */}}
+                    body.{{ .GoName }} = {{ .Schema.TypeDecl }}(values[0])
+                    {{- else if or (hasPrefix .Schema.TypeDecl "map[") (and (ne .Schema.TypeDecl "string") (ne .Schema.TypeDecl "")) }}
+                    {{/* Complex type (struct, map) - parse as JSON */}}
+                    if err := json.Unmarshal([]byte(values[0]), &body.{{ .GoName }}); err != nil {
+                        http.Error(w, err.Error(), http.StatusBadRequest)
+                        return
+                    }
+                    {{- else }}
+                    {{/* String type */}}
+                    {{- if .IsPointerType }}
+                    body.{{ .GoName }} = &values[0]
+                    {{- else }}
+                    body.{{ .GoName }} = values[0]
+                    {{- end }}
+                    {{- end }}
+                }
+            {{- end }}
+        {{- end }}
     opts.Body = &body
     {{- end }}
 {{- end }}
@@ -254,16 +318,19 @@ if err != nil {
             _, _ = fmt.Fprintf(w, "%v", *resp.Body)
         }
     {{- else if eq $op.Response.Success.ContentType "application/octet-stream" }}
+        w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
+            {{- if eq $op.Response.Success.Schema.GoType "runtime.File" }}
             data, err := resp.Body.Bytes()
             if err != nil {
                 http.Error(w, err.Error(), http.StatusInternalServerError)
                 return
             }
-            w.WriteHeader(status)
             _, _ = w.Write(data)
-        } else {
-            w.WriteHeader(status)
+            {{- else }}
+            {{/* Fallback: JSON encode the response body */}}
+            _ = json.NewEncoder(w).Encode(resp.Body)
+            {{- end }}
         }
     {{- else if eq $op.Response.Success.ContentType "application/x-www-form-urlencoded" }}
         w.WriteHeader(status)

@@ -30,61 +30,61 @@ func (h *Handler) HealthCheck(ctx context.Context) (*HealthCheckResponseData, er
 }
 
 // ListUsers List all users
-func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersRequestOptions) (*ListUsersResponseData, error) {
+func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersHandlerRequestOptions) (*ListUsersResponseData, error) {
     // TODO: Implement your business logic here
     return NewListUsersResponseData(new(ListUsersResponse)), nil
 }
 
 // CreateUser Create a new user via JSON
-func (h *Handler) CreateUser(ctx context.Context, opts *CreateUserRequestOptions) (*CreateUserResponseData, error) {
+func (h *Handler) CreateUser(ctx context.Context, opts *CreateUserHandlerRequestOptions) (*CreateUserResponseData, error) {
     // TODO: Implement your business logic here
     return NewCreateUserResponseData(new(CreateUserResponse)), nil
 }
 
 // ImportUsers Import users from CSV file
-func (h *Handler) ImportUsers(ctx context.Context, opts *ImportUsersRequestOptions) (*ImportUsersResponseData, error) {
+func (h *Handler) ImportUsers(ctx context.Context, opts *ImportUsersHandlerRequestOptions) (*ImportUsersResponseData, error) {
     // TODO: Implement your business logic here
     return NewImportUsersResponseData(new(ImportUsersResponse)), nil
 }
 
 // GetUser Get a user by ID
-func (h *Handler) GetUser(ctx context.Context, opts *GetUserRequestOptions) (*GetUserResponseData, error) {
+func (h *Handler) GetUser(ctx context.Context, opts *GetUserHandlerRequestOptions) (*GetUserResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetUserResponseData(new(GetUserResponse)), nil
 }
 
 // DeleteUser Delete a user
-func (h *Handler) DeleteUser(ctx context.Context, opts *DeleteUserRequestOptions) (*DeleteUserResponseData, error) {
+func (h *Handler) DeleteUser(ctx context.Context, opts *DeleteUserHandlerRequestOptions) (*DeleteUserResponseData, error) {
     // TODO: Implement your business logic here
     return NewDeleteUserResponseData(nil), nil
 }
 
 // GetUserAvatar Get user avatar image
-func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarRequestOptions) (*GetUserAvatarResponseData, error) {
+func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarHandlerRequestOptions) (*GetUserAvatarResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetUserAvatarResponseData(new(GetUserAvatarResponse)), nil
 }
 
 // UploadUserAvatar Upload user avatar
-func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarRequestOptions) (*UploadUserAvatarResponseData, error) {
+func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarHandlerRequestOptions) (*UploadUserAvatarResponseData, error) {
     // TODO: Implement your business logic here
     return NewUploadUserAvatarResponseData(nil), nil
 }
 
 // SubmitContactForm Submit contact form
-func (h *Handler) SubmitContactForm(ctx context.Context, opts *SubmitContactFormRequestOptions) (*SubmitContactFormResponseData, error) {
+func (h *Handler) SubmitContactForm(ctx context.Context, opts *SubmitContactFormHandlerRequestOptions) (*SubmitContactFormResponseData, error) {
     // TODO: Implement your business logic here
     return NewSubmitContactFormResponseData(new(SubmitContactFormResponse)), nil
 }
 
 // CreateNote Create a note from plain text
-func (h *Handler) CreateNote(ctx context.Context, opts *CreateNoteRequestOptions) (*CreateNoteResponseData, error) {
+func (h *Handler) CreateNote(ctx context.Context, opts *CreateNoteHandlerRequestOptions) (*CreateNoteResponseData, error) {
     // TODO: Implement your business logic here
     return NewCreateNoteResponseData(new(CreateNoteResponse)), nil
 }
 
 // ProcessXMLData Process XML data (demonstrates custom content type handling)
-func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataRequestOptions) (*ProcessXMLDataResponseData, error) {
+func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataHandlerRequestOptions) (*ProcessXMLDataResponseData, error) {
     // TODO: Implement your business logic here
     return NewProcessXMLDataResponseData([]byte("TODO: marshal response")), nil
 }
@@ -96,19 +96,19 @@ func (h *Handler) ExportData(ctx context.Context) (*ExportDataResponseData, erro
 }
 
 // GetOAuthToken Get OAuth token (form-encoded response)
-func (h *Handler) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenRequestOptions) (*GetOAuthTokenResponseData, error) {
+func (h *Handler) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenHandlerRequestOptions) (*GetOAuthTokenResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetOAuthTokenResponseData(new(GetOAuthTokenResponse)), nil
 }
 
 // GetItemsByType Get items by type (tests reserved Go keyword as path param)
-func (h *Handler) GetItemsByType(ctx context.Context, opts *GetItemsByTypeRequestOptions) (*GetItemsByTypeResponseData, error) {
+func (h *Handler) GetItemsByType(ctx context.Context, opts *GetItemsByTypeHandlerRequestOptions) (*GetItemsByTypeResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetItemsByTypeResponseData(new(GetItemsByTypeResponse)), nil
 }
 
 // Search Search with union type response (oneOf)
-func (h *Handler) Search(ctx context.Context, opts *SearchRequestOptions) (*SearchResponseData, error) {
+func (h *Handler) Search(ctx context.Context, opts *SearchHandlerRequestOptions) (*SearchResponseData, error) {
     // TODO: Implement your business logic here
     return NewSearchResponseData(new(SearchResponse)), nil
 }
@@ -120,43 +120,43 @@ func (h *Handler) GetStatus(ctx context.Context) (*GetStatusResponseData, error)
 }
 
 // UploadImage Upload image (wildcard content type)
-func (h *Handler) UploadImage(ctx context.Context, opts *UploadImageRequestOptions) (*UploadImageResponseData, error) {
+func (h *Handler) UploadImage(ctx context.Context, opts *UploadImageHandlerRequestOptions) (*UploadImageResponseData, error) {
     // TODO: Implement your business logic here
     return NewUploadImageResponseData(new(UploadImageResponse)), nil
 }
 
 // ListProducts List products with various query param types
-func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsRequestOptions) (*ListProductsResponseData, error) {
+func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsHandlerRequestOptions) (*ListProductsResponseData, error) {
     // TODO: Implement your business logic here
     return NewListProductsResponseData(new(ListProductsResponse)), nil
 }
 
 // GetCategory Get a category by ID (integer path param)
-func (h *Handler) GetCategory(ctx context.Context, opts *GetCategoryRequestOptions) (*GetCategoryResponseData, error) {
+func (h *Handler) GetCategory(ctx context.Context, opts *GetCategoryHandlerRequestOptions) (*GetCategoryResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetCategoryResponseData(new(GetCategoryResponse)), nil
 }
 
 // GetItemsByStatus Get items by active status and rating (boolean + number path params)
-func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusRequestOptions) (*GetItemsByStatusResponseData, error) {
+func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusHandlerRequestOptions) (*GetItemsByStatusResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetItemsByStatusResponseData(new(GetItemsByStatusResponse)), nil
 }
 
 // GetUserPost Get a specific post by a user
-func (h *Handler) GetUserPost(ctx context.Context, opts *GetUserPostRequestOptions) (*GetUserPostResponseData, error) {
+func (h *Handler) GetUserPost(ctx context.Context, opts *GetUserPostHandlerRequestOptions) (*GetUserPostResponseData, error) {
     // TODO: Implement your business logic here
     return NewGetUserPostResponseData(new(GetUserPostResponse)), nil
 }
 
 // CreateOrder Create an order (demonstrates typed error responses)
-func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderRequestOptions) (*CreateOrderResponseData, error) {
+func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderHandlerRequestOptions) (*CreateOrderResponseData, error) {
     // TODO: Implement your business logic here
     return NewCreateOrderResponseData(new(CreateOrderResponse)), nil
 }
 
 // CreateCompany Create a company with nested address
-func (h *Handler) CreateCompany(ctx context.Context, opts *CreateCompanyRequestOptions) (*CreateCompanyResponseData, error) {
+func (h *Handler) CreateCompany(ctx context.Context, opts *CreateCompanyHandlerRequestOptions) (*CreateCompanyResponseData, error) {
     // TODO: Implement your business logic here
     return NewCreateCompanyResponseData(new(CreateCompanyResponse)), nil
 }

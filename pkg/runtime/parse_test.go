@@ -12,7 +12,9 @@ package runtime
 
 import (
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -117,6 +119,49 @@ func TestParseString(t *testing.T) {
 		_, err := ParseString[bool]("not-a-bool")
 		assert.Error(t, err)
 	})
+
+	// Tests for format parameter
+	t.Run("uuid with format", func(t *testing.T) {
+		v, err := ParseString[uuid.UUID]("550e8400-e29b-41d4-a716-446655440000", "uuid")
+		require.NoError(t, err)
+		assert.Equal(t, uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), v)
+	})
+
+	t.Run("uuid invalid", func(t *testing.T) {
+		_, err := ParseString[uuid.UUID]("not-a-uuid", "uuid")
+		assert.Error(t, err)
+	})
+
+	t.Run("date-time with format", func(t *testing.T) {
+		v, err := ParseString[time.Time]("2024-01-15T10:30:00Z", "date-time")
+		require.NoError(t, err)
+		expected, _ := time.Parse(time.RFC3339, "2024-01-15T10:30:00Z")
+		assert.Equal(t, expected, v)
+	})
+
+	t.Run("date-time invalid", func(t *testing.T) {
+		_, err := ParseString[time.Time]("not-a-date", "date-time")
+		assert.Error(t, err)
+	})
+
+	t.Run("date with format", func(t *testing.T) {
+		v, err := ParseString[Date]("2024-01-15", "date")
+		require.NoError(t, err)
+		expected, _ := time.Parse("2006-01-02", "2024-01-15")
+		assert.Equal(t, Date{Time: expected}, v)
+	})
+
+	t.Run("date invalid", func(t *testing.T) {
+		_, err := ParseString[Date]("not-a-date", "date")
+		assert.Error(t, err)
+	})
+
+	t.Run("uuid without format falls through", func(t *testing.T) {
+		// Without format hint, uuid.UUID won't be parsed (returns zero value)
+		v, err := ParseString[uuid.UUID]("550e8400-e29b-41d4-a716-446655440000")
+		require.NoError(t, err)
+		assert.Equal(t, uuid.UUID{}, v) // Zero value since no format hint
+	})
 }
 
 func TestParseStringSlice(t *testing.T) {
@@ -154,5 +199,26 @@ func TestParseStringSlice(t *testing.T) {
 		result, err := ParseStringSlice[int]([]string{})
 		assert.NoError(t, err)
 		assert.Empty(t, result)
+	})
+
+	// Tests for format parameter
+	t.Run("uuid slice with format", func(t *testing.T) {
+		result, err := ParseStringSlice[uuid.UUID]([]string{
+			"550e8400-e29b-41d4-a716-446655440000",
+			"6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+		}, "uuid")
+		assert.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.Equal(t, uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), result[0])
+		assert.Equal(t, uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), result[1])
+	})
+
+	t.Run("uuid slice with invalid", func(t *testing.T) {
+		result, err := ParseStringSlice[uuid.UUID]([]string{
+			"550e8400-e29b-41d4-a716-446655440000",
+			"not-a-uuid",
+		}, "uuid")
+		assert.Error(t, err)
+		assert.Nil(t, result)
 	})
 }

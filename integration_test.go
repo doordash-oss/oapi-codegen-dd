@@ -329,11 +329,14 @@ func TestIntegration(t *testing.T) {
 			// Create config file
 			configContent := `package: integration
 generate:
-  client: true
   validation:
     response: true
-client:
-  name: IntegrationClient
+  handler:
+    kind: std-http
+    name: IntegrationHandler
+    validation:
+      request: true
+      response: true
 output:
   use-single-file: true
   filename: generated.go

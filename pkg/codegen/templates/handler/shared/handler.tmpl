@@ -23,9 +23,9 @@ type {{ $handlerName }}Interface interface {
 {{- range $operations }}{{ $op := . }}
     // {{ $op.ID }} {{ $op.Summary }}
     {{- if $op.HasRequestOptions }}
-    {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}RequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }})
+        {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}HandlerRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }})
     {{- else }}
-    {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }})
+        {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }})
     {{- end }}
 {{- end }}
 }

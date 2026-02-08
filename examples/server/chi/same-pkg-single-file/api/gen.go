@@ -39,49 +39,49 @@ type HandlerInterface interface {
 	// HealthCheck Health check endpoint
 	HealthCheck(ctx context.Context) (*HealthCheckResponseData, error)
 	// ListUsers List all users
-	ListUsers(ctx context.Context, opts *ListUsersRequestOptions) (*ListUsersResponseData, error)
+	ListUsers(ctx context.Context, opts *ListUsersHandlerRequestOptions) (*ListUsersResponseData, error)
 	// CreateUser Create a new user via JSON
-	CreateUser(ctx context.Context, opts *CreateUserRequestOptions) (*CreateUserResponseData, error)
+	CreateUser(ctx context.Context, opts *CreateUserHandlerRequestOptions) (*CreateUserResponseData, error)
 	// ImportUsers Import users from CSV file
-	ImportUsers(ctx context.Context, opts *ImportUsersRequestOptions) (*ImportUsersResponseData, error)
+	ImportUsers(ctx context.Context, opts *ImportUsersHandlerRequestOptions) (*ImportUsersResponseData, error)
 	// GetUser Get a user by ID
-	GetUser(ctx context.Context, opts *GetUserRequestOptions) (*GetUserResponseData, error)
+	GetUser(ctx context.Context, opts *GetUserHandlerRequestOptions) (*GetUserResponseData, error)
 	// DeleteUser Delete a user
-	DeleteUser(ctx context.Context, opts *DeleteUserRequestOptions) (*DeleteUserResponseData, error)
+	DeleteUser(ctx context.Context, opts *DeleteUserHandlerRequestOptions) (*DeleteUserResponseData, error)
 	// GetUserAvatar Get user avatar image
-	GetUserAvatar(ctx context.Context, opts *GetUserAvatarRequestOptions) (*GetUserAvatarResponseData, error)
+	GetUserAvatar(ctx context.Context, opts *GetUserAvatarHandlerRequestOptions) (*GetUserAvatarResponseData, error)
 	// UploadUserAvatar Upload user avatar
-	UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarRequestOptions) (*UploadUserAvatarResponseData, error)
+	UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarHandlerRequestOptions) (*UploadUserAvatarResponseData, error)
 	// SubmitContactForm Submit contact form
-	SubmitContactForm(ctx context.Context, opts *SubmitContactFormRequestOptions) (*SubmitContactFormResponseData, error)
+	SubmitContactForm(ctx context.Context, opts *SubmitContactFormHandlerRequestOptions) (*SubmitContactFormResponseData, error)
 	// CreateNote Create a note from plain text
-	CreateNote(ctx context.Context, opts *CreateNoteRequestOptions) (*CreateNoteResponseData, error)
+	CreateNote(ctx context.Context, opts *CreateNoteHandlerRequestOptions) (*CreateNoteResponseData, error)
 	// ProcessXMLData Process XML data (demonstrates custom content type handling)
-	ProcessXMLData(ctx context.Context, opts *ProcessXMLDataRequestOptions) (*ProcessXMLDataResponseData, error)
+	ProcessXMLData(ctx context.Context, opts *ProcessXMLDataHandlerRequestOptions) (*ProcessXMLDataResponseData, error)
 	// ExportData Export all data as binary archive
 	ExportData(ctx context.Context) (*ExportDataResponseData, error)
 	// GetOAuthToken Get OAuth token (form-encoded response)
-	GetOAuthToken(ctx context.Context, opts *GetOAuthTokenRequestOptions) (*GetOAuthTokenResponseData, error)
+	GetOAuthToken(ctx context.Context, opts *GetOAuthTokenHandlerRequestOptions) (*GetOAuthTokenResponseData, error)
 	// GetItemsByType Get items by type (tests reserved Go keyword as path param)
-	GetItemsByType(ctx context.Context, opts *GetItemsByTypeRequestOptions) (*GetItemsByTypeResponseData, error)
+	GetItemsByType(ctx context.Context, opts *GetItemsByTypeHandlerRequestOptions) (*GetItemsByTypeResponseData, error)
 	// Search Search with union type response (oneOf)
-	Search(ctx context.Context, opts *SearchRequestOptions) (*SearchResponseData, error)
+	Search(ctx context.Context, opts *SearchHandlerRequestOptions) (*SearchResponseData, error)
 	// GetStatus Get status (uses reusable response)
 	GetStatus(ctx context.Context) (*GetStatusResponseData, error)
 	// UploadImage Upload image (wildcard content type)
-	UploadImage(ctx context.Context, opts *UploadImageRequestOptions) (*UploadImageResponseData, error)
+	UploadImage(ctx context.Context, opts *UploadImageHandlerRequestOptions) (*UploadImageResponseData, error)
 	// ListProducts List products with various query param types
-	ListProducts(ctx context.Context, opts *ListProductsRequestOptions) (*ListProductsResponseData, error)
+	ListProducts(ctx context.Context, opts *ListProductsHandlerRequestOptions) (*ListProductsResponseData, error)
 	// GetCategory Get a category by ID (integer path param)
-	GetCategory(ctx context.Context, opts *GetCategoryRequestOptions) (*GetCategoryResponseData, error)
+	GetCategory(ctx context.Context, opts *GetCategoryHandlerRequestOptions) (*GetCategoryResponseData, error)
 	// GetItemsByStatus Get items by active status and rating (boolean + number path params)
-	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusRequestOptions) (*GetItemsByStatusResponseData, error)
+	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusHandlerRequestOptions) (*GetItemsByStatusResponseData, error)
 	// GetUserPost Get a specific post by a user
-	GetUserPost(ctx context.Context, opts *GetUserPostRequestOptions) (*GetUserPostResponseData, error)
+	GetUserPost(ctx context.Context, opts *GetUserPostHandlerRequestOptions) (*GetUserPostResponseData, error)
 	// CreateOrder Create an order (demonstrates typed error responses)
-	CreateOrder(ctx context.Context, opts *CreateOrderRequestOptions) (*CreateOrderResponseData, error)
+	CreateOrder(ctx context.Context, opts *CreateOrderHandlerRequestOptions) (*CreateOrderResponseData, error)
 	// CreateCompany Create a company with nested address
-	CreateCompany(ctx context.Context, opts *CreateCompanyRequestOptions) (*CreateCompanyResponseData, error)
+	CreateCompany(ctx context.Context, opts *CreateCompanyHandlerRequestOptions) (*CreateCompanyResponseData, error)
 }
 
 // HTTPAdapter adapts the HandlerInterface to HTTP handlers.
@@ -133,7 +133,7 @@ func (h *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ListUsersRequestOptions{}
+	opts := &ListUsersHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -148,7 +148,7 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	headerParams := &ListUsersHeaders{}
 	headers := r.Header
 	if headerValues := headers[http.CanonicalHeaderKey("X-Request-ID")]; len(headerValues) > 0 {
-		xrequestId, _ := runtime.ParseString[string](headerValues[0])
+		xrequestId := headerValues[0]
 		headerParams.XRequestID = xrequestId
 	}
 	opts.Header = headerParams
@@ -186,7 +186,7 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateUserRequestOptions{}
+	opts := &CreateUserHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -234,7 +234,7 @@ func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ImportUsersRequestOptions{}
+	opts := &ImportUsersHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -286,13 +286,13 @@ func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserRequestOptions{}
+	opts := &GetUserHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &GetUserPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 
 	// Call business logic
@@ -331,13 +331,13 @@ func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &DeleteUserRequestOptions{}
+	opts := &DeleteUserHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &DeleteUserPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 
 	// Call business logic
@@ -369,13 +369,13 @@ func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserAvatarRequestOptions{}
+	opts := &GetUserAvatarHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &GetUserAvatarPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 
 	// Call business logic
@@ -406,28 +406,26 @@ func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 		status = resp.Status
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(status)
 	if resp != nil && resp.Body != nil {
 		data, err := resp.Body.Bytes()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(status)
 		_, _ = w.Write(data)
-	} else {
-		w.WriteHeader(status)
 	}
 }
 
 func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &UploadUserAvatarRequestOptions{}
+	opts := &UploadUserAvatarHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &UploadUserAvatarPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 	// Parse request body
 	defer r.Body.Close()
@@ -461,7 +459,7 @@ func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &SubmitContactFormRequestOptions{}
+	opts := &SubmitContactFormHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -516,7 +514,7 @@ func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 
 func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateNoteRequestOptions{}
+	opts := &CreateNoteHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -562,7 +560,7 @@ func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ProcessXMLDataRequestOptions{}
+	opts := &ProcessXMLDataHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -627,22 +625,20 @@ func (h *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
 		status = resp.Status
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(status)
 	if resp != nil && resp.Body != nil {
 		data, err := resp.Body.Bytes()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(status)
 		_, _ = w.Write(data)
-	} else {
-		w.WriteHeader(status)
 	}
 }
 
 func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetOAuthTokenRequestOptions{}
+	opts := &GetOAuthTokenHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -700,13 +696,13 @@ func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetItemsByTypeRequestOptions{}
+	opts := &GetItemsByTypeHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &GetItemsByTypePath{}
-	typeStr := r.PathValue("type")
-	pathParams.Type, _ = runtime.ParseString[string](typeStr)
+	pTypeStr := r.PathValue("type")
+	pathParams.Type = pTypeStr
 	opts.PathParams = pathParams
 
 	// Call business logic
@@ -742,14 +738,14 @@ func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &SearchRequestOptions{}
+	opts := &SearchHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
 	queryParams := &SearchQuery{}
 	query := r.URL.Query()
 	qStr := query.Get("q")
-	q, _ := runtime.ParseString[string](qStr)
+	q := qStr
 	queryParams.Q = q
 	opts.Query = queryParams
 
@@ -820,7 +816,7 @@ func (h *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &UploadImageRequestOptions{}
+	opts := &UploadImageHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -859,7 +855,7 @@ func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ListProductsRequestOptions{}
+	opts := &ListProductsHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -918,13 +914,15 @@ func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetCategoryRequestOptions{}
+	opts := &GetCategoryHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &GetCategoryPath{}
-	categoryIdStr := r.PathValue("categoryId")
-	pathParams.CategoryID, _ = runtime.ParseString[int](categoryIdStr)
+	categoryIDStr := r.PathValue("categoryId")
+
+	categoryID, _ := runtime.ParseString[int](categoryIDStr)
+	pathParams.CategoryID = categoryID
 	opts.PathParams = pathParams
 
 	// Parse header parameters
@@ -977,15 +975,19 @@ func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetItemsByStatusRequestOptions{}
+	opts := &GetItemsByStatusHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &GetItemsByStatusPath{}
 	activeStr := r.PathValue("active")
-	pathParams.Active, _ = runtime.ParseString[bool](activeStr)
+
+	active, _ := runtime.ParseString[bool](activeStr)
+	pathParams.Active = active
 	ratingStr := r.PathValue("rating")
-	pathParams.Rating, _ = runtime.ParseString[float32](ratingStr)
+
+	rating, _ := runtime.ParseString[float32](ratingStr)
+	pathParams.Rating = rating
 	opts.PathParams = pathParams
 
 	// Call business logic
@@ -1021,15 +1023,15 @@ func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserPostRequestOptions{}
+	opts := &GetUserPostHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &GetUserPostPath{}
-	userIdStr := r.PathValue("userId")
-	pathParams.UserID, _ = runtime.ParseString[string](userIdStr)
-	postIdStr := r.PathValue("postId")
-	pathParams.PostID, _ = runtime.ParseString[string](postIdStr)
+	userIDStr := r.PathValue("userId")
+	pathParams.UserID = userIDStr
+	postIDStr := r.PathValue("postId")
+	pathParams.PostID = postIDStr
 	opts.PathParams = pathParams
 
 	// Call business logic
@@ -1068,7 +1070,7 @@ func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateOrderRequestOptions{}
+	opts := &CreateOrderHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1116,7 +1118,7 @@ func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateCompanyRequestOptions{}
+	opts := &CreateCompanyHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1218,8 +1220,8 @@ func applyMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Hand
 	return h.ServeHTTP
 }
 
-// ListUsersRequestOptions holds all parameters for the ListUsers operation.
-type ListUsersRequestOptions struct {
+// ListUsersHandlerRequestOptions holds all parameters for the ListUsers operation.
+type ListUsersHandlerRequestOptions struct {
 	Query  *ListUsersQuery
 	Header *ListUsersHeaders
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
@@ -1227,7 +1229,7 @@ type ListUsersRequestOptions struct {
 }
 
 // Validate validates all the fields in the options.
-func (o *ListUsersRequestOptions) Validate() error {
+func (o *ListUsersHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Query != nil {
@@ -1252,15 +1254,15 @@ func (o *ListUsersRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateUserRequestOptions holds all parameters for the CreateUser operation.
-type CreateUserRequestOptions struct {
+// CreateUserHandlerRequestOptions holds all parameters for the CreateUser operation.
+type CreateUserHandlerRequestOptions struct {
 	Body *CreateUserBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateUserRequestOptions) Validate() error {
+func (o *CreateUserHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -1277,15 +1279,15 @@ func (o *CreateUserRequestOptions) Validate() error {
 	return errors
 }
 
-// ImportUsersRequestOptions holds all parameters for the ImportUsers operation.
-type ImportUsersRequestOptions struct {
+// ImportUsersHandlerRequestOptions holds all parameters for the ImportUsers operation.
+type ImportUsersHandlerRequestOptions struct {
 	Body *ImportUsersBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ImportUsersRequestOptions) Validate() error {
+func (o *ImportUsersHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -1302,15 +1304,15 @@ func (o *ImportUsersRequestOptions) Validate() error {
 	return errors
 }
 
-// GetUserRequestOptions holds all parameters for the GetUser operation.
-type GetUserRequestOptions struct {
+// GetUserHandlerRequestOptions holds all parameters for the GetUser operation.
+type GetUserHandlerRequestOptions struct {
 	PathParams *GetUserPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetUserRequestOptions) Validate() error {
+func (o *GetUserHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1327,15 +1329,15 @@ func (o *GetUserRequestOptions) Validate() error {
 	return errors
 }
 
-// DeleteUserRequestOptions holds all parameters for the DeleteUser operation.
-type DeleteUserRequestOptions struct {
+// DeleteUserHandlerRequestOptions holds all parameters for the DeleteUser operation.
+type DeleteUserHandlerRequestOptions struct {
 	PathParams *DeleteUserPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *DeleteUserRequestOptions) Validate() error {
+func (o *DeleteUserHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1352,15 +1354,15 @@ func (o *DeleteUserRequestOptions) Validate() error {
 	return errors
 }
 
-// GetUserAvatarRequestOptions holds all parameters for the GetUserAvatar operation.
-type GetUserAvatarRequestOptions struct {
+// GetUserAvatarHandlerRequestOptions holds all parameters for the GetUserAvatar operation.
+type GetUserAvatarHandlerRequestOptions struct {
 	PathParams *GetUserAvatarPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetUserAvatarRequestOptions) Validate() error {
+func (o *GetUserAvatarHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1377,15 +1379,15 @@ func (o *GetUserAvatarRequestOptions) Validate() error {
 	return errors
 }
 
-// UploadUserAvatarRequestOptions holds all parameters for the UploadUserAvatar operation.
-type UploadUserAvatarRequestOptions struct {
+// UploadUserAvatarHandlerRequestOptions holds all parameters for the UploadUserAvatar operation.
+type UploadUserAvatarHandlerRequestOptions struct {
 	PathParams *UploadUserAvatarPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *UploadUserAvatarRequestOptions) Validate() error {
+func (o *UploadUserAvatarHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1402,15 +1404,15 @@ func (o *UploadUserAvatarRequestOptions) Validate() error {
 	return errors
 }
 
-// SubmitContactFormRequestOptions holds all parameters for the SubmitContactForm operation.
-type SubmitContactFormRequestOptions struct {
+// SubmitContactFormHandlerRequestOptions holds all parameters for the SubmitContactForm operation.
+type SubmitContactFormHandlerRequestOptions struct {
 	Body *SubmitContactFormBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *SubmitContactFormRequestOptions) Validate() error {
+func (o *SubmitContactFormHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -1427,15 +1429,15 @@ func (o *SubmitContactFormRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateNoteRequestOptions holds all parameters for the CreateNote operation.
-type CreateNoteRequestOptions struct {
+// CreateNoteHandlerRequestOptions holds all parameters for the CreateNote operation.
+type CreateNoteHandlerRequestOptions struct {
 	Body *CreateNoteBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateNoteRequestOptions) Validate() error {
+func (o *CreateNoteHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -1452,14 +1454,14 @@ func (o *CreateNoteRequestOptions) Validate() error {
 	return errors
 }
 
-// ProcessXMLDataRequestOptions holds all parameters for the ProcessXMLData operation.
-type ProcessXMLDataRequestOptions struct {
+// ProcessXMLDataHandlerRequestOptions holds all parameters for the ProcessXMLData operation.
+type ProcessXMLDataHandlerRequestOptions struct {
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ProcessXMLDataRequestOptions) Validate() error {
+func (o *ProcessXMLDataHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if len(errors) == 0 {
@@ -1469,15 +1471,15 @@ func (o *ProcessXMLDataRequestOptions) Validate() error {
 	return errors
 }
 
-// GetOAuthTokenRequestOptions holds all parameters for the GetOAuthToken operation.
-type GetOAuthTokenRequestOptions struct {
+// GetOAuthTokenHandlerRequestOptions holds all parameters for the GetOAuthToken operation.
+type GetOAuthTokenHandlerRequestOptions struct {
 	Body *GetOAuthTokenBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetOAuthTokenRequestOptions) Validate() error {
+func (o *GetOAuthTokenHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -1494,15 +1496,15 @@ func (o *GetOAuthTokenRequestOptions) Validate() error {
 	return errors
 }
 
-// GetItemsByTypeRequestOptions holds all parameters for the GetItemsByType operation.
-type GetItemsByTypeRequestOptions struct {
+// GetItemsByTypeHandlerRequestOptions holds all parameters for the GetItemsByType operation.
+type GetItemsByTypeHandlerRequestOptions struct {
 	PathParams *GetItemsByTypePath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetItemsByTypeRequestOptions) Validate() error {
+func (o *GetItemsByTypeHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1519,15 +1521,15 @@ func (o *GetItemsByTypeRequestOptions) Validate() error {
 	return errors
 }
 
-// SearchRequestOptions holds all parameters for the Search operation.
-type SearchRequestOptions struct {
+// SearchHandlerRequestOptions holds all parameters for the Search operation.
+type SearchHandlerRequestOptions struct {
 	Query *SearchQuery
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *SearchRequestOptions) Validate() error {
+func (o *SearchHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Query != nil {
@@ -1544,14 +1546,14 @@ func (o *SearchRequestOptions) Validate() error {
 	return errors
 }
 
-// UploadImageRequestOptions holds all parameters for the UploadImage operation.
-type UploadImageRequestOptions struct {
+// UploadImageHandlerRequestOptions holds all parameters for the UploadImage operation.
+type UploadImageHandlerRequestOptions struct {
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *UploadImageRequestOptions) Validate() error {
+func (o *UploadImageHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if len(errors) == 0 {
@@ -1561,15 +1563,15 @@ func (o *UploadImageRequestOptions) Validate() error {
 	return errors
 }
 
-// ListProductsRequestOptions holds all parameters for the ListProducts operation.
-type ListProductsRequestOptions struct {
+// ListProductsHandlerRequestOptions holds all parameters for the ListProducts operation.
+type ListProductsHandlerRequestOptions struct {
 	Query *ListProductsQuery
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ListProductsRequestOptions) Validate() error {
+func (o *ListProductsHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Query != nil {
@@ -1586,8 +1588,8 @@ func (o *ListProductsRequestOptions) Validate() error {
 	return errors
 }
 
-// GetCategoryRequestOptions holds all parameters for the GetCategory operation.
-type GetCategoryRequestOptions struct {
+// GetCategoryHandlerRequestOptions holds all parameters for the GetCategory operation.
+type GetCategoryHandlerRequestOptions struct {
 	PathParams *GetCategoryPath
 	Header     *GetCategoryHeaders
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
@@ -1595,7 +1597,7 @@ type GetCategoryRequestOptions struct {
 }
 
 // Validate validates all the fields in the options.
-func (o *GetCategoryRequestOptions) Validate() error {
+func (o *GetCategoryHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1620,15 +1622,15 @@ func (o *GetCategoryRequestOptions) Validate() error {
 	return errors
 }
 
-// GetItemsByStatusRequestOptions holds all parameters for the GetItemsByStatus operation.
-type GetItemsByStatusRequestOptions struct {
+// GetItemsByStatusHandlerRequestOptions holds all parameters for the GetItemsByStatus operation.
+type GetItemsByStatusHandlerRequestOptions struct {
 	PathParams *GetItemsByStatusPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetItemsByStatusRequestOptions) Validate() error {
+func (o *GetItemsByStatusHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1645,15 +1647,15 @@ func (o *GetItemsByStatusRequestOptions) Validate() error {
 	return errors
 }
 
-// GetUserPostRequestOptions holds all parameters for the GetUserPost operation.
-type GetUserPostRequestOptions struct {
+// GetUserPostHandlerRequestOptions holds all parameters for the GetUserPost operation.
+type GetUserPostHandlerRequestOptions struct {
 	PathParams *GetUserPostPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetUserPostRequestOptions) Validate() error {
+func (o *GetUserPostHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -1670,15 +1672,15 @@ func (o *GetUserPostRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateOrderRequestOptions holds all parameters for the CreateOrder operation.
-type CreateOrderRequestOptions struct {
+// CreateOrderHandlerRequestOptions holds all parameters for the CreateOrder operation.
+type CreateOrderHandlerRequestOptions struct {
 	Body *CreateOrderBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateOrderRequestOptions) Validate() error {
+func (o *CreateOrderHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -1695,15 +1697,15 @@ func (o *CreateOrderRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateCompanyRequestOptions holds all parameters for the CreateCompany operation.
-type CreateCompanyRequestOptions struct {
+// CreateCompanyHandlerRequestOptions holds all parameters for the CreateCompany operation.
+type CreateCompanyHandlerRequestOptions struct {
 	Body *CreateCompanyBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateCompanyRequestOptions) Validate() error {
+func (o *CreateCompanyHandlerRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {

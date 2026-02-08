@@ -101,7 +101,7 @@ func (pd ParameterDefinition) Explode() bool {
 
 func (pd ParameterDefinition) GoVariableName() string {
 	name := strcase.ToLowerCamel(pd.GoName())
-	if isGoKeyword(name) {
+	if isGoKeyword(name) || reservedTemplateVars[name] {
 		name = "p" + strcase.ToCamel(name)
 	}
 	if unicode.IsNumber([]rune(name)[0]) {

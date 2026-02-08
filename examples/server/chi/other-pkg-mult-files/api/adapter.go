@@ -70,7 +70,7 @@ func (h *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ListUsersRequestOptions{}
+	opts := &ListUsersHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -85,7 +85,7 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	headerParams := &types.ListUsersHeaders{}
 	headers := r.Header
 	if headerValues := headers[http.CanonicalHeaderKey("X-Request-ID")]; len(headerValues) > 0 {
-		xrequestId, _ := runtime.ParseString[string](headerValues[0])
+		xrequestId := headerValues[0]
 		headerParams.XRequestID = xrequestId
 	}
 	opts.Header = headerParams
@@ -139,7 +139,7 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateUserRequestOptions{}
+	opts := &CreateUserHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -203,7 +203,7 @@ func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ImportUsersRequestOptions{}
+	opts := &ImportUsersHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -271,13 +271,13 @@ func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserRequestOptions{}
+	opts := &GetUserHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetUserPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -332,13 +332,13 @@ func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &DeleteUserRequestOptions{}
+	opts := &DeleteUserHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.DeleteUserPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -386,13 +386,13 @@ func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserAvatarRequestOptions{}
+	opts := &GetUserAvatarHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetUserAvatarPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -439,28 +439,26 @@ func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 		status = resp.Status
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(status)
 	if resp != nil && resp.Body != nil {
 		data, err := resp.Body.Bytes()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(status)
 		_, _ = w.Write(data)
-	} else {
-		w.WriteHeader(status)
 	}
 }
 
 func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &UploadUserAvatarRequestOptions{}
+	opts := &UploadUserAvatarHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.UploadUserAvatarPath{}
-	idStr := r.PathValue("id")
-	pathParams.ID, _ = runtime.ParseString[string](idStr)
+	iDStr := r.PathValue("id")
+	pathParams.ID = iDStr
 	opts.PathParams = pathParams
 	// Parse request body
 	defer r.Body.Close()
@@ -510,7 +508,7 @@ func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &SubmitContactFormRequestOptions{}
+	opts := &SubmitContactFormHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -581,7 +579,7 @@ func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 
 func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateNoteRequestOptions{}
+	opts := &CreateNoteHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -643,7 +641,7 @@ func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ProcessXMLDataRequestOptions{}
+	opts := &ProcessXMLDataHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -734,22 +732,20 @@ func (h *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
 		status = resp.Status
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(status)
 	if resp != nil && resp.Body != nil {
 		data, err := resp.Body.Bytes()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(status)
 		_, _ = w.Write(data)
-	} else {
-		w.WriteHeader(status)
 	}
 }
 
 func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetOAuthTokenRequestOptions{}
+	opts := &GetOAuthTokenHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -823,13 +819,13 @@ func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetItemsByTypeRequestOptions{}
+	opts := &GetItemsByTypeHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByTypePath{}
-	typeStr := r.PathValue("type")
-	pathParams.Type, _ = runtime.ParseString[string](typeStr)
+	pTypeStr := r.PathValue("type")
+	pathParams.Type = pTypeStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -881,14 +877,14 @@ func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &SearchRequestOptions{}
+	opts := &SearchHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
 	queryParams := &types.SearchQuery{}
 	query := r.URL.Query()
 	qStr := query.Get("q")
-	q, _ := runtime.ParseString[string](qStr)
+	q := qStr
 	queryParams.Q = q
 	opts.Query = queryParams
 
@@ -985,7 +981,7 @@ func (h *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &UploadImageRequestOptions{}
+	opts := &UploadImageHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1040,7 +1036,7 @@ func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ListProductsRequestOptions{}
+	opts := &ListProductsHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -1115,13 +1111,15 @@ func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetCategoryRequestOptions{}
+	opts := &GetCategoryHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetCategoryPath{}
-	categoryIdStr := r.PathValue("categoryId")
-	pathParams.CategoryID, _ = runtime.ParseString[int](categoryIdStr)
+	categoryIDStr := r.PathValue("categoryId")
+
+	categoryID, _ := runtime.ParseString[int](categoryIDStr)
+	pathParams.CategoryID = categoryID
 	opts.PathParams = pathParams
 
 	// Parse header parameters
@@ -1190,15 +1188,19 @@ func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetItemsByStatusRequestOptions{}
+	opts := &GetItemsByStatusHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByStatusPath{}
 	activeStr := r.PathValue("active")
-	pathParams.Active, _ = runtime.ParseString[bool](activeStr)
+
+	active, _ := runtime.ParseString[bool](activeStr)
+	pathParams.Active = active
 	ratingStr := r.PathValue("rating")
-	pathParams.Rating, _ = runtime.ParseString[float32](ratingStr)
+
+	rating, _ := runtime.ParseString[float32](ratingStr)
+	pathParams.Rating = rating
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -1250,15 +1252,15 @@ func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserPostRequestOptions{}
+	opts := &GetUserPostHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetUserPostPath{}
-	userIdStr := r.PathValue("userId")
-	pathParams.UserID, _ = runtime.ParseString[string](userIdStr)
-	postIdStr := r.PathValue("postId")
-	pathParams.PostID, _ = runtime.ParseString[string](postIdStr)
+	userIDStr := r.PathValue("userId")
+	pathParams.UserID = userIDStr
+	postIDStr := r.PathValue("postId")
+	pathParams.PostID = postIDStr
 	opts.PathParams = pathParams
 
 	// Validate request
@@ -1313,7 +1315,7 @@ func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateOrderRequestOptions{}
+	opts := &CreateOrderHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1377,7 +1379,7 @@ func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateCompanyRequestOptions{}
+	opts := &CreateCompanyHandlerRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body

@@ -34,7 +34,7 @@ func (h *Handler) HealthCheck(ctx context.Context) (*HealthCheckResponseData, er
 	return NewHealthCheckResponseData(&status), nil
 }
 
-func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersRequestOptions) (*ListUsersResponseData, error) {
+func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersHandlerRequestOptions) (*ListUsersResponseData, error) {
 	fixtures := testdata.Users()
 	users := make(types.ListUsersResponse, len(fixtures))
 	for i, f := range fixtures {
@@ -50,17 +50,17 @@ func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersRequestOptions) 
 	return NewListUsersResponseData(&users).WithHeaders(headers), nil
 }
 
-func (h *Handler) CreateUser(ctx context.Context, opts *CreateUserRequestOptions) (*CreateUserResponseData, error) {
+func (h *Handler) CreateUser(ctx context.Context, opts *CreateUserHandlerRequestOptions) (*CreateUserResponseData, error) {
 	user := types.User{ID: "new-1", Name: opts.Body.Name, Email: opts.Body.Email}
 	return NewCreateUserResponseData(&user), nil
 }
 
-func (h *Handler) ImportUsers(ctx context.Context, opts *ImportUsersRequestOptions) (*ImportUsersResponseData, error) {
+func (h *Handler) ImportUsers(ctx context.Context, opts *ImportUsersHandlerRequestOptions) (*ImportUsersResponseData, error) {
 	imported, skipped := 5, 0
 	return NewImportUsersResponseData(&types.ImportUsersResponse{Imported: &imported, Skipped: &skipped}), nil
 }
 
-func (h *Handler) GetUser(ctx context.Context, opts *GetUserRequestOptions) (*GetUserResponseData, error) {
+func (h *Handler) GetUser(ctx context.Context, opts *GetUserHandlerRequestOptions) (*GetUserResponseData, error) {
 	// Return user with requested ID for testing path param extraction
 	user := types.User{
 		ID:    opts.PathParams.ID,
@@ -70,11 +70,11 @@ func (h *Handler) GetUser(ctx context.Context, opts *GetUserRequestOptions) (*Ge
 	return NewGetUserResponseData(&user), nil
 }
 
-func (h *Handler) DeleteUser(ctx context.Context, opts *DeleteUserRequestOptions) (*DeleteUserResponseData, error) {
+func (h *Handler) DeleteUser(ctx context.Context, opts *DeleteUserHandlerRequestOptions) (*DeleteUserResponseData, error) {
 	return NewDeleteUserResponseData(nil), nil
 }
 
-func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarRequestOptions) (*GetUserAvatarResponseData, error) {
+func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarHandlerRequestOptions) (*GetUserAvatarResponseData, error) {
 	h.mu.RLock()
 	avatar, ok := h.avatars[opts.PathParams.ID]
 	h.mu.RUnlock()
@@ -86,7 +86,7 @@ func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarRequestO
 	return NewGetUserAvatarResponseData(&file), nil
 }
 
-func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarRequestOptions) (*UploadUserAvatarResponseData, error) {
+func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarHandlerRequestOptions) (*UploadUserAvatarResponseData, error) {
 	data, err := io.ReadAll(opts.RawRequest.Body)
 	if err != nil {
 		return nil, err
@@ -97,17 +97,17 @@ func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarRe
 	return NewUploadUserAvatarResponseData(nil), nil
 }
 
-func (h *Handler) SubmitContactForm(ctx context.Context, opts *SubmitContactFormRequestOptions) (*SubmitContactFormResponseData, error) {
+func (h *Handler) SubmitContactForm(ctx context.Context, opts *SubmitContactFormHandlerRequestOptions) (*SubmitContactFormResponseData, error) {
 	resp := types.SubmitContactFormResponse{"ticketId": "ticket-123"}
 	return NewSubmitContactFormResponseData(&resp), nil
 }
 
-func (h *Handler) CreateNote(ctx context.Context, opts *CreateNoteRequestOptions) (*CreateNoteResponseData, error) {
+func (h *Handler) CreateNote(ctx context.Context, opts *CreateNoteHandlerRequestOptions) (*CreateNoteResponseData, error) {
 	id := 1
 	return NewCreateNoteResponseData(&id), nil
 }
 
-func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataRequestOptions) (*ProcessXMLDataResponseData, error) {
+func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataHandlerRequestOptions) (*ProcessXMLDataResponseData, error) {
 	xmlBytes, err := io.ReadAll(opts.RawRequest.Body)
 	if err != nil {
 		return nil, err
@@ -128,19 +128,19 @@ func (h *Handler) ExportData(ctx context.Context) (*ExportDataResponseData, erro
 	return NewExportDataResponseData(&file), nil
 }
 
-func (h *Handler) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenRequestOptions) (*GetOAuthTokenResponseData, error) {
+func (h *Handler) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenHandlerRequestOptions) (*GetOAuthTokenResponseData, error) {
 	expiresIn := 3600
 	return NewGetOAuthTokenResponseData(&types.GetOAuthTokenResponse{
 		AccessToken: "test-token", TokenType: "bearer", ExpiresIn: &expiresIn,
 	}), nil
 }
 
-func (h *Handler) GetItemsByType(ctx context.Context, opts *GetItemsByTypeRequestOptions) (*GetItemsByTypeResponseData, error) {
+func (h *Handler) GetItemsByType(ctx context.Context, opts *GetItemsByTypeHandlerRequestOptions) (*GetItemsByTypeResponseData, error) {
 	items := types.GetItemsByTypeResponse{opts.PathParams.Type + "-item1", opts.PathParams.Type + "-item2"}
 	return NewGetItemsByTypeResponseData(&items), nil
 }
 
-func (h *Handler) Search(ctx context.Context, opts *SearchRequestOptions) (*SearchResponseData, error) {
+func (h *Handler) Search(ctx context.Context, opts *SearchHandlerRequestOptions) (*SearchResponseData, error) {
 	q := opts.Query.Q
 	if len(q) > 5 && q[:5] == "user:" {
 		user := types.User{ID: "1", Name: q[5:], Email: "search@example.com"}
@@ -157,12 +157,12 @@ func (h *Handler) GetStatus(ctx context.Context) (*GetStatusResponseData, error)
 	return NewGetStatusResponseData(&types.GetStatusResponse{Status: &status, Uptime: &uptime}), nil
 }
 
-func (h *Handler) UploadImage(ctx context.Context, opts *UploadImageRequestOptions) (*UploadImageResponseData, error) {
+func (h *Handler) UploadImage(ctx context.Context, opts *UploadImageHandlerRequestOptions) (*UploadImageResponseData, error) {
 	id, url := "img-123", "https://example.com/images/img-123"
 	return NewUploadImageResponseData(&types.UploadImageResponse{ID: &id, URL: &url}), nil
 }
 
-func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsRequestOptions) (*ListProductsResponseData, error) {
+func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsHandlerRequestOptions) (*ListProductsResponseData, error) {
 	fixtures := testdata.Products()
 	fixtures = testdata.FilterProductsByIDs(fixtures, opts.Query.Ids)
 	fixtures = testdata.FilterProductsByTags(fixtures, opts.Query.Tags)
@@ -174,12 +174,12 @@ func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsRequestOpt
 	return NewListProductsResponseData(&resp), nil
 }
 
-func (h *Handler) GetCategory(ctx context.Context, opts *GetCategoryRequestOptions) (*GetCategoryResponseData, error) {
+func (h *Handler) GetCategory(ctx context.Context, opts *GetCategoryHandlerRequestOptions) (*GetCategoryResponseData, error) {
 	category := types.Category{ID: opts.PathParams.CategoryID, Name: "Test Category"}
 	return NewGetCategoryResponseData(&category), nil
 }
 
-func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusRequestOptions) (*GetItemsByStatusResponseData, error) {
+func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusHandlerRequestOptions) (*GetItemsByStatusResponseData, error) {
 	// Return items based on active status and rating
 	items := types.GetItemsByStatusResponse{
 		fmt.Sprintf("item-active-%v-rating-%.1f", opts.PathParams.Active, opts.PathParams.Rating),
@@ -187,13 +187,13 @@ func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusRe
 	return NewGetItemsByStatusResponseData(&items), nil
 }
 
-func (h *Handler) GetUserPost(ctx context.Context, opts *GetUserPostRequestOptions) (*GetUserPostResponseData, error) {
+func (h *Handler) GetUserPost(ctx context.Context, opts *GetUserPostHandlerRequestOptions) (*GetUserPostResponseData, error) {
 	f := testdata.NewPost(opts.PathParams.UserID, opts.PathParams.PostID)
 	post := types.Post{ID: f.ID, UserID: f.UserID, Title: f.Title, Content: f.Content}
 	return NewGetUserPostResponseData(&post), nil
 }
 
-func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderRequestOptions) (*CreateOrderResponseData, error) {
+func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderHandlerRequestOptions) (*CreateOrderResponseData, error) {
 	order := types.Order{
 		ID: testdata.NewOrderID(), ProductID: opts.Body.ProductID,
 		Quantity: opts.Body.Quantity, Status: "pending",
@@ -204,7 +204,7 @@ func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderRequestOptio
 	return NewCreateOrderResponseData(&order), nil
 }
 
-func (h *Handler) CreateCompany(ctx context.Context, opts *CreateCompanyRequestOptions) (*CreateCompanyResponseData, error) {
+func (h *Handler) CreateCompany(ctx context.Context, opts *CreateCompanyHandlerRequestOptions) (*CreateCompanyResponseData, error) {
 	var contacts *types.Company_Contacts
 	if opts.Body.Contacts != nil {
 		c := make(types.Company_Contacts, len(*opts.Body.Contacts))

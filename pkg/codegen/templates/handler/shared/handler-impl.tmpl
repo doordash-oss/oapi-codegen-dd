@@ -48,7 +48,7 @@ var _ {{ $handlerName }}Interface = (*{{ $handlerName }})(nil)
 {{ range $operations }}{{ $op := . }}
 {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
 {{- if $op.HasRequestOptions }}
-func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}RequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}HandlerRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
     // TODO: Implement your business logic here
     {{- if $op.Response.Success }}
     {{- if $op.Response.Success.IsRaw }}

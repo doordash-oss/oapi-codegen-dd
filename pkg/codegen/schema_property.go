@@ -36,6 +36,31 @@ func (p Property) IsEqual(other Property) bool {
 		p.Constraints.IsEqual(other.Constraints)
 }
 
+// reservedTemplateVars are variable names used in handler templates that should be avoided.
+var reservedTemplateVars = map[string]bool{
+	"ctx": true, "opts": true, "pathParams": true, "query": true, "queryParams": true,
+	"headerParams": true, "headers": true, "body": true, "resp": true, "status": true,
+	"w": true, "r": true, "err": true, "result": true, "values": true,
+}
+
+// GoVariableName returns a safe Go variable name for this property.
+// It handles Go keywords by prefixing with "p" and numbers by prefixing with "n".
+// It also avoids reserved template variable names.
+func (p Property) GoVariableName() string {
+	// Use GoName (already sanitized) and convert to lowerCamelCase
+	name := p.GoName
+	if len(name) > 0 {
+		name = strings.ToLower(string(name[0])) + name[1:]
+	}
+	if isGoKeyword(name) || reservedTemplateVars[name] {
+		name = "p" + p.GoName
+	}
+	if len(name) > 0 && name[0] >= '0' && name[0] <= '9' {
+		name = "n" + name
+	}
+	return name
+}
+
 // IsFile returns true if this property is a file type (format: binary).
 func (p Property) IsFile() bool {
 	return p.Schema.GoType == "runtime.File"

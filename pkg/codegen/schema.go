@@ -93,6 +93,15 @@ func (s GoSchema) IsZero() bool {
 	return s.TypeDecl() == ""
 }
 
+// Format returns the OpenAPI format of the schema (e.g., "uuid", "date-time", "date").
+// Returns empty string if no format is specified.
+func (s GoSchema) Format() string {
+	if s.OpenAPISchema != nil {
+		return s.OpenAPISchema.Format
+	}
+	return ""
+}
+
 // IsAnyType returns true if the schema represents the 'any' type or an array of 'any'.
 // These types don't need validation methods since they accept any value.
 func (s GoSchema) IsAnyType() bool {
