@@ -112,14 +112,8 @@ func (pd ParameterDefinition) GoVariableName() string {
 }
 
 func (pd ParameterDefinition) GoName() string {
-	goName := pd.ParamName
 	exts := extractExtensions(pd.Spec.Extensions)
-	if extension, ok := exts[extGoName]; ok {
-		if extGoFieldName, err := parseString(extension); err == nil {
-			goName = extGoFieldName
-		}
-	}
-	return schemaNameToTypeName(goName)
+	return createPropertyGoFieldName(pd.ParamName, exts)
 }
 
 // IsPointerType returns true if this parameter's field in the generated struct is a pointer.
@@ -142,8 +136,8 @@ func (pd ParameterDefinition) IsPointerType() bool {
 			if slices.Contains(schema.Type, "array") {
 				return false
 			}
-			// Object types with additionalProperties generate maps, which are not pointers
-			if slices.Contains(schema.Type, "object") && schema.AdditionalProperties != nil {
+			// Object types with additionalProperties generate maps, which are reference types
+			if slices.Contains(schema.Type, "object") && schemaHasAdditionalProperties(schema) {
 				return false
 			}
 		}

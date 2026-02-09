@@ -701,6 +701,7 @@ func (h *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 		status = resp.Status
 	}
 	w.Header().Set("Content-Type", "application/xml")
+
 	w.WriteHeader(status)
 	if resp != nil && resp.Body != nil {
 		_, _ = w.Write(resp.Body)

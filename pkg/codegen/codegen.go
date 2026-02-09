@@ -425,6 +425,7 @@ func extractAllTypeDefinitions(types []TypeDefinition) []TypeDefinition {
 
 // collectResponseErrors collects the response errors from the type definitions.
 // We need non-alias types for the response errors, so we could generate Error function.
+// This also marks each resolved type as needing an Error() method in the TypeTracker.
 func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, error) {
 	if len(errNames) == 0 {
 		return nil, nil
@@ -444,6 +445,7 @@ func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, e
 			if visited[name] {
 				// Circular reference detected, use current name
 				res = append(res, name)
+				tracker.MarkNeedsErrorMethod(name)
 				break
 			}
 			visited[name] = true
@@ -454,6 +456,7 @@ func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, e
 			}
 			if !typ.IsAlias() {
 				res = append(res, name)
+				tracker.MarkNeedsErrorMethod(name)
 				break
 			}
 			// For aliases, the target type name is in GoType (when DefineViaAlias is true)
@@ -464,6 +467,7 @@ func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, e
 			}
 			if newName == "" || newName == name {
 				res = append(res, name)
+				tracker.MarkNeedsErrorMethod(name)
 				break
 			}
 
@@ -471,6 +475,7 @@ func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, e
 			// (not a primitive Go type like map[string]any)
 			if _, exists := tracker.LookupByName(newName); !exists {
 				res = append(res, name)
+				tracker.MarkNeedsErrorMethod(name)
 				break
 			}
 			name = newName

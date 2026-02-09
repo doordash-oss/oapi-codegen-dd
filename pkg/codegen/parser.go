@@ -120,6 +120,7 @@ type TplTypeContext struct {
 	Config         Configuration
 	WithHeader     bool
 	ResponseErrors map[string]bool
+	TypeTracker    *TypeTracker
 }
 
 // TplOperationsContext is the context passed to templates to generate client code.
@@ -371,6 +372,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				Config:         p.cfg,
 				WithHeader:     withHeader,
 				ResponseErrors: responseErrs,
+				TypeTracker:    p.ctx.TypeTracker,
 			}
 			out, err := p.ParseTemplates([]string{"types.tmpl"}, typesCtx)
 			if err != nil {
@@ -395,6 +397,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				Config:         p.cfg,
 				WithHeader:     withHeader,
 				ResponseErrors: responseErrs,
+				TypeTracker:    p.ctx.TypeTracker,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("error generating code for union types: %w", err)

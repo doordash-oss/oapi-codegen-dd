@@ -40,4 +40,11 @@ limitations under the License.
         }
     }
     {{ end }}
+
+    {{/* Error() method for enum types that are error responses */}}
+    {{ if and $root.TypeTracker ($root.TypeTracker.NeedsErrorMethod $Enum.Name) }}
+    func ({{$alias}} {{$Enum.Name}}) Error() string {
+        return string({{$alias}})
+    }
+    {{ end }}
 {{end}}

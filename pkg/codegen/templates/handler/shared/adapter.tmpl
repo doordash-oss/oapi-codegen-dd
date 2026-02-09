@@ -353,9 +353,11 @@ if err != nil {
                 return
             }
             _, _ = w.Write(data)
+            {{- else if eq $op.Response.Success.Schema.GoType "[]byte" }}
+            _, _ = w.Write(resp.Body)
             {{- else }}
-            {{/* Fallback: JSON encode the response body */}}
-            _ = json.NewEncoder(w).Encode(resp.Body)
+            {{/* Pointer to []byte */}}
+            _, _ = w.Write(*resp.Body)
             {{- end }}
         }
     {{- else if eq $op.Response.Success.ContentType "application/x-www-form-urlencoded" }}
@@ -367,10 +369,10 @@ if err != nil {
             }
         }
     {{- else }}
-        {{/* Unknown content type - try JSON encoding as fallback */}}
+        {{/* Unknown content type - body is pre-marshaled []byte */}}
         w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
-            _ = json.NewEncoder(w).Encode(resp.Body)
+            _, _ = w.Write(resp.Body)
         }
     {{- end }}
     {{- else }}

@@ -30,14 +30,19 @@ type TypeTracker struct {
 
 	// defaultSuffixes are tried before falling back to numeric suffixes
 	defaultSuffixes []string
+
+	// needsErrorMethod tracks which types need an Error() method generated.
+	// This is used for error response types that must implement the error interface.
+	needsErrorMethod map[string]bool
 }
 
 // newTypeTracker creates a new TypeTracker.
 func newTypeTracker() *TypeTracker {
 	return &TypeTracker{
-		byName:   make(map[string]*TypeDefinition),
-		byRef:    make(map[string]string),
-		counters: make(map[string]int),
+		byName:           make(map[string]*TypeDefinition),
+		byRef:            make(map[string]string),
+		counters:         make(map[string]int),
+		needsErrorMethod: make(map[string]bool),
 	}
 }
 
@@ -150,4 +155,50 @@ func (r *TypeTracker) AsMap() map[string]*TypeDefinition {
 // Size returns the number of registered types.
 func (r *TypeTracker) Size() int {
 	return len(r.byName)
+}
+
+// MarkNeedsErrorMethod marks a type as needing an Error() method.
+// If the type is an alias, it follows the alias chain to find the actual
+// non-alias type that should get the Error() method.
+// Types that are 'any' or '[]any' are skipped since methods can't be added to them.
+func (r *TypeTracker) MarkNeedsErrorMethod(name string) {
+	actualType := r.resolveAliasChain(name)
+	// Check if the resolved type is 'any' - can't add methods to interface types
+	if td, exists := r.byName[actualType]; exists && td.Schema.IsAnyType() {
+		return
+	}
+	r.needsErrorMethod[actualType] = true
+}
+
+// NeedsErrorMethod returns true if the type needs an Error() method.
+func (r *TypeTracker) NeedsErrorMethod(name string) bool {
+	return r.needsErrorMethod[name]
+}
+
+// resolveAliasChain follows the alias chain to find the actual non-alias type.
+// For example, if Foo = Bar and Bar = Baz (struct), it returns "Baz".
+func (r *TypeTracker) resolveAliasChain(name string) string {
+	visited := make(map[string]bool)
+	current := name
+
+	for {
+		if visited[current] {
+			// Circular reference, return current
+			return current
+		}
+		visited[current] = true
+
+		td, exists := r.byName[current]
+		if !exists || td.Schema.GoType == "" {
+			return current
+		}
+
+		if !td.Schema.DefineViaAlias {
+			// Not an alias, this is the actual type
+			return current
+		}
+
+		// Follow the alias to the next type
+		current = td.Schema.GoType
+	}
 }

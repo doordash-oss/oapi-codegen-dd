@@ -22,6 +22,7 @@ limitations under the License.
 {{ $loc := .specLocation }}
 {{ $responseErrors := .responseErrors }}
 {{ $typeSchemaMap := .typeSchemaMap }}
+{{ $typeTracker := .typeTracker }}
 {{ $isParam := or (eq $loc "path") (eq $loc "query") (eq $loc "header") (eq $loc "body") (eq $loc "schema") (eq $loc "union") }}
 {{ $isResponse := eq $loc "response" }}
 {{ $skipValidation := $config.Generate.Validation.Skip }}
@@ -42,19 +43,16 @@ limitations under the License.
     {{ end }}
     {{ end -}}
 
-    {{ if $responseErrors }}
-    {{- $isResponseError := index $responseErrors $td.Name }}
-    {{/* Error() method - only for non-aliases (aliases can't have methods) */}}
-    {{ if and $isResponseError (not $td.IsAlias) (not $td.Schema.IsAnyType) }}
-    {{ $alias := $loc | fst | lower }}
-    func ({{$alias}} {{$td.Name}}) Error() string {
+    {{/* Error() method - TypeTracker handles alias resolution and any-type filtering */}}
+    {{ if and $typeTracker ($typeTracker.NeedsErrorMethod $td.Name) }}
+    {{ $errAlias := $loc | fst | lower }}
+    func ({{$errAlias}} {{$td.Name}}) Error() string {
         {{- if index $config.ErrorMapping $td.Name}}
-        {{ $td.GetErrorResponse $config.ErrorMapping $alias $typeSchemaMap }}
+        {{ $td.GetErrorResponse $config.ErrorMapping $errAlias $typeSchemaMap }}
         {{ else }}
         return "unmapped client error"
         {{ end -}}
     }
-    {{ end }}
     {{ end }}
 
     {{ if and $td.Schema.HasAdditionalProperties (not $td.IsAlias) }}
@@ -184,9 +182,10 @@ limitations under the License.
 {{ $responseErrors := .ResponseErrors }}
 {{ $typeSchemaMap := .TypeSchemaMap }}
 {{ $loc := .SpecLocation }}
+{{ $typeTracker := .TypeTracker }}
 
 {{- range .Types}}{{ $td := . }}
 {{ if not $td.Schema.UnionElements }}
-  {{ template "typeDef" (dict "type" $td "config" $config "specLocation" $loc "responseErrors" $responseErrors "typeSchemaMap" $typeSchemaMap) }}
+  {{ template "typeDef" (dict "type" $td "config" $config "specLocation" $loc "responseErrors" $responseErrors "typeSchemaMap" $typeSchemaMap "typeTracker" $typeTracker) }}
 {{ end }}
 {{ end }}

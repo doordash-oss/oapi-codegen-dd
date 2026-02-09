@@ -25,6 +25,10 @@ func (p ProcessPaymentErrorResponseText) Validate() error {
 	}
 }
 
+func (p ProcessPaymentErrorResponseText) Error() string {
+	return string(p)
+}
+
 type ProcessPaymentErrorResponse string
 
 const (
