@@ -245,6 +245,7 @@
           "enum": [
             "chi",
             "echo",
+            "fiber",
             "gin",
             "std-http",
           ],

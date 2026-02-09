@@ -24,46 +24,48 @@ package main
 import (
     "fmt"
     "log"
-    "net/http"
     "os"
     "os/signal"
     "syscall"
     "time"
 
-    "github.com/gin-gonic/gin"
+    "github.com/gofiber/fiber/v3"
+    "github.com/gofiber/fiber/v3/middleware/recover"
+    "github.com/gofiber/fiber/v3/middleware/requestid"
+    "github.com/gofiber/fiber/v3/middleware/logger"
     handler "{{ $server.HandlerPackage }}"
 )
 
 func main() {
-    // Create Gin engine with default middleware (Logger, Recovery)
-    r := gin.Default()
+    // Create Fiber app
+    app := fiber.New(fiber.Config{
+        ReadTimeout:  {{ $server.Timeout }} * time.Second,
+        WriteTimeout: {{ $server.Timeout }} * time.Second,
+        IdleTimeout:  2 * {{ $server.Timeout }} * time.Second,
+    })
+
+    // Add Fiber built-in middleware
+    app.Use(recover.New())
+    app.Use(requestid.New())
+    app.Use(logger.New())
 
     // Add custom middleware from generated scaffold
-    r.Use(handler.ExampleMiddleware())
+    app.Use(handler.ExampleMiddleware())
 
     // Create your service implementation
     svc := handler.New{{ $config.Generate.Handler.Name }}()
 
     // Register routes
-    handler.NewRouter(r, svc)
+    handler.NewRouter(app, svc)
 
     // Configure server
     port := {{ $server.Port }}
     addr := fmt.Sprintf(":%d", port)
-    timeout := {{ $server.Timeout }} * time.Second
-
-    server := &http.Server{
-        Addr:         addr,
-        Handler:      r,
-        ReadTimeout:  timeout,
-        WriteTimeout: timeout,
-        IdleTimeout:  2 * timeout,
-    }
 
     // Start server in goroutine
     go func() {
         log.Printf("Starting server on %s", addr)
-        if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+        if err := app.Listen(addr); err != nil {
             log.Fatalf("Server error: %v", err)
         }
     }()
@@ -74,6 +76,8 @@ func main() {
     <-quit
 
     log.Println("Shutting down server...")
+    _ = app.Shutdown()
 }
 {{end}}
 {{template "server-main" .}}
+

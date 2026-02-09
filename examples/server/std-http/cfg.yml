@@ -4,11 +4,10 @@ output:
   directory: api
   use-single-file: true
 error-mapping:
-  CreateOrderErrorResponse: message
+  CreateUserErrorResponse: message
 generate:
   handler:
-    kind: gin
+    kind: std-http
     server:
       directory: server
-      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/gin/same-pkg-single-file/api
-
+      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/std-http/api

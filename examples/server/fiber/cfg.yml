@@ -7,7 +7,8 @@ error-mapping:
   CreateOrderErrorResponse: message
 generate:
   handler:
-    kind: echo
+    kind: fiber
     server:
       directory: server
-      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/same-pkg-single-file/api
+      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/fiber/api
+

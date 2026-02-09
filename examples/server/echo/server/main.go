@@ -8,8 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/same-pkg-single-file/api"
+	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/api"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -21,6 +22,11 @@ func main() {
 	// Add Echo built-in middleware
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestID())
+	e.Use(middleware.Logger())
+	e.Use(middleware.CORS())
+	e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+		Timeout: 30 * time.Second,
+	}))
 
 	// Add custom middleware from generated scaffold
 	e.Use(handler.ExampleMiddleware())

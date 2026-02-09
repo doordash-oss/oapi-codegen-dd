@@ -37,7 +37,7 @@ func main() {
     // Create Echo instance
     e := echo.New()
 
-    // Add Echo middleware
+    // Add Echo built-in middleware
     e.Use(middleware.Recover())
     e.Use(middleware.RequestID())
     e.Use(middleware.Logger())
@@ -45,6 +45,9 @@ func main() {
     e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
         Timeout: {{ $server.Timeout }} * time.Second,
     }))
+
+    // Add custom middleware from generated scaffold
+    e.Use(handler.ExampleMiddleware())
 
     // Create your service implementation
     svc := handler.New{{ $config.Generate.Handler.Name }}()

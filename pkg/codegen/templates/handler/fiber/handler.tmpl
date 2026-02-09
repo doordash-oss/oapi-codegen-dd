@@ -1,0 +1,80 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/* Fiber framework template blocks */}}
+
+{{define "router-import"}}fiber "github.com/gofiber/fiber/v3"
+"github.com/gofiber/fiber/v3/middleware/adaptor"{{end}}
+
+{{/* Fiber uses adaptor to convert http.Handler, path params copied to request */}}
+{{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
+
+{{define "router-config"}}
+type routerConfig struct {
+    middlewares []fiber.Handler
+}
+
+// WithMiddleware adds middleware to the router.
+func WithMiddleware(mw fiber.Handler) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+
+// fiberHTTPHandler wraps an http.HandlerFunc with path param injection for Fiber.
+func fiberHTTPHandler(h http.HandlerFunc, pathParams ...string) fiber.Handler {
+    return func(c fiber.Ctx) error {
+        return adaptor.HTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            // Copy path params from Fiber context to http.Request
+            for _, param := range pathParams {
+                r.SetPathValue(param, c.Params(param))
+            }
+            h(w, r)
+        })(c)
+    }
+}
+{{end}}
+
+{{define "new-router"}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $serviceName := $config.Generate.Handler.Name -}}
+// NewRouter registers routes on the given Fiber app with the service implementation.
+func NewRouter(app *fiber.App, svc {{ $serviceName }}Interface, opts ...RouterOption) {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    httpAdapter := NewHTTPAdapter(svc)
+
+    // Apply middleware to all routes
+    for _, mw := range cfg.middlewares {
+        app.Use(mw)
+    }
+
+    {{- range $operations }}{{ $op := . }}
+        {{- if $op.PathParams }}
+        app.{{ $op.Method | lower | ucFirst }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", fiberHTTPHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
+        {{- else }}
+        app.{{ $op.Method | lower | ucFirst }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", adaptor.HTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
+        {{- end }}
+    {{- end }}
+}
+{{end}}
+
+{{template "handler/adapter.tmpl" .}}
+{{template "handler/router.tmpl" .}}
+

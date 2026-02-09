@@ -12,29 +12,32 @@ import (
 	"syscall"
 	"time"
 
-	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/gin/same-pkg-single-file/api"
-	gin "github.com/gin-gonic/gin"
+	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/std-http/api"
 )
 
 func main() {
 	// Create your service implementation
 	svc := handler.NewService()
 
-	// Create Gin engine and register routes
-	r := gin.Default()
-	handler.NewRouter(r, svc)
+	// Create router with all available middleware
+	router := handler.NewRouter(svc,
+		handler.WithMiddleware(handler.RecoveryMiddleware),
+		handler.WithMiddleware(handler.RequestIDMiddleware),
+		handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),
+		handler.WithMiddleware(handler.CORSMiddleware(handler.DefaultCORSConfig())),
+		handler.WithMiddleware(handler.TimeoutMiddleware(30*time.Second)),
+	)
 
 	// Configure server
 	port := 8080
 	addr := fmt.Sprintf(":%d", port)
-	timeout := 30 * time.Second
 
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      r,
-		ReadTimeout:  timeout,
-		WriteTimeout: timeout,
-		IdleTimeout:  2 * timeout,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	// Start server in goroutine

@@ -342,6 +342,8 @@ const (
 	HandlerKindChi HandlerKind = "chi"
 	// HandlerKindEcho generates handlers for the Echo framework.
 	HandlerKindEcho HandlerKind = "echo"
+	// HandlerKindFiber generates handlers for the Fiber framework.
+	HandlerKindFiber HandlerKind = "fiber"
 	// HandlerKindGin generates handlers for the Gin framework.
 	HandlerKindGin HandlerKind = "gin"
 	// HandlerKindStdHTTP generates handlers for Go's standard library http.ServeMux (Go 1.22+).
@@ -351,7 +353,7 @@ const (
 // IsValid returns true if the handler kind is a supported value.
 func (k HandlerKind) IsValid() bool {
 	switch k {
-	case HandlerKindChi, HandlerKindEcho, HandlerKindGin, HandlerKindStdHTTP:
+	case HandlerKindChi, HandlerKindEcho, HandlerKindFiber, HandlerKindGin, HandlerKindStdHTTP:
 		return true
 	default:
 		return false

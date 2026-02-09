@@ -13,6 +13,8 @@ import (
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
+	fiber "github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
 )
 
 type OrderStatus string
@@ -219,9 +221,6 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*CreateUserErrorResponse); ok {
-			code = 400
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -320,9 +319,6 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*GetUserErrorResponse); ok {
-			code = 404
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -1102,9 +1098,6 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUserPost(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*GetUserPostErrorResponse); ok {
-			code = 404
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -1231,59 +1224,65 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []func(http.Handler) http.Handler
+	middlewares []fiber.Handler
 }
 
 // WithMiddleware adds middleware to the router.
-func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
+func WithMiddleware(mw fiber.Handler) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.middlewares = append(cfg.middlewares, mw)
 	}
 }
 
-// NewRouter creates a new http.ServeMux with the given service implementation.
-func NewRouter(svc ServiceInterface, opts ...RouterOption) *http.ServeMux {
+// fiberHTTPHandler wraps an http.HandlerFunc with path param injection for Fiber.
+func fiberHTTPHandler(h http.HandlerFunc, pathParams ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		return adaptor.HTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Copy path params from Fiber context to http.Request
+			for _, param := range pathParams {
+				r.SetPathValue(param, c.Params(param))
+			}
+			h(w, r)
+		})(c)
+	}
+}
+
+// NewRouter registers routes on the given Fiber app with the service implementation.
+func NewRouter(app *fiber.App, svc ServiceInterface, opts ...RouterOption) {
 	cfg := &routerConfig{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc)
+	httpAdapter := NewHTTPAdapter(svc)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", applyMiddleware(http.HandlerFunc(adapter.HealthCheck), cfg.middlewares...))
-	mux.HandleFunc("GET /users", applyMiddleware(http.HandlerFunc(adapter.ListUsers), cfg.middlewares...))
-	mux.HandleFunc("POST /users", applyMiddleware(http.HandlerFunc(adapter.CreateUser), cfg.middlewares...))
-	mux.HandleFunc("POST /users/import", applyMiddleware(http.HandlerFunc(adapter.ImportUsers), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{id}", applyMiddleware(http.HandlerFunc(adapter.GetUser), cfg.middlewares...))
-	mux.HandleFunc("DELETE /users/{id}", applyMiddleware(http.HandlerFunc(adapter.DeleteUser), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{id}/avatar", applyMiddleware(http.HandlerFunc(adapter.GetUserAvatar), cfg.middlewares...))
-	mux.HandleFunc("PUT /users/{id}/avatar", applyMiddleware(http.HandlerFunc(adapter.UploadUserAvatar), cfg.middlewares...))
-	mux.HandleFunc("POST /contact", applyMiddleware(http.HandlerFunc(adapter.SubmitContactForm), cfg.middlewares...))
-	mux.HandleFunc("POST /notes", applyMiddleware(http.HandlerFunc(adapter.CreateNote), cfg.middlewares...))
-	mux.HandleFunc("POST /xml-data", applyMiddleware(http.HandlerFunc(adapter.ProcessXMLData), cfg.middlewares...))
-	mux.HandleFunc("GET /export", applyMiddleware(http.HandlerFunc(adapter.ExportData), cfg.middlewares...))
-	mux.HandleFunc("POST /oauth/token", applyMiddleware(http.HandlerFunc(adapter.GetOAuthToken), cfg.middlewares...))
-	mux.HandleFunc("GET /items/{type}", applyMiddleware(http.HandlerFunc(adapter.GetItemsByType), cfg.middlewares...))
-	mux.HandleFunc("GET /search", applyMiddleware(http.HandlerFunc(adapter.Search), cfg.middlewares...))
-	mux.HandleFunc("GET /status", applyMiddleware(http.HandlerFunc(adapter.GetStatus), cfg.middlewares...))
-	mux.HandleFunc("POST /images", applyMiddleware(http.HandlerFunc(adapter.UploadImage), cfg.middlewares...))
-	mux.HandleFunc("GET /products", applyMiddleware(http.HandlerFunc(adapter.ListProducts), cfg.middlewares...))
-	mux.HandleFunc("GET /categories/{categoryId}", applyMiddleware(http.HandlerFunc(adapter.GetCategory), cfg.middlewares...))
-	mux.HandleFunc("GET /items/{type}/{rating}", applyMiddleware(http.HandlerFunc(adapter.GetItemsByStatus), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{id}/posts/{postId}", applyMiddleware(http.HandlerFunc(adapter.GetUserPost), cfg.middlewares...))
-	mux.HandleFunc("POST /orders", applyMiddleware(http.HandlerFunc(adapter.CreateOrder), cfg.middlewares...))
-	mux.HandleFunc("POST /companies", applyMiddleware(http.HandlerFunc(adapter.CreateCompany), cfg.middlewares...))
-
-	return mux
-}
-
-// applyMiddleware wraps a handler with the given middleware chain.
-func applyMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	for i := len(middlewares) - 1; i >= 0; i-- {
-		h = middlewares[i](h)
+	// Apply middleware to all routes
+	for _, mw := range cfg.middlewares {
+		app.Use(mw)
 	}
-	return h.ServeHTTP
+	app.Get("/health", adaptor.HTTPHandlerFunc(httpAdapter.HealthCheck))
+	app.Get("/users", adaptor.HTTPHandlerFunc(httpAdapter.ListUsers))
+	app.Post("/users", adaptor.HTTPHandlerFunc(httpAdapter.CreateUser))
+	app.Post("/users/import", adaptor.HTTPHandlerFunc(httpAdapter.ImportUsers))
+	app.Get("/users/:id", fiberHTTPHandler(httpAdapter.GetUser, "id"))
+	app.Delete("/users/:id", fiberHTTPHandler(httpAdapter.DeleteUser, "id"))
+	app.Get("/users/:id/avatar", fiberHTTPHandler(httpAdapter.GetUserAvatar, "id"))
+	app.Put("/users/:id/avatar", fiberHTTPHandler(httpAdapter.UploadUserAvatar, "id"))
+	app.Post("/contact", adaptor.HTTPHandlerFunc(httpAdapter.SubmitContactForm))
+	app.Post("/notes", adaptor.HTTPHandlerFunc(httpAdapter.CreateNote))
+	app.Post("/xml-data", adaptor.HTTPHandlerFunc(httpAdapter.ProcessXMLData))
+	app.Get("/export", adaptor.HTTPHandlerFunc(httpAdapter.ExportData))
+	app.Post("/oauth/token", adaptor.HTTPHandlerFunc(httpAdapter.GetOAuthToken))
+	app.Get("/items/:type", fiberHTTPHandler(httpAdapter.GetItemsByType, "type"))
+	app.Get("/search", adaptor.HTTPHandlerFunc(httpAdapter.Search))
+	app.Get("/status", adaptor.HTTPHandlerFunc(httpAdapter.GetStatus))
+	app.Post("/images", adaptor.HTTPHandlerFunc(httpAdapter.UploadImage))
+	app.Get("/products", adaptor.HTTPHandlerFunc(httpAdapter.ListProducts))
+	app.Get("/categories/:categoryId", fiberHTTPHandler(httpAdapter.GetCategory, "categoryId"))
+	app.Get("/items/:type/:rating", fiberHTTPHandler(httpAdapter.GetItemsByStatus, "type", "rating"))
+	app.Get("/users/:id/posts/:postId", fiberHTTPHandler(httpAdapter.GetUserPost, "id", "postId"))
+	app.Post("/orders", adaptor.HTTPHandlerFunc(httpAdapter.CreateOrder))
+	app.Post("/companies", adaptor.HTTPHandlerFunc(httpAdapter.CreateCompany))
 }
 
 type ListUsersHeaders struct {
@@ -2019,37 +2018,13 @@ type ListUsersResponse []User
 
 type CreateUserResponse = User
 
-type CreateUserErrorResponse struct {
-	Code    *string `json:"code,omitempty"`
-	Message *string `json:"message,omitempty"`
-}
-
-func (r CreateUserErrorResponse) Error() string {
-	res0 := r.Message
-	if res0 == nil {
-		return "unknown error"
-	}
-	res1 := *res0
-	return res1
-}
+type CreateUserErrorResponse = Error
 
 type ImportUsersResponse = ImportResult
 
 type GetUserResponse = User
 
-type GetUserErrorResponse struct {
-	Code    *string `json:"code,omitempty"`
-	Message *string `json:"message,omitempty"`
-}
-
-func (r GetUserErrorResponse) Error() string {
-	res0 := r.Message
-	if res0 == nil {
-		return "unknown error"
-	}
-	res1 := *res0
-	return res1
-}
+type GetUserErrorResponse = Error
 
 type GetUserAvatarResponse = runtime.File
 
@@ -2124,18 +2099,7 @@ type GetItemsByStatusResponse []string
 
 type GetUserPostResponse = Post
 
-type GetUserPostErrorResponse struct {
-	Code    string `json:"code" validate:"required"`
-	Message string `json:"message" validate:"required"`
-
-	// Resource The resource type that was not found
-	Resource string `json:"resource" validate:"required"`
-}
-
-func (r GetUserPostErrorResponse) Error() string {
-	res0 := r.Message
-	return res0
-}
+type GetUserPostErrorResponse = NotFoundError
 
 type CreateOrderResponse = Order
 
@@ -2150,13 +2114,7 @@ func (r CreateOrderErrorResponse) Error() string {
 	return res0
 }
 
-type CreateOrderErrorResponseJSON struct {
-	Code    string `json:"code" validate:"required"`
-	Message string `json:"message" validate:"required"`
-
-	// ExistingID ID of the conflicting resource
-	ExistingID *string `json:"existingId,omitempty"`
-}
+type CreateOrderErrorResponseJSON = ConflictError
 
 type CreateCompanyResponse = Company
 
@@ -2702,6 +2660,10 @@ type Error struct {
 	Message *string `json:"message,omitempty"`
 }
 
+func (s Error) Error() string {
+	return "unmapped client error"
+}
+
 type TokenResponse struct {
 	AccessToken string `json:"access_token" validate:"required"`
 	TokenType   string `json:"token_type" validate:"required"`
@@ -2760,6 +2722,10 @@ type NotFoundError struct {
 
 func (n NotFoundError) Validate() error {
 	return runtime.ConvertValidatorError(typesValidator.Struct(n))
+}
+
+func (s NotFoundError) Error() string {
+	return "unmapped client error"
 }
 
 type ValidationError struct {
