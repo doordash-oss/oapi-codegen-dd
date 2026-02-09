@@ -77,12 +77,12 @@ func LoggingMiddleware(logger func(format string, args ...any)) func(http.Handle
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			
+
 			// Wrap response writer to capture status code
 			wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-			
+
 			next.ServeHTTP(wrapped, r)
-			
+
 			duration := time.Since(start)
 			logger("%s %s %d %v", r.Method, r.URL.Path, wrapped.statusCode, duration)
 		})
@@ -101,21 +101,21 @@ func (rw *responseWriter) WriteHeader(code int) {
 
 // CORSConfig holds CORS configuration options.
 type CORSConfig struct {
-	AllowOrigins	 []string
-	AllowMethods	 []string
-	AllowHeaders	 []string
+	AllowOrigins     []string
+	AllowMethods     []string
+	AllowHeaders     []string
 	AllowCredentials bool
-	MaxAge		   int
+	MaxAge           int
 }
 
 // DefaultCORSConfig returns a permissive CORS configuration.
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{
-		AllowOrigins:	 []string{"*"},
-		AllowMethods:	 []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:	 []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
 		AllowCredentials: false,
-		MaxAge:		   86400,
+		MaxAge:           86400,
 	}
 }
 
@@ -124,7 +124,7 @@ func CORSMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			
+
 			// Check if origin is allowed
 			allowed := false
 			for _, o := range cfg.AllowOrigins {
@@ -133,14 +133,14 @@ func CORSMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
 					break
 				}
 			}
-			
+
 			if allowed && origin != "" {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				if cfg.AllowCredentials {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 				}
 			}
-			
+
 			// Handle preflight
 			if r.Method == http.MethodOptions {
 				w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
@@ -151,7 +151,7 @@ func CORSMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}

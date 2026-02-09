@@ -26,7 +26,7 @@ package {{ $config.PackageName }}
 import (
 	"context"
 	{{- range $config.AdditionalImports}}
-	{{.Alias}} "{{.Package}}"
+	{{if .Alias}}{{.Alias}} {{end}}"{{.Package}}"
 	{{- end}}
 )
 
@@ -45,7 +45,8 @@ func New{{ $handlerName }}() *{{ $handlerName }} {
 var _ {{ $handlerName }}Interface = (*{{ $handlerName }})(nil)
 
 // Interface method implementations - fill in your business logic
-{{ range $operations }}{{ $op := . }}
+{{- range $operations }}{{ $op := . }}
+
 {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
 {{- if $op.HasRequestOptions }}
 func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}HandlerRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
@@ -76,4 +77,4 @@ func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Respon
 	{{- end }}
 }
 {{- end }}
-{{ end }}
+{{- end }}
