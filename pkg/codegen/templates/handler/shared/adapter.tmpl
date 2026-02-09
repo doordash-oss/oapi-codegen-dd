@@ -379,7 +379,7 @@ if err != nil {
         if resp != nil && resp.Body != nil {
             _, _ = fmt.Fprintf(w, "%v", *resp.Body)
         }
-    {{- else if eq $op.Response.Success.ContentType "application/octet-stream" }}
+    {{- else if or (eq $op.Response.Success.ContentType "application/octet-stream") (hasPrefix $op.Response.Success.ContentType "application/octet-stream;") }}
         w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
             {{- if or (eq $op.Response.Success.Schema.GoType "runtime.File") (eq $op.Response.Success.Schema.Format "binary") }}
@@ -391,6 +391,9 @@ if err != nil {
             _, _ = w.Write(data)
             {{- else if eq $op.Response.Success.Schema.GoType "[]byte" }}
             _, _ = w.Write(resp.Body)
+            {{- else if eq $op.Response.Success.Schema.GoType "string" }}
+            {{/* String type - convert to []byte */}}
+            _, _ = w.Write([]byte(*resp.Body))
             {{- else }}
             {{/* Pointer to []byte */}}
             _, _ = w.Write(*resp.Body)
