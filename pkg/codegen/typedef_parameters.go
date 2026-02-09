@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -126,9 +127,18 @@ func (pd ParameterDefinition) GoName() string {
 func (pd ParameterDefinition) IsPointerType() bool {
 	typeDef := pd.Schema.TypeDecl()
 
-	// Arrays and maps are not pointers
+	// Arrays and maps are not pointers (check TypeDecl prefix)
 	if strings.HasPrefix(typeDef, "map[") || strings.HasPrefix(typeDef, "[]") {
 		return false
+	}
+
+	// Check if the underlying OpenAPI schema is an array type
+	// This handles named type aliases like "type ExpandPublication = []string"
+	if pd.Spec != nil && pd.Spec.Schema != nil {
+		schema := pd.Spec.Schema.Schema()
+		if schema != nil && slices.Contains(schema.Type, "array") {
+			return false
+		}
 	}
 
 	// Check x-go-type-skip-optional-pointer extension
