@@ -44,11 +44,12 @@ type ParameterEncoding struct {
 // Spec is the parsed openapi3.Parameter object
 // GoSchema is the GoSchema object
 type ParameterDefinition struct {
-	ParamName string
-	In        string
-	Required  bool
-	Spec      *v3high.Parameter
-	Schema    GoSchema
+	ParamName      string
+	In             string
+	Required       bool
+	Spec           *v3high.Parameter
+	Schema         GoSchema
+	resolvedGoName string // The actual Go field name after conflict resolution (set by generateParamsTypes)
 }
 
 // TypeDef is here as an adapter after a large refactoring so that I don't
@@ -112,6 +113,10 @@ func (pd ParameterDefinition) GoVariableName() string {
 }
 
 func (pd ParameterDefinition) GoName() string {
+	// Use resolvedGoName if set (after conflict resolution in generateParamsTypes)
+	if pd.resolvedGoName != "" {
+		return pd.resolvedGoName
+	}
 	exts := extractExtensions(pd.Spec.Extensions)
 	return createPropertyGoFieldName(pd.ParamName, exts)
 }
@@ -311,7 +316,8 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 	encodings := map[string]ParameterEncoding{}
 	goFieldNames := make(map[string]int) // Track Go field names to detect conflicts
 
-	for _, param := range objectParams {
+	for i := range objectParams {
+		param := &objectParams[i]
 		pSchema := param.Schema
 		if pSchema.HasAdditionalProperties {
 			propRefName := strings.Join([]string{typeName, param.GoName()}, "_")
@@ -347,6 +353,9 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 		} else {
 			goFieldNames[baseGoName] = 0
 		}
+
+		// Store the resolved Go name for use in templates
+		param.resolvedGoName = goName
 
 		properties = append(properties, Property{
 			GoName:        goName,

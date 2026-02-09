@@ -249,8 +249,6 @@ func (r *CreateNoteResponseData) WithStatus(code int) *CreateNoteResponseData {
 
 // ProcessXMLDataResponseData wraps the success response with optional headers and status override.
 type ProcessXMLDataResponseData struct {
-	// Body contains pre-marshaled bytes for custom content types.
-	// Set Content-Type via Headers.
 	Body    []byte
 	Headers http.Header
 	Status  int // 0 = use default (200)
