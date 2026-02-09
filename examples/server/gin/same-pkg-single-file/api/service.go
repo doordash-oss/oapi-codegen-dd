@@ -65,7 +65,6 @@ func (s *Service) ImportUsers(ctx context.Context, opts *ImportUsersServiceReque
 
 // GetUser handles GET /users/{id}
 func (s *Service) GetUser(ctx context.Context, opts *GetUserServiceRequestOptions) (*GetUserResponseData, error) {
-	// Return user with requested ID for testing path param extraction
 	user := User{
 		ID:    opts.PathParams.ID,
 		Name:  "Test User",
@@ -197,9 +196,8 @@ func (s *Service) GetCategory(ctx context.Context, opts *GetCategoryServiceReque
 	return NewGetCategoryResponseData(&category), nil
 }
 
-// GetItemsByStatus handles GET /items/{active}/{rating}
+// GetItemsByStatus handles GET /items/{type}/{rating}
 func (s *Service) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error) {
-	// Return items based on active status and rating
 	items := GetItemsByStatusResponse{
 		fmt.Sprintf("item-type-%s-rating-%.1f", opts.PathParams.Type, opts.PathParams.Rating),
 	}

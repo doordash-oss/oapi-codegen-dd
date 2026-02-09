@@ -201,14 +201,14 @@ func (s *Service) GetCategory(ctx context.Context, opts *GetCategoryServiceReque
 func (s *Service) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error) {
 	// Return items based on active status and rating
 	items := GetItemsByStatusResponse{
-		fmt.Sprintf("item-active-%v-rating-%.1f", opts.PathParams.Active, opts.PathParams.Rating),
+		fmt.Sprintf("item-type-%s-rating-%.1f", opts.PathParams.Type, opts.PathParams.Rating),
 	}
 	return NewGetItemsByStatusResponseData(&items), nil
 }
 
-// GetUserPost handles GET /users/{userId}/posts/{postId}
+// GetUserPost handles GET /users/{id}/posts/{postId}
 func (s *Service) GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error) {
-	f := testdata.NewPost(opts.PathParams.UserID, opts.PathParams.PostID)
+	f := testdata.NewPost(opts.PathParams.ID, opts.PathParams.PostID)
 	post := Post{ID: f.ID, UserID: f.UserID, Title: f.Title, Content: f.Content}
 	return NewGetUserPostResponseData(&post), nil
 }

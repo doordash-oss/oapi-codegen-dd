@@ -13,19 +13,20 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{/* Chi-specific template blocks */}}
+{{/* Gin framework template blocks */}}
 
-{{define "router-import"}}"github.com/go-chi/chi/v5"{{end}}
+{{define "router-import"}}gin "github.com/gin-gonic/gin"{{end}}
 
-{{define "get-path-param"}}chi.URLParam(r, "{{ . }}"){{end}}
+{{/* Gin uses r.PathValue() since we copy params from Gin context to request */}}
+{{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
 {{define "router-config"}}
 type routerConfig struct {
-    middlewares []func(http.Handler) http.Handler
+    middlewares []gin.HandlerFunc
 }
 
 // WithMiddleware adds middleware to the router.
-func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
+func WithMiddleware(mw gin.HandlerFunc) RouterOption {
     return func(cfg *routerConfig) {
         cfg.middlewares = append(cfg.middlewares, mw)
     }
@@ -36,8 +37,8 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
 {{- $serviceName := $config.Generate.Handler.Name -}}
-// NewRouter creates a new chi.Router with the given service implementation.
-func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) chi.Router {
+// NewRouter registers routes on the given Gin engine with the service implementation.
+func NewRouter(r *gin.Engine, svc {{ $serviceName }}Interface, opts ...RouterOption) {
     cfg := &routerConfig{}
     for _, opt := range opts {
         opt(cfg)
@@ -45,16 +46,22 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) chi.Router
 
     adapter := NewHTTPAdapter(svc)
 
-    r := chi.NewRouter()
+    // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
         r.Use(mw)
     }
 
     {{- range $operations }}{{ $op := . }}
-        r.Method("{{ $op.Method }}", "{{ escapeGoString $op.Path }}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+        r.{{ $op.Method | caps }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", func(c *gin.Context) {
+            {{- if $op.PathParams }}
+            // Copy path params to request for http.Handler compatibility
+            {{- range $op.PathParams.Schema.Properties }}
+            c.Request.SetPathValue("{{ .JsonFieldName }}", c.Param("{{ .JsonFieldName }}"))
+            {{- end }}
+            {{- end }}
+            adapter.{{ $op.ID | ucFirst }}(c.Writer, c.Request)
+        })
     {{- end }}
-
-    return r
 }
 {{end}}
 

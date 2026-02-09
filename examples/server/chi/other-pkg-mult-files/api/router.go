@@ -53,8 +53,8 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 	r.Method("POST", "/images", http.HandlerFunc(adapter.UploadImage))
 	r.Method("GET", "/products", http.HandlerFunc(adapter.ListProducts))
 	r.Method("GET", "/categories/{categoryId}", http.HandlerFunc(adapter.GetCategory))
-	r.Method("GET", "/items/{active}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
-	r.Method("GET", "/users/{userId}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
+	r.Method("GET", "/items/{type}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
+	r.Method("GET", "/users/{id}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
 	r.Method("POST", "/orders", http.HandlerFunc(adapter.CreateOrder))
 	r.Method("POST", "/companies", http.HandlerFunc(adapter.CreateCompany))
 

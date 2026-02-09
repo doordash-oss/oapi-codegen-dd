@@ -135,13 +135,13 @@ func (s *Service) GetCategory(ctx context.Context, opts *GetCategoryServiceReque
 	return NewGetCategoryResponseData(new(types.GetCategoryResponse)), nil
 }
 
-// GetItemsByStatus handles GET /items/{active}/{rating} - Get items by active status and rating (boolean + number path params)
+// GetItemsByStatus handles GET /items/{type}/{rating} - Get items by type and rating (string + number path params)
 func (s *Service) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error) {
 	// TODO: Implement your business logic here
 	return NewGetItemsByStatusResponseData(new(types.GetItemsByStatusResponse)), nil
 }
 
-// GetUserPost handles GET /users/{userId}/posts/{postId} - Get a specific post by a user
+// GetUserPost handles GET /users/{id}/posts/{postId} - Get a specific post by a user
 func (s *Service) GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error) {
 	// TODO: Implement your business logic here
 	return NewGetUserPostResponseData(new(types.GetUserPostResponse)), nil

@@ -74,7 +74,7 @@ type ServiceInterface interface {
 	ListProducts(ctx context.Context, opts *ListProductsServiceRequestOptions) (*ListProductsResponseData, error)
 	// GetCategory Get a category by ID (integer path param)
 	GetCategory(ctx context.Context, opts *GetCategoryServiceRequestOptions) (*GetCategoryResponseData, error)
-	// GetItemsByStatus Get items by active status and rating (boolean + number path params)
+	// GetItemsByStatus Get items by type and rating (string + number path params)
 	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error)
 	// GetUserPost Get a specific post by a user
 	GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error)
@@ -1314,7 +1314,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetItemsByStatus handles GET /items/{active}/{rating}
+// GetItemsByStatus handles GET /items/{type}/{rating}
 func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	opts := &GetItemsByStatusServiceRequestOptions{}
@@ -1322,13 +1322,8 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByStatusPath{}
-	pathParamActiveStr := chi.URLParam(r, "active")
-
-	pathParamActive, err := runtime.ParseString[bool](pathParamActiveStr)
-	if returnParseError(w, "active", err) {
-		return
-	}
-	pathParams.Active = pathParamActive
+	pathParamTypeStr := chi.URLParam(r, "type")
+	pathParams.Type = pathParamTypeStr
 	pathParamRatingStr := chi.URLParam(r, "rating")
 
 	pathParamRating, err := runtime.ParseString[float32](pathParamRatingStr)
@@ -1385,7 +1380,7 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetUserPost handles GET /users/{userId}/posts/{postId}
+// GetUserPost handles GET /users/{id}/posts/{postId}
 func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	opts := &GetUserPostServiceRequestOptions{}
@@ -1393,8 +1388,8 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &types.GetUserPostPath{}
-	pathParamUserIDStr := chi.URLParam(r, "userId")
-	pathParams.UserID = pathParamUserIDStr
+	pathParamIDStr := chi.URLParam(r, "id")
+	pathParams.ID = pathParamIDStr
 	pathParamPostIDStr := chi.URLParam(r, "postId")
 	pathParams.PostID = pathParamPostIDStr
 	opts.PathParams = pathParams
@@ -1616,8 +1611,8 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 	r.Method("POST", "/images", http.HandlerFunc(adapter.UploadImage))
 	r.Method("GET", "/products", http.HandlerFunc(adapter.ListProducts))
 	r.Method("GET", "/categories/{categoryId}", http.HandlerFunc(adapter.GetCategory))
-	r.Method("GET", "/items/{active}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
-	r.Method("GET", "/users/{userId}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
+	r.Method("GET", "/items/{type}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
+	r.Method("GET", "/users/{id}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
 	r.Method("POST", "/orders", http.HandlerFunc(adapter.CreateOrder))
 	r.Method("POST", "/companies", http.HandlerFunc(adapter.CreateCompany))
 

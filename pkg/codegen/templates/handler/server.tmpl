@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/* Default server-main. Frameworks can override this in their own server.tmpl */}}
+{{define "server-main"}}
 {{- $config := .Config -}}
 {{- $server := .ServerOptions -}}
 // Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
@@ -73,3 +75,5 @@ func main() {
 
     log.Println("Shutting down server...")
 }
+{{end}}
+{{template "server-main" .}}

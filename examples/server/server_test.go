@@ -11,7 +11,9 @@ import (
 
 	chiapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/chi/other-pkg-mult-files/api"
 	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/same-pkg-single-file/api"
+	ginapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/gin/same-pkg-single-file/api"
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/std-http/same-pkg-single-file/api"
+	"github.com/gin-gonic/gin"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +32,12 @@ func testServers() []serverTestCase {
 			e := echo.New()
 			echoapi.NewRouter(e, echoapi.NewService())
 			return e
+		}},
+		{"gin", func() http.Handler {
+			gin.SetMode(gin.TestMode)
+			r := gin.New()
+			ginapi.NewRouter(r, ginapi.NewService())
+			return r
 		}},
 	}
 }
@@ -308,12 +316,12 @@ func TestListProducts_QueryParams(t *testing.T) {
 	}
 }
 
-func TestGetItemsByStatus_BoolAndFloatPathParams(t *testing.T) {
+func TestGetItemsByStatus_TypeAndRatingPathParams(t *testing.T) {
 	for _, tc := range testServers() {
 		t.Run(tc.name, func(t *testing.T) {
 			h := tc.newRouter()
-			// Test with boolean and float path params
-			req := httptest.NewRequest("GET", "/items/true/4.5", nil)
+			// Test with string and float path params
+			req := httptest.NewRequest("GET", "/items/electronics/4.5", nil)
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
 
@@ -322,7 +330,7 @@ func TestGetItemsByStatus_BoolAndFloatPathParams(t *testing.T) {
 			err := json.Unmarshal(rr.Body.Bytes(), &items)
 			require.NoError(t, err)
 			assert.Len(t, items, 1)
-			assert.Contains(t, items[0], "active-true")
+			assert.Contains(t, items[0], "type-electronics")
 			assert.Contains(t, items[0], "rating-4.5")
 		})
 	}

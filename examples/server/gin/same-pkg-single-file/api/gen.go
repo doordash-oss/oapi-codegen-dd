@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
-	"github.com/go-chi/chi/v5"
+	gin "github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -220,9 +220,6 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*CreateUserErrorResponse); ok {
-			code = 400
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -313,7 +310,7 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetUserPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
@@ -356,7 +353,7 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &DeleteUserPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
@@ -395,7 +392,7 @@ func (a *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetUserAvatarPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
@@ -446,7 +443,7 @@ func (a *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &UploadUserAvatarPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 	// Parse request body
@@ -730,7 +727,7 @@ func (a *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetItemsByTypePath{}
-	pathParamTypeStr := chi.URLParam(r, "type")
+	pathParamTypeStr := r.PathValue("type")
 	pathParams.Type = pathParamTypeStr
 	opts.PathParams = pathParams
 
@@ -966,7 +963,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetCategoryPath{}
-	pathParamCategoryIDStr := chi.URLParam(r, "categoryId")
+	pathParamCategoryIDStr := r.PathValue("categoryId")
 
 	pathParamCategoryID, err := runtime.ParseString[int](pathParamCategoryIDStr)
 	if returnParseError(w, "categoryId", err) {
@@ -1040,9 +1037,9 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetItemsByStatusPath{}
-	pathParamTypeStr := chi.URLParam(r, "type")
+	pathParamTypeStr := r.PathValue("type")
 	pathParams.Type = pathParamTypeStr
-	pathParamRatingStr := chi.URLParam(r, "rating")
+	pathParamRatingStr := r.PathValue("rating")
 
 	pathParamRating, err := runtime.ParseString[float32](pathParamRatingStr)
 	if returnParseError(w, "rating", err) {
@@ -1090,9 +1087,9 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetUserPostPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
-	pathParamPostIDStr := chi.URLParam(r, "postId")
+	pathParamPostIDStr := r.PathValue("postId")
 	pathParams.PostID = pathParamPostIDStr
 	opts.PathParams = pathParams
 
@@ -1146,6 +1143,9 @@ func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateOrder(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if _, ok := err.(*CreateOrderErrorResponse); ok {
+			code = 400
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
@@ -1223,18 +1223,18 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []func(http.Handler) http.Handler
+	middlewares []gin.HandlerFunc
 }
 
 // WithMiddleware adds middleware to the router.
-func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
+func WithMiddleware(mw gin.HandlerFunc) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.middlewares = append(cfg.middlewares, mw)
 	}
 }
 
-// NewRouter creates a new chi.Router with the given service implementation.
-func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
+// NewRouter registers routes on the given Gin engine with the service implementation.
+func NewRouter(r *gin.Engine, svc ServiceInterface, opts ...RouterOption) {
 	cfg := &routerConfig{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -1242,35 +1242,97 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 
 	adapter := NewHTTPAdapter(svc)
 
-	r := chi.NewRouter()
+	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
 		r.Use(mw)
 	}
-	r.Method("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
-	r.Method("GET", "/users", http.HandlerFunc(adapter.ListUsers))
-	r.Method("POST", "/users", http.HandlerFunc(adapter.CreateUser))
-	r.Method("POST", "/users/import", http.HandlerFunc(adapter.ImportUsers))
-	r.Method("GET", "/users/{id}", http.HandlerFunc(adapter.GetUser))
-	r.Method("DELETE", "/users/{id}", http.HandlerFunc(adapter.DeleteUser))
-	r.Method("GET", "/users/{id}/avatar", http.HandlerFunc(adapter.GetUserAvatar))
-	r.Method("PUT", "/users/{id}/avatar", http.HandlerFunc(adapter.UploadUserAvatar))
-	r.Method("POST", "/contact", http.HandlerFunc(adapter.SubmitContactForm))
-	r.Method("POST", "/notes", http.HandlerFunc(adapter.CreateNote))
-	r.Method("POST", "/xml-data", http.HandlerFunc(adapter.ProcessXMLData))
-	r.Method("GET", "/export", http.HandlerFunc(adapter.ExportData))
-	r.Method("POST", "/oauth/token", http.HandlerFunc(adapter.GetOAuthToken))
-	r.Method("GET", "/items/{type}", http.HandlerFunc(adapter.GetItemsByType))
-	r.Method("GET", "/search", http.HandlerFunc(adapter.Search))
-	r.Method("GET", "/status", http.HandlerFunc(adapter.GetStatus))
-	r.Method("POST", "/images", http.HandlerFunc(adapter.UploadImage))
-	r.Method("GET", "/products", http.HandlerFunc(adapter.ListProducts))
-	r.Method("GET", "/categories/{categoryId}", http.HandlerFunc(adapter.GetCategory))
-	r.Method("GET", "/items/{type}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
-	r.Method("GET", "/users/{id}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
-	r.Method("POST", "/orders", http.HandlerFunc(adapter.CreateOrder))
-	r.Method("POST", "/companies", http.HandlerFunc(adapter.CreateCompany))
-
-	return r
+	r.GET("/health", func(c *gin.Context) {
+		adapter.HealthCheck(c.Writer, c.Request)
+	})
+	r.GET("/users", func(c *gin.Context) {
+		adapter.ListUsers(c.Writer, c.Request)
+	})
+	r.POST("/users", func(c *gin.Context) {
+		adapter.CreateUser(c.Writer, c.Request)
+	})
+	r.POST("/users/import", func(c *gin.Context) {
+		adapter.ImportUsers(c.Writer, c.Request)
+	})
+	r.GET("/users/:id", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("id", c.Param("id"))
+		adapter.GetUser(c.Writer, c.Request)
+	})
+	r.DELETE("/users/:id", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("id", c.Param("id"))
+		adapter.DeleteUser(c.Writer, c.Request)
+	})
+	r.GET("/users/:id/avatar", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("id", c.Param("id"))
+		adapter.GetUserAvatar(c.Writer, c.Request)
+	})
+	r.PUT("/users/:id/avatar", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("id", c.Param("id"))
+		adapter.UploadUserAvatar(c.Writer, c.Request)
+	})
+	r.POST("/contact", func(c *gin.Context) {
+		adapter.SubmitContactForm(c.Writer, c.Request)
+	})
+	r.POST("/notes", func(c *gin.Context) {
+		adapter.CreateNote(c.Writer, c.Request)
+	})
+	r.POST("/xml-data", func(c *gin.Context) {
+		adapter.ProcessXMLData(c.Writer, c.Request)
+	})
+	r.GET("/export", func(c *gin.Context) {
+		adapter.ExportData(c.Writer, c.Request)
+	})
+	r.POST("/oauth/token", func(c *gin.Context) {
+		adapter.GetOAuthToken(c.Writer, c.Request)
+	})
+	r.GET("/items/:type", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("type", c.Param("type"))
+		adapter.GetItemsByType(c.Writer, c.Request)
+	})
+	r.GET("/search", func(c *gin.Context) {
+		adapter.Search(c.Writer, c.Request)
+	})
+	r.GET("/status", func(c *gin.Context) {
+		adapter.GetStatus(c.Writer, c.Request)
+	})
+	r.POST("/images", func(c *gin.Context) {
+		adapter.UploadImage(c.Writer, c.Request)
+	})
+	r.GET("/products", func(c *gin.Context) {
+		adapter.ListProducts(c.Writer, c.Request)
+	})
+	r.GET("/categories/:categoryId", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("categoryId", c.Param("categoryId"))
+		adapter.GetCategory(c.Writer, c.Request)
+	})
+	r.GET("/items/:type/:rating", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("type", c.Param("type"))
+		c.Request.SetPathValue("rating", c.Param("rating"))
+		adapter.GetItemsByStatus(c.Writer, c.Request)
+	})
+	r.GET("/users/:id/posts/:postId", func(c *gin.Context) {
+		// Copy path params to request for http.Handler compatibility
+		c.Request.SetPathValue("id", c.Param("id"))
+		c.Request.SetPathValue("postId", c.Param("postId"))
+		adapter.GetUserPost(c.Writer, c.Request)
+	})
+	r.POST("/orders", func(c *gin.Context) {
+		adapter.CreateOrder(c.Writer, c.Request)
+	})
+	r.POST("/companies", func(c *gin.Context) {
+		adapter.CreateCompany(c.Writer, c.Request)
+	})
 }
 
 type ListUsersHeaders struct {
@@ -2006,19 +2068,7 @@ type ListUsersResponse []User
 
 type CreateUserResponse = User
 
-type CreateUserErrorResponse struct {
-	Code    *string `json:"code,omitempty"`
-	Message *string `json:"message,omitempty"`
-}
-
-func (r CreateUserErrorResponse) Error() string {
-	res0 := r.Message
-	if res0 == nil {
-		return "unknown error"
-	}
-	res1 := *res0
-	return res1
-}
+type CreateUserErrorResponse = Error
 
 type ImportUsersResponse = ImportResult
 
@@ -2103,7 +2153,16 @@ type GetUserPostErrorResponse = NotFoundError
 
 type CreateOrderResponse = Order
 
-type CreateOrderErrorResponse = ValidationError
+type CreateOrderErrorResponse struct {
+	Code    string                 `json:"code" validate:"required"`
+	Message string                 `json:"message" validate:"required"`
+	Fields  ValidationError_Fields `json:"fields" validate:"required"`
+}
+
+func (r CreateOrderErrorResponse) Error() string {
+	res0 := r.Message
+	return res0
+}
 
 type CreateOrderErrorResponseJSON = ConflictError
 
@@ -2742,10 +2801,6 @@ func (v ValidationError) Validate() error {
 		return nil
 	}
 	return errors
-}
-
-func (s ValidationError) Error() string {
-	return "unmapped client error"
 }
 
 type ValidationError_Fields []ValidationError_Fields_Item

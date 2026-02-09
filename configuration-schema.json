@@ -244,8 +244,9 @@
           "type": "string",
           "enum": [
             "chi",
+            "echo",
+            "gin",
             "std-http",
-            "echo"
           ],
           "description": "Router/framework to generate for. Defaults to 'chi'."
         },

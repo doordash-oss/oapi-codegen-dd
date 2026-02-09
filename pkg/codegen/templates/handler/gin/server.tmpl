@@ -22,42 +22,44 @@ limitations under the License.
 package main
 
 import (
+    "fmt"
     "log"
+    "net/http"
     "os"
     "os/signal"
     "syscall"
     "time"
 
-    "github.com/labstack/echo/v4"
-    "github.com/labstack/echo/v4/middleware"
+    gin "github.com/gin-gonic/gin"
     handler "{{ $server.HandlerPackage }}"
 )
 
 func main() {
-    // Create Echo instance
-    e := echo.New()
-
-    // Add Echo middleware
-    e.Use(middleware.Recover())
-    e.Use(middleware.RequestID())
-    e.Use(middleware.Logger())
-    e.Use(middleware.CORS())
-    e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
-        Timeout: {{ $server.Timeout }} * time.Second,
-    }))
-
     // Create your service implementation
     svc := handler.New{{ $config.Generate.Handler.Name }}()
 
-    // Register routes
-    handler.NewRouter(e, svc)
+    // Create Gin engine and register routes
+    r := gin.Default()
+    handler.NewRouter(r, svc)
 
-    // Start server
-    port := "{{ $server.Port }}"
+    // Configure server
+    port := {{ $server.Port }}
+    addr := fmt.Sprintf(":%d", port)
+    timeout := {{ $server.Timeout }} * time.Second
+
+    server := &http.Server{
+        Addr:         addr,
+        Handler:      r,
+        ReadTimeout:  timeout,
+        WriteTimeout: timeout,
+        IdleTimeout:  2 * timeout,
+    }
+
+    // Start server in goroutine
     go func() {
-        log.Printf("Starting server on :%s", port)
-        if err := e.Start(":" + port); err != nil {
-            log.Printf("Server stopped: %v", err)
+        log.Printf("Starting server on %s", addr)
+        if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("Server error: %v", err)
         }
     }()
 

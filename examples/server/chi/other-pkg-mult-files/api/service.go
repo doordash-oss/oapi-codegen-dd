@@ -198,18 +198,18 @@ func (s *Service) GetCategory(ctx context.Context, opts *GetCategoryServiceReque
 	return NewGetCategoryResponseData(&category), nil
 }
 
-// GetItemsByStatus handles GET /items/{active}/{rating}
+// GetItemsByStatus handles GET /items/{type}/{rating}
 func (s *Service) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error) {
-	// Return items based on active status and rating
+	// Return items based on type and rating
 	items := types.GetItemsByStatusResponse{
-		fmt.Sprintf("item-active-%v-rating-%.1f", opts.PathParams.Active, opts.PathParams.Rating),
+		fmt.Sprintf("item-type-%s-rating-%.1f", opts.PathParams.Type, opts.PathParams.Rating),
 	}
 	return NewGetItemsByStatusResponseData(&items), nil
 }
 
-// GetUserPost handles GET /users/{userId}/posts/{postId}
+// GetUserPost handles GET /users/{id}/posts/{postId}
 func (s *Service) GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error) {
-	f := testdata.NewPost(opts.PathParams.UserID, opts.PathParams.PostID)
+	f := testdata.NewPost(opts.PathParams.ID, opts.PathParams.PostID)
 	post := types.Post{ID: f.ID, UserID: f.UserID, Title: f.Title, Content: f.Content}
 	return NewGetUserPostResponseData(&post), nil
 }

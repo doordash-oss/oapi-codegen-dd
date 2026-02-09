@@ -32,45 +32,6 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 }
 {{end}}
 
-{{define "handle-parse-error"}}
-// returnParseError writes a 400 Bad Request response if err is not nil.
-// Returns true if an error was written (caller should return), false otherwise.
-func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
-    if err != nil {
-        http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
-        return true
-    }
-    return false
-}
-{{end}}
-
-{{define "handle-validation-error"}}
-    // Validate request
-    if err := opts.Validate(); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-{{end}}
-
-{{define "handle-service-error"}}
-{{- $op := .Op -}}
-{{- $modelsPrefix := .ModelsPrefix -}}
-if err != nil {
-    code := http.StatusInternalServerError
-    {{- if $op.Response.Error }}
-        {{- if not (or $op.Response.Error.Schema.DefineViaAlias $op.Response.Error.Schema.IsAnyType) }}
-            if _, ok := err.(*{{ $modelsPrefix }}{{ $op.Response.Error.ResponseName }}); ok {
-                code = {{ $op.Response.Error.StatusCode }}
-            }
-        {{- end }}
-    {{- end }}
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(code)
-    _ = json.NewEncoder(w).Encode(err)
-    return
-}
-{{end}}
-
 {{define "new-router"}}
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}

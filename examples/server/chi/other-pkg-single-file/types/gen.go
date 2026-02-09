@@ -100,7 +100,7 @@ func (g GetCategoryPath) Validate() error {
 }
 
 type GetItemsByStatusPath struct {
-	Active bool    `json:"active"`
+	Type   string  `json:"type" validate:"required"`
 	Rating float32 `json:"rating" validate:"required"`
 }
 
@@ -109,7 +109,7 @@ func (g GetItemsByStatusPath) Validate() error {
 }
 
 type GetUserPostPath struct {
-	UserID string `json:"userId" validate:"required"`
+	ID     string `json:"id" validate:"required"`
 	PostID string `json:"postId" validate:"required"`
 }
 

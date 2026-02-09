@@ -74,7 +74,7 @@ type ServiceInterface interface {
 	ListProducts(ctx context.Context, opts *ListProductsServiceRequestOptions) (*ListProductsResponseData, error)
 	// GetCategory Get a category by ID (integer path param)
 	GetCategory(ctx context.Context, opts *GetCategoryServiceRequestOptions) (*GetCategoryResponseData, error)
-	// GetItemsByStatus Get items by active status and rating (boolean + number path params)
+	// GetItemsByStatus Get items by type and rating (string + number path params)
 	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error)
 	// GetUserPost Get a specific post by a user
 	GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error)
@@ -1034,7 +1034,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetItemsByStatus handles GET /items/{active}/{rating}
+// GetItemsByStatus handles GET /items/{type}/{rating}
 func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	opts := &GetItemsByStatusServiceRequestOptions{}
@@ -1042,13 +1042,8 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetItemsByStatusPath{}
-	pathParamActiveStr := r.PathValue("active")
-
-	pathParamActive, err := runtime.ParseString[bool](pathParamActiveStr)
-	if returnParseError(w, "active", err) {
-		return
-	}
-	pathParams.Active = pathParamActive
+	pathParamTypeStr := r.PathValue("type")
+	pathParams.Type = pathParamTypeStr
 	pathParamRatingStr := r.PathValue("rating")
 
 	pathParamRating, err := runtime.ParseString[float32](pathParamRatingStr)
@@ -1089,7 +1084,7 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetUserPost handles GET /users/{userId}/posts/{postId}
+// GetUserPost handles GET /users/{id}/posts/{postId}
 func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	opts := &GetUserPostServiceRequestOptions{}
@@ -1097,8 +1092,8 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path parameters
 	pathParams := &GetUserPostPath{}
-	pathParamUserIDStr := r.PathValue("userId")
-	pathParams.UserID = pathParamUserIDStr
+	pathParamIDStr := r.PathValue("id")
+	pathParams.ID = pathParamIDStr
 	pathParamPostIDStr := r.PathValue("postId")
 	pathParams.PostID = pathParamPostIDStr
 	opts.PathParams = pathParams
@@ -1275,8 +1270,8 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *http.ServeMux {
 	mux.HandleFunc("POST /images", applyMiddleware(http.HandlerFunc(adapter.UploadImage), cfg.middlewares...))
 	mux.HandleFunc("GET /products", applyMiddleware(http.HandlerFunc(adapter.ListProducts), cfg.middlewares...))
 	mux.HandleFunc("GET /categories/{categoryId}", applyMiddleware(http.HandlerFunc(adapter.GetCategory), cfg.middlewares...))
-	mux.HandleFunc("GET /items/{active}/{rating}", applyMiddleware(http.HandlerFunc(adapter.GetItemsByStatus), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{userId}/posts/{postId}", applyMiddleware(http.HandlerFunc(adapter.GetUserPost), cfg.middlewares...))
+	mux.HandleFunc("GET /items/{type}/{rating}", applyMiddleware(http.HandlerFunc(adapter.GetItemsByStatus), cfg.middlewares...))
+	mux.HandleFunc("GET /users/{id}/posts/{postId}", applyMiddleware(http.HandlerFunc(adapter.GetUserPost), cfg.middlewares...))
 	mux.HandleFunc("POST /orders", applyMiddleware(http.HandlerFunc(adapter.CreateOrder), cfg.middlewares...))
 	mux.HandleFunc("POST /companies", applyMiddleware(http.HandlerFunc(adapter.CreateCompany), cfg.middlewares...))
 
@@ -1360,7 +1355,7 @@ func (g GetCategoryPath) Validate() error {
 }
 
 type GetItemsByStatusPath struct {
-	Active bool    `json:"active"`
+	Type   string  `json:"type" validate:"required"`
 	Rating float32 `json:"rating" validate:"required"`
 }
 
@@ -1369,7 +1364,7 @@ func (g GetItemsByStatusPath) Validate() error {
 }
 
 type GetUserPostPath struct {
-	UserID string `json:"userId" validate:"required"`
+	ID     string `json:"id" validate:"required"`
 	PostID string `json:"postId" validate:"required"`
 }
 

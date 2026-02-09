@@ -426,16 +426,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Category"
 
-  /items/{active}/{rating}:
+  /items/{type}/{rating}:
     get:
       operationId: getItemsByStatus
-      summary: Get items by active status and rating (boolean + number path params)
+      summary: Get items by type and rating (string + number path params)
       parameters:
-        - name: active
+        - name: type
           in: path
           required: true
           schema:
-            type: boolean
+            type: string
         - name: rating
           in: path
           required: true
@@ -451,12 +451,12 @@ paths:
                 items:
                   type: string
 
-  /users/{userId}/posts/{postId}:
+  /users/{id}/posts/{postId}:
     get:
       operationId: getUserPost
       summary: Get a specific post by a user
       parameters:
-        - name: userId
+        - name: id
           in: path
           required: true
           schema:
