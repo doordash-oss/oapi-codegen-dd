@@ -230,8 +230,10 @@ func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 		body.File.InitFromMultipart(fileHeaders[0])
 	}
 	if values := r.MultipartForm.Value["overwrite"]; len(values) > 0 {
-		body.Overwrite = new(bool)
-		*body.Overwrite = values[0] == "true"
+
+		if v, err := runtime.ParseString[bool](values[0]); err == nil {
+			body.Overwrite = &v
+		}
 	}
 	opts.Body = &body
 

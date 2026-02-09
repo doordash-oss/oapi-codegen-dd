@@ -164,7 +164,14 @@ func (pd ParameterDefinition) IsPointerType() bool {
 		return false
 	}
 
-	// A parameter is a pointer if it's not required (nullable = !required in newConstraints)
+	// A parameter is a pointer if it's nullable.
+	// This matches the logic in newConstraints: nullable := !required || hasNilType || deref(schema.Nullable)
+	// The parameter can be required but still nullable if schema.Nullable is true.
+	schema := pd.Spec.Schema.Schema()
+	if schema != nil && schema.Nullable != nil && *schema.Nullable {
+		return true
+	}
+
 	return !pd.Required
 }
 

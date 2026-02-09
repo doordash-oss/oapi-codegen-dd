@@ -5,7 +5,6 @@ package api
 
 import (
 	"context"
-
 	"github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/chi/other-pkg-single-file/types"
 )
 

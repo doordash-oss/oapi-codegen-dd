@@ -355,7 +355,7 @@ if err != nil {
     {{- else if eq $op.Response.Success.ContentType "application/octet-stream" }}
         w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
-            {{- if eq $op.Response.Success.Schema.GoType "runtime.File" }}
+            {{- if or (eq $op.Response.Success.Schema.GoType "runtime.File") (eq $op.Response.Success.Schema.Format "binary") }}
             data, err := resp.Body.Bytes()
             if err != nil {
                 http.Error(w, err.Error(), http.StatusInternalServerError)
