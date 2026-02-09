@@ -371,13 +371,19 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 
 		// IsRaw is true for unsupported content types that require manual marshaling
+		// Use HasPrefix to handle content types with parameters (e.g., "text/html; charset=UTF-8")
 		isRaw := contentType != "" &&
 			contentType != "application/json" &&
+			!strings.HasPrefix(contentType, "application/json;") &&
 			!isMediaTypeJson(contentType) &&
 			contentType != "text/plain" &&
+			!strings.HasPrefix(contentType, "text/plain;") &&
 			contentType != "text/html" &&
+			!strings.HasPrefix(contentType, "text/html;") &&
 			contentType != "application/octet-stream" &&
-			contentType != "application/x-www-form-urlencoded"
+			!strings.HasPrefix(contentType, "application/octet-stream;") &&
+			contentType != "application/x-www-form-urlencoded" &&
+			!strings.HasPrefix(contentType, "application/x-www-form-urlencoded;")
 
 		rcd := &ResponseContentDefinition{
 			ResponseName: responseName,
