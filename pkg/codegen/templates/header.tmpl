@@ -57,6 +57,9 @@ import (
     {{- range .Imports }}
         {{ . }}
     {{- end }}
+    {{- if and .Config.Generate .Config.Generate.Handler }}
+    {{template "router-import" .}}
+    {{- end }}
     {{- range .Config.AdditionalImports}}
     {{.Alias -}} "{{.Package}}"
     {{- end}}

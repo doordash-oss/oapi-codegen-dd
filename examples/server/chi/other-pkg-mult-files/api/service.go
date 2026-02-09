@@ -16,25 +16,27 @@ import (
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 )
 
-// Handler handles API requests.
-type Handler struct {
+// Service handles API requests.
+type Service struct {
 	mu      sync.RWMutex
 	avatars map[string][]byte
 }
 
-// NewHandler creates a new Handler.
-func NewHandler() *Handler {
-	return &Handler{avatars: make(map[string][]byte)}
+// NewService creates a new Service.
+func NewService() *Service {
+	return &Service{avatars: make(map[string][]byte)}
 }
 
-var _ HandlerInterface = (*Handler)(nil)
+var _ ServiceInterface = (*Service)(nil)
 
-func (h *Handler) HealthCheck(ctx context.Context) (*HealthCheckResponseData, error) {
+// HealthCheck handles GET /health
+func (s *Service) HealthCheck(ctx context.Context) (*HealthCheckResponseData, error) {
 	status := "OK"
 	return NewHealthCheckResponseData(&status), nil
 }
 
-func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersHandlerRequestOptions) (*ListUsersResponseData, error) {
+// ListUsers handles GET /users
+func (s *Service) ListUsers(ctx context.Context, opts *ListUsersServiceRequestOptions) (*ListUsersResponseData, error) {
 	fixtures := testdata.Users()
 	users := make(types.ListUsersResponse, len(fixtures))
 	for i, f := range fixtures {
@@ -50,17 +52,20 @@ func (h *Handler) ListUsers(ctx context.Context, opts *ListUsersHandlerRequestOp
 	return NewListUsersResponseData(&users).WithHeaders(headers), nil
 }
 
-func (h *Handler) CreateUser(ctx context.Context, opts *CreateUserHandlerRequestOptions) (*CreateUserResponseData, error) {
+// CreateUser handles POST /users
+func (s *Service) CreateUser(ctx context.Context, opts *CreateUserServiceRequestOptions) (*CreateUserResponseData, error) {
 	user := types.User{ID: "new-1", Name: opts.Body.Name, Email: opts.Body.Email}
 	return NewCreateUserResponseData(&user), nil
 }
 
-func (h *Handler) ImportUsers(ctx context.Context, opts *ImportUsersHandlerRequestOptions) (*ImportUsersResponseData, error) {
+// ImportUsers handles POST /users/import
+func (s *Service) ImportUsers(ctx context.Context, opts *ImportUsersServiceRequestOptions) (*ImportUsersResponseData, error) {
 	imported, skipped := 5, 0
 	return NewImportUsersResponseData(&types.ImportUsersResponse{Imported: &imported, Skipped: &skipped}), nil
 }
 
-func (h *Handler) GetUser(ctx context.Context, opts *GetUserHandlerRequestOptions) (*GetUserResponseData, error) {
+// GetUser handles GET /users/{id}
+func (s *Service) GetUser(ctx context.Context, opts *GetUserServiceRequestOptions) (*GetUserResponseData, error) {
 	// Return user with requested ID for testing path param extraction
 	user := types.User{
 		ID:    opts.PathParams.ID,
@@ -70,14 +75,16 @@ func (h *Handler) GetUser(ctx context.Context, opts *GetUserHandlerRequestOption
 	return NewGetUserResponseData(&user), nil
 }
 
-func (h *Handler) DeleteUser(ctx context.Context, opts *DeleteUserHandlerRequestOptions) (*DeleteUserResponseData, error) {
+// DeleteUser handles DELETE /users/{id}
+func (s *Service) DeleteUser(ctx context.Context, opts *DeleteUserServiceRequestOptions) (*DeleteUserResponseData, error) {
 	return NewDeleteUserResponseData(nil), nil
 }
 
-func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarHandlerRequestOptions) (*GetUserAvatarResponseData, error) {
-	h.mu.RLock()
-	avatar, ok := h.avatars[opts.PathParams.ID]
-	h.mu.RUnlock()
+// GetUserAvatar handles GET /users/{id}/avatar
+func (s *Service) GetUserAvatar(ctx context.Context, opts *GetUserAvatarServiceRequestOptions) (*GetUserAvatarResponseData, error) {
+	s.mu.RLock()
+	avatar, ok := s.avatars[opts.PathParams.ID]
+	s.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("avatar not found")
 	}
@@ -86,28 +93,32 @@ func (h *Handler) GetUserAvatar(ctx context.Context, opts *GetUserAvatarHandlerR
 	return NewGetUserAvatarResponseData(&file), nil
 }
 
-func (h *Handler) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarHandlerRequestOptions) (*UploadUserAvatarResponseData, error) {
+// UploadUserAvatar handles PUT /users/{id}/avatar
+func (s *Service) UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarServiceRequestOptions) (*UploadUserAvatarResponseData, error) {
 	data, err := io.ReadAll(opts.RawRequest.Body)
 	if err != nil {
 		return nil, err
 	}
-	h.mu.Lock()
-	h.avatars[opts.PathParams.ID] = data
-	h.mu.Unlock()
+	s.mu.Lock()
+	s.avatars[opts.PathParams.ID] = data
+	s.mu.Unlock()
 	return NewUploadUserAvatarResponseData(nil), nil
 }
 
-func (h *Handler) SubmitContactForm(ctx context.Context, opts *SubmitContactFormHandlerRequestOptions) (*SubmitContactFormResponseData, error) {
+// SubmitContactForm handles POST /contact
+func (s *Service) SubmitContactForm(ctx context.Context, opts *SubmitContactFormServiceRequestOptions) (*SubmitContactFormResponseData, error) {
 	resp := types.SubmitContactFormResponse{"ticketId": "ticket-123"}
 	return NewSubmitContactFormResponseData(&resp), nil
 }
 
-func (h *Handler) CreateNote(ctx context.Context, opts *CreateNoteHandlerRequestOptions) (*CreateNoteResponseData, error) {
+// CreateNote handles POST /notes
+func (s *Service) CreateNote(ctx context.Context, opts *CreateNoteServiceRequestOptions) (*CreateNoteResponseData, error) {
 	id := 1
 	return NewCreateNoteResponseData(&id), nil
 }
 
-func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataHandlerRequestOptions) (*ProcessXMLDataResponseData, error) {
+// ProcessXMLData handles POST /xml-data
+func (s *Service) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataServiceRequestOptions) (*ProcessXMLDataResponseData, error) {
 	xmlBytes, err := io.ReadAll(opts.RawRequest.Body)
 	if err != nil {
 		return nil, err
@@ -122,25 +133,29 @@ func (h *Handler) ProcessXMLData(ctx context.Context, opts *ProcessXMLDataHandle
 	return resp, nil
 }
 
-func (h *Handler) ExportData(ctx context.Context) (*ExportDataResponseData, error) {
+// ExportData handles GET /export
+func (s *Service) ExportData(ctx context.Context) (*ExportDataResponseData, error) {
 	file := runtime.File{}
 	file.InitFromBytes([]byte("exported data"), "export.zip")
 	return NewExportDataResponseData(&file), nil
 }
 
-func (h *Handler) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenHandlerRequestOptions) (*GetOAuthTokenResponseData, error) {
+// GetOAuthToken handles POST /oauth/token
+func (s *Service) GetOAuthToken(ctx context.Context, opts *GetOAuthTokenServiceRequestOptions) (*GetOAuthTokenResponseData, error) {
 	expiresIn := 3600
 	return NewGetOAuthTokenResponseData(&types.GetOAuthTokenResponse{
 		AccessToken: "test-token", TokenType: "bearer", ExpiresIn: &expiresIn,
 	}), nil
 }
 
-func (h *Handler) GetItemsByType(ctx context.Context, opts *GetItemsByTypeHandlerRequestOptions) (*GetItemsByTypeResponseData, error) {
+// GetItemsByType handles GET /items/{type}
+func (s *Service) GetItemsByType(ctx context.Context, opts *GetItemsByTypeServiceRequestOptions) (*GetItemsByTypeResponseData, error) {
 	items := types.GetItemsByTypeResponse{opts.PathParams.Type + "-item1", opts.PathParams.Type + "-item2"}
 	return NewGetItemsByTypeResponseData(&items), nil
 }
 
-func (h *Handler) Search(ctx context.Context, opts *SearchHandlerRequestOptions) (*SearchResponseData, error) {
+// Search handles GET /search
+func (s *Service) Search(ctx context.Context, opts *SearchServiceRequestOptions) (*SearchResponseData, error) {
 	q := opts.Query.Q
 	if len(q) > 5 && q[:5] == "user:" {
 		user := types.User{ID: "1", Name: q[5:], Email: "search@example.com"}
@@ -152,17 +167,20 @@ func (h *Handler) Search(ctx context.Context, opts *SearchHandlerRequestOptions)
 	return NewSearchResponseData(&types.SearchResponse{Search_Response_OneOf: union}), nil
 }
 
-func (h *Handler) GetStatus(ctx context.Context) (*GetStatusResponseData, error) {
+// GetStatus handles GET /status
+func (s *Service) GetStatus(ctx context.Context) (*GetStatusResponseData, error) {
 	status, uptime := "healthy", 12345
 	return NewGetStatusResponseData(&types.GetStatusResponse{Status: &status, Uptime: &uptime}), nil
 }
 
-func (h *Handler) UploadImage(ctx context.Context, opts *UploadImageHandlerRequestOptions) (*UploadImageResponseData, error) {
+// UploadImage handles POST /images
+func (s *Service) UploadImage(ctx context.Context, opts *UploadImageServiceRequestOptions) (*UploadImageResponseData, error) {
 	id, url := "img-123", "https://example.com/images/img-123"
 	return NewUploadImageResponseData(&types.UploadImageResponse{ID: &id, URL: &url}), nil
 }
 
-func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsHandlerRequestOptions) (*ListProductsResponseData, error) {
+// ListProducts handles GET /products
+func (s *Service) ListProducts(ctx context.Context, opts *ListProductsServiceRequestOptions) (*ListProductsResponseData, error) {
 	fixtures := testdata.Products()
 	fixtures = testdata.FilterProductsByIDs(fixtures, opts.Query.Ids)
 	fixtures = testdata.FilterProductsByTags(fixtures, opts.Query.Tags)
@@ -174,12 +192,14 @@ func (h *Handler) ListProducts(ctx context.Context, opts *ListProductsHandlerReq
 	return NewListProductsResponseData(&resp), nil
 }
 
-func (h *Handler) GetCategory(ctx context.Context, opts *GetCategoryHandlerRequestOptions) (*GetCategoryResponseData, error) {
+// GetCategory handles GET /categories/{categoryId}
+func (s *Service) GetCategory(ctx context.Context, opts *GetCategoryServiceRequestOptions) (*GetCategoryResponseData, error) {
 	category := types.Category{ID: opts.PathParams.CategoryID, Name: "Test Category"}
 	return NewGetCategoryResponseData(&category), nil
 }
 
-func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusHandlerRequestOptions) (*GetItemsByStatusResponseData, error) {
+// GetItemsByStatus handles GET /items/{active}/{rating}
+func (s *Service) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error) {
 	// Return items based on active status and rating
 	items := types.GetItemsByStatusResponse{
 		fmt.Sprintf("item-active-%v-rating-%.1f", opts.PathParams.Active, opts.PathParams.Rating),
@@ -187,13 +207,15 @@ func (h *Handler) GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusHa
 	return NewGetItemsByStatusResponseData(&items), nil
 }
 
-func (h *Handler) GetUserPost(ctx context.Context, opts *GetUserPostHandlerRequestOptions) (*GetUserPostResponseData, error) {
+// GetUserPost handles GET /users/{userId}/posts/{postId}
+func (s *Service) GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error) {
 	f := testdata.NewPost(opts.PathParams.UserID, opts.PathParams.PostID)
 	post := types.Post{ID: f.ID, UserID: f.UserID, Title: f.Title, Content: f.Content}
 	return NewGetUserPostResponseData(&post), nil
 }
 
-func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderHandlerRequestOptions) (*CreateOrderResponseData, error) {
+// CreateOrder handles POST /orders
+func (s *Service) CreateOrder(ctx context.Context, opts *CreateOrderServiceRequestOptions) (*CreateOrderResponseData, error) {
 	order := types.Order{
 		ID: testdata.NewOrderID(), ProductID: opts.Body.ProductID,
 		Quantity: opts.Body.Quantity, Status: "pending",
@@ -204,7 +226,8 @@ func (h *Handler) CreateOrder(ctx context.Context, opts *CreateOrderHandlerReque
 	return NewCreateOrderResponseData(&order), nil
 }
 
-func (h *Handler) CreateCompany(ctx context.Context, opts *CreateCompanyHandlerRequestOptions) (*CreateCompanyResponseData, error) {
+// CreateCompany handles POST /companies
+func (s *Service) CreateCompany(ctx context.Context, opts *CreateCompanyServiceRequestOptions) (*CreateCompanyResponseData, error) {
 	var contacts *types.Company_Contacts
 	if opts.Body.Contacts != nil {
 		c := make(types.Company_Contacts, len(*opts.Body.Contacts))

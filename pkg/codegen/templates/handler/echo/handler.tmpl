@@ -13,19 +13,20 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{/* Chi-specific template blocks */}}
+{{/* Echo framework template blocks */}}
 
-{{define "router-import"}}"github.com/go-chi/chi/v5"{{end}}
+{{define "router-import"}}echo "github.com/labstack/echo/v4"{{end}}
 
-{{define "get-path-param"}}chi.URLParam(r, "{{ . }}"){{end}}
+{{/* Echo uses r.PathValue() since we copy params from Echo context to request */}}
+{{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
 {{define "router-config"}}
 type routerConfig struct {
-    middlewares []func(http.Handler) http.Handler
+    middlewares []echo.MiddlewareFunc
 }
 
 // WithMiddleware adds middleware to the router.
-func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
+func WithMiddleware(mw echo.MiddlewareFunc) RouterOption {
     return func(cfg *routerConfig) {
         cfg.middlewares = append(cfg.middlewares, mw)
     }
@@ -75,8 +76,8 @@ if err != nil {
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
 {{- $serviceName := $config.Generate.Handler.Name -}}
-// NewRouter creates a new chi.Router with the given service implementation.
-func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) chi.Router {
+// NewRouter registers routes on the given Echo instance with the service implementation.
+func NewRouter(e *echo.Echo, svc {{ $serviceName }}Interface, opts ...RouterOption) {
     cfg := &routerConfig{}
     for _, opt := range opts {
         opt(cfg)
@@ -84,16 +85,23 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) chi.Router
 
     adapter := NewHTTPAdapter(svc)
 
-    r := chi.NewRouter()
+    // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
-        r.Use(mw)
+        e.Use(mw)
     }
 
     {{- range $operations }}{{ $op := . }}
-        r.Method("{{ $op.Method }}", "{{ escapeGoString $op.Path }}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+        e.{{ $op.Method | caps }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", func(c echo.Context) error {
+            {{- if $op.PathParams }}
+            // Copy path params to request for http.Handler compatibility
+            {{- range $op.PathParams.Schema.Properties }}
+            c.Request().SetPathValue("{{ .JsonFieldName }}", c.Param("{{ .JsonFieldName }}"))
+            {{- end }}
+            {{- end }}
+            adapter.{{ $op.ID | ucFirst }}(c.Response(), c.Request())
+            return nil
+        })
     {{- end }}
-
-    return r
 }
 {{end}}
 

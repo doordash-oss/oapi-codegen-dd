@@ -3,16 +3,17 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
-	"github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/chi/other-pkg-single-file/types"
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
-	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	echo "github.com/labstack/echo/v4"
 )
 
 type OrderStatus string
@@ -121,16 +122,6 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-
 	// Apply custom headers from response
 	if resp != nil && resp.Headers != nil {
 		for k, v := range resp.Headers {
@@ -159,7 +150,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse query parameters
-	queryParams := &types.ListUsersQuery{}
+	queryParams := &ListUsersQuery{}
 	query := r.URL.Query()
 	if queryParamLimitStr := query.Get("limit"); queryParamLimitStr != "" {
 		queryParamLimit, err := runtime.ParseString[int](queryParamLimitStr)
@@ -171,19 +162,13 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	opts.Query = queryParams
 
 	// Parse header parameters
-	headerParams := &types.ListUsersHeaders{}
+	headerParams := &ListUsersHeaders{}
 	headers := r.Header
 	if headerValues := headers[http.CanonicalHeaderKey("X-Request-ID")]; len(headerValues) > 0 {
 		headerParamXRequestID := headerValues[0]
 		headerParams.XRequestID = headerParamXRequestID
 	}
 	opts.Header = headerParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.ListUsers(ctx, opts)
@@ -193,16 +178,6 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -234,18 +209,12 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	defer r.Body.Close()
-	var body types.CreateUserBody
+	var body CreateUserBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	opts.Body = &body
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.CreateUser(ctx, opts)
@@ -255,16 +224,6 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -300,7 +259,7 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var body types.ImportUsersBody
+	var body ImportUsersBody
 	if fileHeaders := r.MultipartForm.File["file"]; len(fileHeaders) > 0 {
 		body.File.InitFromMultipart(fileHeaders[0])
 	}
@@ -312,12 +271,6 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	opts.Body = &body
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.ImportUsers(ctx, opts)
 	if err != nil {
@@ -326,16 +279,6 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -366,16 +309,10 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.GetUserPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParams := &GetUserPath{}
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.GetUser(ctx, opts)
@@ -385,16 +322,6 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -425,16 +352,10 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.DeleteUserPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParams := &DeleteUserPath{}
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.DeleteUser(ctx, opts)
@@ -444,16 +365,6 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -480,38 +391,22 @@ func (a *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.GetUserAvatarPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParams := &GetUserAvatarPath{}
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.GetUserAvatar(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*types.GetUserAvatarErrorResponse); ok {
+		if _, ok := err.(*GetUserAvatarErrorResponse); ok {
 			code = 404
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -547,18 +442,12 @@ func (a *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.UploadUserAvatarPath{}
-	pathParamIDStr := chi.URLParam(r, "id")
+	pathParams := &UploadUserAvatarPath{}
+	pathParamIDStr := r.PathValue("id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 	// Parse request body
 	defer r.Body.Close()
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.UploadUserAvatar(ctx, opts)
@@ -568,16 +457,6 @@ func (a *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -605,7 +484,7 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 
 	// Parse request body
 	defer r.Body.Close()
-	var body types.SubmitContactFormBody
+	var body SubmitContactFormBody
 	formBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -622,12 +501,6 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 	}
 	opts.Body = &body
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.SubmitContactForm(ctx, opts)
 	if err != nil {
@@ -636,16 +509,6 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -682,14 +545,8 @@ func (a *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	body := types.CreateNoteBody(string(bodyBytes))
+	body := CreateNoteBody(string(bodyBytes))
 	opts.Body = &body
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.CreateNote(ctx, opts)
@@ -699,16 +556,6 @@ func (a *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -741,12 +588,6 @@ func (a *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.ProcessXMLData(ctx, opts)
 	if err != nil {
@@ -755,16 +596,6 @@ func (a *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -803,16 +634,6 @@ func (a *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-
 	// Apply custom headers from response
 	if resp != nil && resp.Headers != nil {
 		for k, v := range resp.Headers {
@@ -847,7 +668,7 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	defer r.Body.Close()
-	var body types.GetOAuthTokenBody
+	var body GetOAuthTokenBody
 	formBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -864,12 +685,6 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	}
 	opts.Body = &body
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.GetOAuthToken(ctx, opts)
 	if err != nil {
@@ -878,16 +693,6 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -921,16 +726,10 @@ func (a *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.GetItemsByTypePath{}
-	pathParamTypeStr := chi.URLParam(r, "type")
+	pathParams := &GetItemsByTypePath{}
+	pathParamTypeStr := r.PathValue("type")
 	pathParams.Type = pathParamTypeStr
 	opts.PathParams = pathParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.GetItemsByType(ctx, opts)
@@ -940,16 +739,6 @@ func (a *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -980,19 +769,13 @@ func (a *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse query parameters
-	queryParams := &types.SearchQuery{}
+	queryParams := &SearchQuery{}
 	query := r.URL.Query()
 	if queryParamQStr := query.Get("q"); queryParamQStr != "" {
 		queryParamQ := queryParamQStr
 		queryParams.Q = queryParamQ
 	}
 	opts.Query = queryParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.Search(ctx, opts)
@@ -1002,16 +785,6 @@ func (a *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1049,16 +822,6 @@ func (a *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-
 	// Apply custom headers from response
 	if resp != nil && resp.Headers != nil {
 		for k, v := range resp.Headers {
@@ -1089,12 +852,6 @@ func (a *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.UploadImage(ctx, opts)
 	if err != nil {
@@ -1103,16 +860,6 @@ func (a *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1143,7 +890,7 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse query parameters
-	queryParams := &types.ListProductsQuery{}
+	queryParams := &ListProductsQuery{}
 	query := r.URL.Query()
 
 	if values, ok := query["ids"]; ok {
@@ -1177,12 +924,6 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	opts.Query = queryParams
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.ListProducts(ctx, opts)
 	if err != nil {
@@ -1191,16 +932,6 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1231,8 +962,8 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.GetCategoryPath{}
-	pathParamCategoryIDStr := chi.URLParam(r, "categoryId")
+	pathParams := &GetCategoryPath{}
+	pathParamCategoryIDStr := r.PathValue("categoryId")
 
 	pathParamCategoryID, err := runtime.ParseString[int](pathParamCategoryIDStr)
 	if returnParseError(w, "categoryId", err) {
@@ -1242,7 +973,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	opts.PathParams = pathParams
 
 	// Parse header parameters
-	headerParams := &types.GetCategoryHeaders{}
+	headerParams := &GetCategoryHeaders{}
 	headers := r.Header
 	if headerValues := headers[http.CanonicalHeaderKey("X-Include-Products")]; len(headerValues) > 0 {
 		headerParamXIncludeProducts, err := runtime.ParseString[bool](headerValues[0])
@@ -1267,12 +998,6 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	opts.Header = headerParams
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.GetCategory(ctx, opts)
 	if err != nil {
@@ -1281,16 +1006,6 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1321,15 +1036,15 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.GetItemsByStatusPath{}
-	pathParamActiveStr := chi.URLParam(r, "active")
+	pathParams := &GetItemsByStatusPath{}
+	pathParamActiveStr := r.PathValue("active")
 
 	pathParamActive, err := runtime.ParseString[bool](pathParamActiveStr)
 	if returnParseError(w, "active", err) {
 		return
 	}
 	pathParams.Active = pathParamActive
-	pathParamRatingStr := chi.URLParam(r, "rating")
+	pathParamRatingStr := r.PathValue("rating")
 
 	pathParamRating, err := runtime.ParseString[float32](pathParamRatingStr)
 	if returnParseError(w, "rating", err) {
@@ -1337,12 +1052,6 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	pathParams.Rating = pathParamRating
 	opts.PathParams = pathParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.GetItemsByStatus(ctx, opts)
@@ -1352,16 +1061,6 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1392,18 +1091,12 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	opts.RawRequest = r
 
 	// Parse path parameters
-	pathParams := &types.GetUserPostPath{}
-	pathParamUserIDStr := chi.URLParam(r, "userId")
+	pathParams := &GetUserPostPath{}
+	pathParamUserIDStr := r.PathValue("userId")
 	pathParams.UserID = pathParamUserIDStr
-	pathParamPostIDStr := chi.URLParam(r, "postId")
+	pathParamPostIDStr := r.PathValue("postId")
 	pathParams.PostID = pathParamPostIDStr
 	opts.PathParams = pathParams
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.GetUserPost(ctx, opts)
@@ -1413,16 +1106,6 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1454,37 +1137,24 @@ func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	defer r.Body.Close()
-	var body types.CreateOrderBody
+	var body CreateOrderBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	opts.Body = &body
 
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	// Call business logic
 	resp, err := a.svc.CreateOrder(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if _, ok := err.(*CreateOrderErrorResponse); ok {
+			code = 400
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1516,18 +1186,12 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	defer r.Body.Close()
-	var body types.CreateCompanyBody
+	var body CreateCompanyBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	opts.Body = &body
-
-	// Validate request
-	if err := opts.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// Call business logic
 	resp, err := a.svc.CreateCompany(ctx, opts)
@@ -1537,16 +1201,6 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(err)
 		return
-	}
-
-	// Validate response
-	if resp != nil && resp.Body != nil {
-		if v, ok := any(resp.Body).(runtime.Validator); ok {
-			if err := v.Validate(); err != nil {
-				http.Error(w, "internal validation error", http.StatusInternalServerError)
-				return
-			}
-		}
 	}
 
 	// Apply custom headers from response
@@ -1574,18 +1228,18 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []func(http.Handler) http.Handler
+	middlewares []echo.MiddlewareFunc
 }
 
 // WithMiddleware adds middleware to the router.
-func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
+func WithMiddleware(mw echo.MiddlewareFunc) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.middlewares = append(cfg.middlewares, mw)
 	}
 }
 
-// NewRouter creates a new chi.Router with the given service implementation.
-func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
+// NewRouter registers routes on the given Echo instance with the service implementation.
+func NewRouter(e *echo.Echo, svc ServiceInterface, opts ...RouterOption) {
 	cfg := &routerConfig{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -1593,46 +1247,301 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 
 	adapter := NewHTTPAdapter(svc)
 
-	r := chi.NewRouter()
+	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
-		r.Use(mw)
+		e.Use(mw)
 	}
-	r.Method("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
-	r.Method("GET", "/users", http.HandlerFunc(adapter.ListUsers))
-	r.Method("POST", "/users", http.HandlerFunc(adapter.CreateUser))
-	r.Method("POST", "/users/import", http.HandlerFunc(adapter.ImportUsers))
-	r.Method("GET", "/users/{id}", http.HandlerFunc(adapter.GetUser))
-	r.Method("DELETE", "/users/{id}", http.HandlerFunc(adapter.DeleteUser))
-	r.Method("GET", "/users/{id}/avatar", http.HandlerFunc(adapter.GetUserAvatar))
-	r.Method("PUT", "/users/{id}/avatar", http.HandlerFunc(adapter.UploadUserAvatar))
-	r.Method("POST", "/contact", http.HandlerFunc(adapter.SubmitContactForm))
-	r.Method("POST", "/notes", http.HandlerFunc(adapter.CreateNote))
-	r.Method("POST", "/xml-data", http.HandlerFunc(adapter.ProcessXMLData))
-	r.Method("GET", "/export", http.HandlerFunc(adapter.ExportData))
-	r.Method("POST", "/oauth/token", http.HandlerFunc(adapter.GetOAuthToken))
-	r.Method("GET", "/items/{type}", http.HandlerFunc(adapter.GetItemsByType))
-	r.Method("GET", "/search", http.HandlerFunc(adapter.Search))
-	r.Method("GET", "/status", http.HandlerFunc(adapter.GetStatus))
-	r.Method("POST", "/images", http.HandlerFunc(adapter.UploadImage))
-	r.Method("GET", "/products", http.HandlerFunc(adapter.ListProducts))
-	r.Method("GET", "/categories/{categoryId}", http.HandlerFunc(adapter.GetCategory))
-	r.Method("GET", "/items/{active}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
-	r.Method("GET", "/users/{userId}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
-	r.Method("POST", "/orders", http.HandlerFunc(adapter.CreateOrder))
-	r.Method("POST", "/companies", http.HandlerFunc(adapter.CreateCompany))
+	e.GET("/health", func(c echo.Context) error {
+		adapter.HealthCheck(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/users", func(c echo.Context) error {
+		adapter.ListUsers(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/users", func(c echo.Context) error {
+		adapter.CreateUser(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/users/import", func(c echo.Context) error {
+		adapter.ImportUsers(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/users/:id", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("id", c.Param("id"))
+		adapter.GetUser(c.Response(), c.Request())
+		return nil
+	})
+	e.DELETE("/users/:id", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("id", c.Param("id"))
+		adapter.DeleteUser(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/users/:id/avatar", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("id", c.Param("id"))
+		adapter.GetUserAvatar(c.Response(), c.Request())
+		return nil
+	})
+	e.PUT("/users/:id/avatar", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("id", c.Param("id"))
+		adapter.UploadUserAvatar(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/contact", func(c echo.Context) error {
+		adapter.SubmitContactForm(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/notes", func(c echo.Context) error {
+		adapter.CreateNote(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/xml-data", func(c echo.Context) error {
+		adapter.ProcessXMLData(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/export", func(c echo.Context) error {
+		adapter.ExportData(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/oauth/token", func(c echo.Context) error {
+		adapter.GetOAuthToken(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/items/:type", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("type", c.Param("type"))
+		adapter.GetItemsByType(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/search", func(c echo.Context) error {
+		adapter.Search(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/status", func(c echo.Context) error {
+		adapter.GetStatus(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/images", func(c echo.Context) error {
+		adapter.UploadImage(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/products", func(c echo.Context) error {
+		adapter.ListProducts(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/categories/:categoryId", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("categoryId", c.Param("categoryId"))
+		adapter.GetCategory(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/items/:active/:rating", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("active", c.Param("active"))
+		c.Request().SetPathValue("rating", c.Param("rating"))
+		adapter.GetItemsByStatus(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/users/:userId/posts/:postId", func(c echo.Context) error {
+		// Copy path params to request for http.Handler compatibility
+		c.Request().SetPathValue("userId", c.Param("userId"))
+		c.Request().SetPathValue("postId", c.Param("postId"))
+		adapter.GetUserPost(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/orders", func(c echo.Context) error {
+		adapter.CreateOrder(c.Response(), c.Request())
+		return nil
+	})
+	e.POST("/companies", func(c echo.Context) error {
+		adapter.CreateCompany(c.Response(), c.Request())
+		return nil
+	})
+}
 
-	return r
+type ListUsersHeaders struct {
+	// XRequestID Unique request identifier for tracing
+	XRequestID string `json:"X-Request-ID" validate:"required"`
+}
+
+func (l ListUsersHeaders) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(l))
+}
+
+type GetCategoryHeaders struct {
+	// XIncludeProducts Include products count (boolean header)
+	XIncludeProducts *bool `json:"X-Include-Products,omitempty"`
+
+	// XMaxDepth Max depth for nested categories (integer header)
+	XMaxDepth *int `json:"X-Max-Depth,omitempty"`
+
+	// XPriceThreshold Price threshold filter (number header)
+	XPriceThreshold *float32 `json:"X-Price-Threshold,omitempty"`
+}
+
+type GetUserPath struct {
+	ID string `json:"id" validate:"required"`
+}
+
+func (g GetUserPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type DeleteUserPath struct {
+	ID string `json:"id" validate:"required"`
+}
+
+func (d DeleteUserPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(d))
+}
+
+type GetUserAvatarPath struct {
+	ID string `json:"id" validate:"required"`
+}
+
+func (g GetUserAvatarPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type UploadUserAvatarPath struct {
+	ID string `json:"id" validate:"required"`
+}
+
+func (u UploadUserAvatarPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(u))
+}
+
+type GetItemsByTypePath struct {
+	Type string `json:"type" validate:"required"`
+}
+
+func (g GetItemsByTypePath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type GetCategoryPath struct {
+	CategoryID int `json:"categoryId" validate:"required"`
+}
+
+func (g GetCategoryPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type GetItemsByStatusPath struct {
+	Active bool    `json:"active"`
+	Rating float32 `json:"rating" validate:"required"`
+}
+
+func (g GetItemsByStatusPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type GetUserPostPath struct {
+	UserID string `json:"userId" validate:"required"`
+	PostID string `json:"postId" validate:"required"`
+}
+
+func (g GetUserPostPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type CreateUserBody = CreateUserRequest
+
+type ImportUsersBody struct {
+	// File CSV file with user data
+	File runtime.File `json:"file" validate:"required"`
+
+	// Overwrite Overwrite existing users
+	Overwrite *bool `json:"overwrite,omitempty"`
+}
+
+func (i ImportUsersBody) Validate() error {
+	var errors runtime.ValidationErrors
+	if v, ok := any(i.File).(runtime.Validator); ok {
+		if err := v.Validate(); err != nil {
+			errors = errors.Append("File", err)
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+type UploadUserAvatarBody = runtime.File
+
+type SubmitContactFormBody struct {
+	Name    string `json:"name" validate:"required"`
+	Email   string `json:"email" validate:"required"`
+	Message string `json:"message" validate:"required"`
+}
+
+func (s SubmitContactFormBody) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(s))
+}
+
+type CreateNoteBody = string
+
+type ProcessXMLDataBody = XMLPayload
+
+type GetOAuthTokenBody struct {
+	GrantType    string  `json:"grant_type" validate:"required"`
+	ClientID     string  `json:"client_id" validate:"required"`
+	ClientSecret *string `json:"client_secret,omitempty"`
+}
+
+func (g GetOAuthTokenBody) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
+type UploadImageBody = runtime.File
+
+type CreateOrderBody = CreateOrderRequest
+
+type CreateCompanyBody = CreateCompanyRequest
+
+type ListUsersQuery struct {
+	Limit *int `json:"limit,omitempty"`
+}
+
+type SearchQuery struct {
+	Q string `json:"q" validate:"required"`
+}
+
+func (s SearchQuery) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(s))
+}
+
+type ListProductsQuery struct {
+	// Ids Filter by product IDs (string array)
+	Ids []string `json:"ids,omitempty"`
+
+	// Tags Filter by tags (string array)
+	Tags []string `json:"tags,omitempty"`
+
+	// CategoryIds Filter by category IDs (integer array)
+	CategoryIds []int `json:"categoryIds,omitempty"`
+
+	// MinPrice Minimum price (number/float)
+	MinPrice *float32 `json:"minPrice,omitempty"`
+
+	// Active Filter by active status (boolean)
+	Active *bool `json:"active,omitempty"`
 }
 
 // HealthCheckResponseData wraps the success response with optional headers and status override.
 type HealthCheckResponseData struct {
-	Body    *types.HealthCheckResponse
+	Body    *HealthCheckResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewHealthCheckResponseData creates a new HealthCheckResponseData with the given body.
-func NewHealthCheckResponseData(body *types.HealthCheckResponse) *HealthCheckResponseData {
+func NewHealthCheckResponseData(body *HealthCheckResponse) *HealthCheckResponseData {
 	return &HealthCheckResponseData{Body: body}
 }
 
@@ -1650,13 +1559,13 @@ func (r *HealthCheckResponseData) WithStatus(code int) *HealthCheckResponseData 
 
 // ListUsersResponseData wraps the success response with optional headers and status override.
 type ListUsersResponseData struct {
-	Body    *types.ListUsersResponse
+	Body    *ListUsersResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewListUsersResponseData creates a new ListUsersResponseData with the given body.
-func NewListUsersResponseData(body *types.ListUsersResponse) *ListUsersResponseData {
+func NewListUsersResponseData(body *ListUsersResponse) *ListUsersResponseData {
 	return &ListUsersResponseData{Body: body}
 }
 
@@ -1674,13 +1583,13 @@ func (r *ListUsersResponseData) WithStatus(code int) *ListUsersResponseData {
 
 // CreateUserResponseData wraps the success response with optional headers and status override.
 type CreateUserResponseData struct {
-	Body    *types.CreateUserResponse
+	Body    *CreateUserResponse
 	Headers http.Header
 	Status  int // 0 = use default (201)
 }
 
 // NewCreateUserResponseData creates a new CreateUserResponseData with the given body.
-func NewCreateUserResponseData(body *types.CreateUserResponse) *CreateUserResponseData {
+func NewCreateUserResponseData(body *CreateUserResponse) *CreateUserResponseData {
 	return &CreateUserResponseData{Body: body}
 }
 
@@ -1698,13 +1607,13 @@ func (r *CreateUserResponseData) WithStatus(code int) *CreateUserResponseData {
 
 // ImportUsersResponseData wraps the success response with optional headers and status override.
 type ImportUsersResponseData struct {
-	Body    *types.ImportUsersResponse
+	Body    *ImportUsersResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewImportUsersResponseData creates a new ImportUsersResponseData with the given body.
-func NewImportUsersResponseData(body *types.ImportUsersResponse) *ImportUsersResponseData {
+func NewImportUsersResponseData(body *ImportUsersResponse) *ImportUsersResponseData {
 	return &ImportUsersResponseData{Body: body}
 }
 
@@ -1722,13 +1631,13 @@ func (r *ImportUsersResponseData) WithStatus(code int) *ImportUsersResponseData 
 
 // GetUserResponseData wraps the success response with optional headers and status override.
 type GetUserResponseData struct {
-	Body    *types.GetUserResponse
+	Body    *GetUserResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetUserResponseData creates a new GetUserResponseData with the given body.
-func NewGetUserResponseData(body *types.GetUserResponse) *GetUserResponseData {
+func NewGetUserResponseData(body *GetUserResponse) *GetUserResponseData {
 	return &GetUserResponseData{Body: body}
 }
 
@@ -1770,13 +1679,13 @@ func (r *DeleteUserResponseData) WithStatus(code int) *DeleteUserResponseData {
 
 // GetUserAvatarResponseData wraps the success response with optional headers and status override.
 type GetUserAvatarResponseData struct {
-	Body    *types.GetUserAvatarResponse
+	Body    *GetUserAvatarResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetUserAvatarResponseData creates a new GetUserAvatarResponseData with the given body.
-func NewGetUserAvatarResponseData(body *types.GetUserAvatarResponse) *GetUserAvatarResponseData {
+func NewGetUserAvatarResponseData(body *GetUserAvatarResponse) *GetUserAvatarResponseData {
 	return &GetUserAvatarResponseData{Body: body}
 }
 
@@ -1818,13 +1727,13 @@ func (r *UploadUserAvatarResponseData) WithStatus(code int) *UploadUserAvatarRes
 
 // SubmitContactFormResponseData wraps the success response with optional headers and status override.
 type SubmitContactFormResponseData struct {
-	Body    *types.SubmitContactFormResponse
+	Body    *SubmitContactFormResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewSubmitContactFormResponseData creates a new SubmitContactFormResponseData with the given body.
-func NewSubmitContactFormResponseData(body *types.SubmitContactFormResponse) *SubmitContactFormResponseData {
+func NewSubmitContactFormResponseData(body *SubmitContactFormResponse) *SubmitContactFormResponseData {
 	return &SubmitContactFormResponseData{Body: body}
 }
 
@@ -1842,13 +1751,13 @@ func (r *SubmitContactFormResponseData) WithStatus(code int) *SubmitContactFormR
 
 // CreateNoteResponseData wraps the success response with optional headers and status override.
 type CreateNoteResponseData struct {
-	Body    *types.CreateNoteResponse
+	Body    *CreateNoteResponse
 	Headers http.Header
 	Status  int // 0 = use default (201)
 }
 
 // NewCreateNoteResponseData creates a new CreateNoteResponseData with the given body.
-func NewCreateNoteResponseData(body *types.CreateNoteResponse) *CreateNoteResponseData {
+func NewCreateNoteResponseData(body *CreateNoteResponse) *CreateNoteResponseData {
 	return &CreateNoteResponseData{Body: body}
 }
 
@@ -1890,13 +1799,13 @@ func (r *ProcessXMLDataResponseData) WithStatus(code int) *ProcessXMLDataRespons
 
 // ExportDataResponseData wraps the success response with optional headers and status override.
 type ExportDataResponseData struct {
-	Body    *types.ExportDataResponse
+	Body    *ExportDataResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewExportDataResponseData creates a new ExportDataResponseData with the given body.
-func NewExportDataResponseData(body *types.ExportDataResponse) *ExportDataResponseData {
+func NewExportDataResponseData(body *ExportDataResponse) *ExportDataResponseData {
 	return &ExportDataResponseData{Body: body}
 }
 
@@ -1914,13 +1823,13 @@ func (r *ExportDataResponseData) WithStatus(code int) *ExportDataResponseData {
 
 // GetOAuthTokenResponseData wraps the success response with optional headers and status override.
 type GetOAuthTokenResponseData struct {
-	Body    *types.GetOAuthTokenResponse
+	Body    *GetOAuthTokenResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetOAuthTokenResponseData creates a new GetOAuthTokenResponseData with the given body.
-func NewGetOAuthTokenResponseData(body *types.GetOAuthTokenResponse) *GetOAuthTokenResponseData {
+func NewGetOAuthTokenResponseData(body *GetOAuthTokenResponse) *GetOAuthTokenResponseData {
 	return &GetOAuthTokenResponseData{Body: body}
 }
 
@@ -1938,13 +1847,13 @@ func (r *GetOAuthTokenResponseData) WithStatus(code int) *GetOAuthTokenResponseD
 
 // GetItemsByTypeResponseData wraps the success response with optional headers and status override.
 type GetItemsByTypeResponseData struct {
-	Body    *types.GetItemsByTypeResponse
+	Body    *GetItemsByTypeResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetItemsByTypeResponseData creates a new GetItemsByTypeResponseData with the given body.
-func NewGetItemsByTypeResponseData(body *types.GetItemsByTypeResponse) *GetItemsByTypeResponseData {
+func NewGetItemsByTypeResponseData(body *GetItemsByTypeResponse) *GetItemsByTypeResponseData {
 	return &GetItemsByTypeResponseData{Body: body}
 }
 
@@ -1962,13 +1871,13 @@ func (r *GetItemsByTypeResponseData) WithStatus(code int) *GetItemsByTypeRespons
 
 // SearchResponseData wraps the success response with optional headers and status override.
 type SearchResponseData struct {
-	Body    *types.SearchResponse
+	Body    *SearchResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewSearchResponseData creates a new SearchResponseData with the given body.
-func NewSearchResponseData(body *types.SearchResponse) *SearchResponseData {
+func NewSearchResponseData(body *SearchResponse) *SearchResponseData {
 	return &SearchResponseData{Body: body}
 }
 
@@ -1986,13 +1895,13 @@ func (r *SearchResponseData) WithStatus(code int) *SearchResponseData {
 
 // GetStatusResponseData wraps the success response with optional headers and status override.
 type GetStatusResponseData struct {
-	Body    *types.GetStatusResponse
+	Body    *GetStatusResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetStatusResponseData creates a new GetStatusResponseData with the given body.
-func NewGetStatusResponseData(body *types.GetStatusResponse) *GetStatusResponseData {
+func NewGetStatusResponseData(body *GetStatusResponse) *GetStatusResponseData {
 	return &GetStatusResponseData{Body: body}
 }
 
@@ -2010,13 +1919,13 @@ func (r *GetStatusResponseData) WithStatus(code int) *GetStatusResponseData {
 
 // UploadImageResponseData wraps the success response with optional headers and status override.
 type UploadImageResponseData struct {
-	Body    *types.UploadImageResponse
+	Body    *UploadImageResponse
 	Headers http.Header
 	Status  int // 0 = use default (201)
 }
 
 // NewUploadImageResponseData creates a new UploadImageResponseData with the given body.
-func NewUploadImageResponseData(body *types.UploadImageResponse) *UploadImageResponseData {
+func NewUploadImageResponseData(body *UploadImageResponse) *UploadImageResponseData {
 	return &UploadImageResponseData{Body: body}
 }
 
@@ -2034,13 +1943,13 @@ func (r *UploadImageResponseData) WithStatus(code int) *UploadImageResponseData 
 
 // ListProductsResponseData wraps the success response with optional headers and status override.
 type ListProductsResponseData struct {
-	Body    *types.ListProductsResponse
+	Body    *ListProductsResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewListProductsResponseData creates a new ListProductsResponseData with the given body.
-func NewListProductsResponseData(body *types.ListProductsResponse) *ListProductsResponseData {
+func NewListProductsResponseData(body *ListProductsResponse) *ListProductsResponseData {
 	return &ListProductsResponseData{Body: body}
 }
 
@@ -2058,13 +1967,13 @@ func (r *ListProductsResponseData) WithStatus(code int) *ListProductsResponseDat
 
 // GetCategoryResponseData wraps the success response with optional headers and status override.
 type GetCategoryResponseData struct {
-	Body    *types.GetCategoryResponse
+	Body    *GetCategoryResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetCategoryResponseData creates a new GetCategoryResponseData with the given body.
-func NewGetCategoryResponseData(body *types.GetCategoryResponse) *GetCategoryResponseData {
+func NewGetCategoryResponseData(body *GetCategoryResponse) *GetCategoryResponseData {
 	return &GetCategoryResponseData{Body: body}
 }
 
@@ -2082,13 +1991,13 @@ func (r *GetCategoryResponseData) WithStatus(code int) *GetCategoryResponseData 
 
 // GetItemsByStatusResponseData wraps the success response with optional headers and status override.
 type GetItemsByStatusResponseData struct {
-	Body    *types.GetItemsByStatusResponse
+	Body    *GetItemsByStatusResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetItemsByStatusResponseData creates a new GetItemsByStatusResponseData with the given body.
-func NewGetItemsByStatusResponseData(body *types.GetItemsByStatusResponse) *GetItemsByStatusResponseData {
+func NewGetItemsByStatusResponseData(body *GetItemsByStatusResponse) *GetItemsByStatusResponseData {
 	return &GetItemsByStatusResponseData{Body: body}
 }
 
@@ -2106,13 +2015,13 @@ func (r *GetItemsByStatusResponseData) WithStatus(code int) *GetItemsByStatusRes
 
 // GetUserPostResponseData wraps the success response with optional headers and status override.
 type GetUserPostResponseData struct {
-	Body    *types.GetUserPostResponse
+	Body    *GetUserPostResponse
 	Headers http.Header
 	Status  int // 0 = use default (200)
 }
 
 // NewGetUserPostResponseData creates a new GetUserPostResponseData with the given body.
-func NewGetUserPostResponseData(body *types.GetUserPostResponse) *GetUserPostResponseData {
+func NewGetUserPostResponseData(body *GetUserPostResponse) *GetUserPostResponseData {
 	return &GetUserPostResponseData{Body: body}
 }
 
@@ -2130,13 +2039,13 @@ func (r *GetUserPostResponseData) WithStatus(code int) *GetUserPostResponseData 
 
 // CreateOrderResponseData wraps the success response with optional headers and status override.
 type CreateOrderResponseData struct {
-	Body    *types.CreateOrderResponse
+	Body    *CreateOrderResponse
 	Headers http.Header
 	Status  int // 0 = use default (201)
 }
 
 // NewCreateOrderResponseData creates a new CreateOrderResponseData with the given body.
-func NewCreateOrderResponseData(body *types.CreateOrderResponse) *CreateOrderResponseData {
+func NewCreateOrderResponseData(body *CreateOrderResponse) *CreateOrderResponseData {
 	return &CreateOrderResponseData{Body: body}
 }
 
@@ -2154,13 +2063,13 @@ func (r *CreateOrderResponseData) WithStatus(code int) *CreateOrderResponseData 
 
 // CreateCompanyResponseData wraps the success response with optional headers and status override.
 type CreateCompanyResponseData struct {
-	Body    *types.CreateCompanyResponse
+	Body    *CreateCompanyResponse
 	Headers http.Header
 	Status  int // 0 = use default (201)
 }
 
 // NewCreateCompanyResponseData creates a new CreateCompanyResponseData with the given body.
-func NewCreateCompanyResponseData(body *types.CreateCompanyResponse) *CreateCompanyResponseData {
+func NewCreateCompanyResponseData(body *CreateCompanyResponse) *CreateCompanyResponseData {
 	return &CreateCompanyResponseData{Body: body}
 }
 
@@ -2176,10 +2085,121 @@ func (r *CreateCompanyResponseData) WithStatus(code int) *CreateCompanyResponseD
 	return r
 }
 
+type StatusResponse struct {
+	Status *string `json:"status,omitempty"`
+	Uptime *int    `json:"uptime,omitempty"`
+}
+
+type HealthCheckResponse = string
+
+type ListUsersResponse []User
+
+type CreateUserResponse = User
+
+type CreateUserErrorResponse = Error
+
+type ImportUsersResponse = ImportResult
+
+type GetUserResponse = User
+
+type GetUserErrorResponse = Error
+
+type GetUserAvatarResponse = runtime.File
+
+type GetUserAvatarErrorResponse string
+
+func (r GetUserAvatarErrorResponse) Error() string {
+	return "unmapped client error"
+}
+
+type SubmitContactFormResponse map[string]any
+
+type CreateNoteResponse = int
+
+type ProcessXMLDataResponse = XMLPayload
+
+type ExportDataResponse = runtime.File
+
+type GetOAuthTokenResponse = TokenResponse
+
+type GetItemsByTypeResponse []string
+
+type SearchResponse struct {
+	Search_Response_OneOf *Search_Response_OneOf `json:"-"`
+}
+
+func (s SearchResponse) MarshalJSON() ([]byte, error) {
+	var parts []json.RawMessage
+
+	{
+		b, err := runtime.MarshalJSON(s.Search_Response_OneOf)
+		if err != nil {
+			return nil, fmt.Errorf("Search_Response_OneOf marshal: %w", err)
+		}
+		parts = append(parts, b)
+	}
+
+	return runtime.CoalesceOrMerge(parts...)
+}
+
+func (s *SearchResponse) UnmarshalJSON(data []byte) error {
+	trim := bytes.TrimSpace(data)
+	if bytes.Equal(trim, []byte("null")) {
+		return nil
+	}
+	if len(trim) == 0 {
+		return fmt.Errorf("empty JSON input")
+	}
+
+	if s.Search_Response_OneOf == nil {
+		s.Search_Response_OneOf = &Search_Response_OneOf{}
+	}
+
+	if err := runtime.UnmarshalJSON(data, s.Search_Response_OneOf); err != nil {
+		return fmt.Errorf("Search_Response_OneOf unmarshal: %w", err)
+	}
+
+	return nil
+}
+
+type GetStatusResponse = StatusResponse
+
+type UploadImageResponse struct {
+	ID  *string `json:"id,omitempty"`
+	URL *string `json:"url,omitempty"`
+}
+
+type ListProductsResponse []Product
+
+type GetCategoryResponse = Category
+
+type GetItemsByStatusResponse []string
+
+type GetUserPostResponse = Post
+
+type GetUserPostErrorResponse = NotFoundError
+
+type CreateOrderResponse = Order
+
+type CreateOrderErrorResponse struct {
+	Code    string                 `json:"code" validate:"required"`
+	Message string                 `json:"message" validate:"required"`
+	Fields  ValidationError_Fields `json:"fields" validate:"required"`
+}
+
+func (r CreateOrderErrorResponse) Error() string {
+	res0 := r.Message
+	return res0
+}
+
+type CreateOrderErrorResponseJSON = ConflictError
+
+type CreateCompanyResponse = Company
+
 // ListUsersServiceRequestOptions holds all parameters for the ListUsers operation.
 type ListUsersServiceRequestOptions struct {
-	Query  *types.ListUsersQuery
-	Header *types.ListUsersHeaders
+	Query  *ListUsersQuery
+	Header *ListUsersHeaders
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2212,7 +2232,7 @@ func (o *ListUsersServiceRequestOptions) Validate() error {
 
 // CreateUserServiceRequestOptions holds all parameters for the CreateUser operation.
 type CreateUserServiceRequestOptions struct {
-	Body *types.CreateUserBody
+	Body *CreateUserBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2237,7 +2257,7 @@ func (o *CreateUserServiceRequestOptions) Validate() error {
 
 // ImportUsersServiceRequestOptions holds all parameters for the ImportUsers operation.
 type ImportUsersServiceRequestOptions struct {
-	Body *types.ImportUsersBody
+	Body *ImportUsersBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2262,7 +2282,7 @@ func (o *ImportUsersServiceRequestOptions) Validate() error {
 
 // GetUserServiceRequestOptions holds all parameters for the GetUser operation.
 type GetUserServiceRequestOptions struct {
-	PathParams *types.GetUserPath
+	PathParams *GetUserPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2287,7 +2307,7 @@ func (o *GetUserServiceRequestOptions) Validate() error {
 
 // DeleteUserServiceRequestOptions holds all parameters for the DeleteUser operation.
 type DeleteUserServiceRequestOptions struct {
-	PathParams *types.DeleteUserPath
+	PathParams *DeleteUserPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2312,7 +2332,7 @@ func (o *DeleteUserServiceRequestOptions) Validate() error {
 
 // GetUserAvatarServiceRequestOptions holds all parameters for the GetUserAvatar operation.
 type GetUserAvatarServiceRequestOptions struct {
-	PathParams *types.GetUserAvatarPath
+	PathParams *GetUserAvatarPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2337,7 +2357,7 @@ func (o *GetUserAvatarServiceRequestOptions) Validate() error {
 
 // UploadUserAvatarServiceRequestOptions holds all parameters for the UploadUserAvatar operation.
 type UploadUserAvatarServiceRequestOptions struct {
-	PathParams *types.UploadUserAvatarPath
+	PathParams *UploadUserAvatarPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2362,7 +2382,7 @@ func (o *UploadUserAvatarServiceRequestOptions) Validate() error {
 
 // SubmitContactFormServiceRequestOptions holds all parameters for the SubmitContactForm operation.
 type SubmitContactFormServiceRequestOptions struct {
-	Body *types.SubmitContactFormBody
+	Body *SubmitContactFormBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2387,7 +2407,7 @@ func (o *SubmitContactFormServiceRequestOptions) Validate() error {
 
 // CreateNoteServiceRequestOptions holds all parameters for the CreateNote operation.
 type CreateNoteServiceRequestOptions struct {
-	Body *types.CreateNoteBody
+	Body *CreateNoteBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2429,7 +2449,7 @@ func (o *ProcessXMLDataServiceRequestOptions) Validate() error {
 
 // GetOAuthTokenServiceRequestOptions holds all parameters for the GetOAuthToken operation.
 type GetOAuthTokenServiceRequestOptions struct {
-	Body *types.GetOAuthTokenBody
+	Body *GetOAuthTokenBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2454,7 +2474,7 @@ func (o *GetOAuthTokenServiceRequestOptions) Validate() error {
 
 // GetItemsByTypeServiceRequestOptions holds all parameters for the GetItemsByType operation.
 type GetItemsByTypeServiceRequestOptions struct {
-	PathParams *types.GetItemsByTypePath
+	PathParams *GetItemsByTypePath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2479,7 +2499,7 @@ func (o *GetItemsByTypeServiceRequestOptions) Validate() error {
 
 // SearchServiceRequestOptions holds all parameters for the Search operation.
 type SearchServiceRequestOptions struct {
-	Query *types.SearchQuery
+	Query *SearchQuery
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2521,7 +2541,7 @@ func (o *UploadImageServiceRequestOptions) Validate() error {
 
 // ListProductsServiceRequestOptions holds all parameters for the ListProducts operation.
 type ListProductsServiceRequestOptions struct {
-	Query *types.ListProductsQuery
+	Query *ListProductsQuery
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2546,8 +2566,8 @@ func (o *ListProductsServiceRequestOptions) Validate() error {
 
 // GetCategoryServiceRequestOptions holds all parameters for the GetCategory operation.
 type GetCategoryServiceRequestOptions struct {
-	PathParams *types.GetCategoryPath
-	Header     *types.GetCategoryHeaders
+	PathParams *GetCategoryPath
+	Header     *GetCategoryHeaders
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2580,7 +2600,7 @@ func (o *GetCategoryServiceRequestOptions) Validate() error {
 
 // GetItemsByStatusServiceRequestOptions holds all parameters for the GetItemsByStatus operation.
 type GetItemsByStatusServiceRequestOptions struct {
-	PathParams *types.GetItemsByStatusPath
+	PathParams *GetItemsByStatusPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2605,7 +2625,7 @@ func (o *GetItemsByStatusServiceRequestOptions) Validate() error {
 
 // GetUserPostServiceRequestOptions holds all parameters for the GetUserPost operation.
 type GetUserPostServiceRequestOptions struct {
-	PathParams *types.GetUserPostPath
+	PathParams *GetUserPostPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2630,7 +2650,7 @@ func (o *GetUserPostServiceRequestOptions) Validate() error {
 
 // CreateOrderServiceRequestOptions holds all parameters for the CreateOrder operation.
 type CreateOrderServiceRequestOptions struct {
-	Body *types.CreateOrderBody
+	Body *CreateOrderBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2655,7 +2675,7 @@ func (o *CreateOrderServiceRequestOptions) Validate() error {
 
 // CreateCompanyServiceRequestOptions holds all parameters for the CreateCompany operation.
 type CreateCompanyServiceRequestOptions struct {
-	Body *types.CreateCompanyBody
+	Body *CreateCompanyBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
@@ -2676,6 +2696,322 @@ func (o *CreateCompanyServiceRequestOptions) Validate() error {
 	}
 
 	return errors
+}
+
+type SearchItem struct {
+	ID          string  `json:"id" validate:"required"`
+	Title       string  `json:"title" validate:"required"`
+	Description *string `json:"description,omitempty"`
+}
+
+func (s SearchItem) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(s))
+}
+
+type User struct {
+	ID    string `json:"id" validate:"required"`
+	Name  string `json:"name" validate:"required"`
+	Email string `json:"email" validate:"required"`
+}
+
+func (u User) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(u))
+}
+
+type CreateUserRequest struct {
+	Name  string `json:"name" validate:"required"`
+	Email string `json:"email" validate:"required"`
+}
+
+func (c CreateUserRequest) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+}
+
+type ImportResult struct {
+	Imported *int     `json:"imported,omitempty"`
+	Skipped  *int     `json:"skipped,omitempty"`
+	Errors   []string `json:"errors,omitempty"`
+}
+
+type Error struct {
+	Code    *string `json:"code,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+func (s Error) Error() string {
+	return "unmapped client error"
+}
+
+type TokenResponse struct {
+	AccessToken string `json:"access_token" validate:"required"`
+	TokenType   string `json:"token_type" validate:"required"`
+	ExpiresIn   *int   `json:"expires_in,omitempty"`
+}
+
+func (t TokenResponse) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(t))
+}
+
+type XMLPayload struct {
+	Name  *string `json:"name,omitempty"`
+	Value *string `json:"value,omitempty"`
+}
+
+type Category struct {
+	ID          int     `json:"id" validate:"required"`
+	Name        string  `json:"name" validate:"required"`
+	Description *string `json:"description,omitempty"`
+}
+
+func (c Category) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+}
+
+type Product struct {
+	ID    string   `json:"id" validate:"required"`
+	Name  string   `json:"name" validate:"required"`
+	Price float32  `json:"price" validate:"required"`
+	Tags  []string `json:"tags,omitempty"`
+}
+
+func (p Product) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(p))
+}
+
+type Post struct {
+	ID        string     `json:"id" validate:"required"`
+	UserID    string     `json:"userId" validate:"required"`
+	Title     string     `json:"title" validate:"required"`
+	Content   string     `json:"content" validate:"required"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+}
+
+func (p Post) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(p))
+}
+
+type NotFoundError struct {
+	Code    string `json:"code" validate:"required"`
+	Message string `json:"message" validate:"required"`
+
+	// Resource The resource type that was not found
+	Resource string `json:"resource" validate:"required"`
+}
+
+func (n NotFoundError) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(n))
+}
+
+func (s NotFoundError) Error() string {
+	return "unmapped client error"
+}
+
+type ValidationError struct {
+	Code    string                 `json:"code" validate:"required"`
+	Message string                 `json:"message" validate:"required"`
+	Fields  ValidationError_Fields `json:"fields" validate:"required"`
+}
+
+func (v ValidationError) Validate() error {
+	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(v.Code, "required"); err != nil {
+		errors = errors.Append("Code", err)
+	}
+	if err := typesValidator.Var(v.Message, "required"); err != nil {
+		errors = errors.Append("Message", err)
+	}
+	if v, ok := any(v.Fields).(runtime.Validator); ok {
+		if err := v.Validate(); err != nil {
+			errors = errors.Append("Fields", err)
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+type ValidationError_Fields []ValidationError_Fields_Item
+
+func (v ValidationError_Fields) Validate() error {
+	var errors runtime.ValidationErrors
+	for i, item := range v {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("[%d]", i), err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+type ValidationError_Fields_Item struct {
+	Field     *string `json:"field,omitempty"`
+	ErrorData *string `json:"error,omitempty"`
+}
+
+type ConflictError struct {
+	Code    string `json:"code" validate:"required"`
+	Message string `json:"message" validate:"required"`
+
+	// ExistingID ID of the conflicting resource
+	ExistingID *string `json:"existingId,omitempty"`
+}
+
+func (c ConflictError) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+}
+
+type CreateOrderRequest struct {
+	ProductID string  `json:"productId" validate:"required"`
+	Quantity  int     `json:"quantity" validate:"required,gte=1"`
+	Notes     *string `json:"notes,omitempty"`
+}
+
+func (c CreateOrderRequest) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+}
+
+type Order struct {
+	ID        string      `json:"id" validate:"required"`
+	ProductID string      `json:"productId" validate:"required"`
+	Quantity  int         `json:"quantity" validate:"required"`
+	Status    OrderStatus `json:"status" validate:"required"`
+	CreatedAt *time.Time  `json:"createdAt,omitempty"`
+}
+
+func (o Order) Validate() error {
+	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(o.ID, "required"); err != nil {
+		errors = errors.Append("ID", err)
+	}
+	if err := typesValidator.Var(o.ProductID, "required"); err != nil {
+		errors = errors.Append("ProductID", err)
+	}
+	if err := typesValidator.Var(o.Quantity, "required"); err != nil {
+		errors = errors.Append("Quantity", err)
+	}
+	if v, ok := any(o.Status).(runtime.Validator); ok {
+		if err := v.Validate(); err != nil {
+			errors = errors.Append("Status", err)
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+type Address struct {
+	Street     string  `json:"street" validate:"required"`
+	City       string  `json:"city" validate:"required"`
+	State      *string `json:"state,omitempty"`
+	PostalCode *string `json:"postalCode,omitempty"`
+	Country    string  `json:"country" validate:"required"`
+}
+
+func (a Address) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(a))
+}
+
+type CreateCompanyRequest struct {
+	Name     string                         `json:"name" validate:"required"`
+	Address  Address                        `json:"address"`
+	Contacts *CreateCompanyRequest_Contacts `json:"contacts,omitempty"`
+}
+
+func (c CreateCompanyRequest) Validate() error {
+	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(c.Name, "required"); err != nil {
+		errors = errors.Append("Name", err)
+	}
+	if v, ok := any(c.Address).(runtime.Validator); ok {
+		if err := v.Validate(); err != nil {
+			errors = errors.Append("Address", err)
+		}
+	}
+	if c.Contacts != nil {
+		if v, ok := any(c.Contacts).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append("Contacts", err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+type CreateCompanyRequest_Contacts []CreateCompanyRequest_Contacts_Item
+
+type CreateCompanyRequest_Contacts_Item struct {
+	Name  *string `json:"name,omitempty"`
+	Email *string `json:"email,omitempty"`
+	Phone *string `json:"phone,omitempty"`
+}
+
+type Company struct {
+	ID        string            `json:"id" validate:"required"`
+	Name      string            `json:"name" validate:"required"`
+	Address   Address           `json:"address"`
+	Contacts  *Company_Contacts `json:"contacts,omitempty"`
+	CreatedAt *time.Time        `json:"createdAt,omitempty"`
+}
+
+func (c Company) Validate() error {
+	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(c.ID, "required"); err != nil {
+		errors = errors.Append("ID", err)
+	}
+	if err := typesValidator.Var(c.Name, "required"); err != nil {
+		errors = errors.Append("Name", err)
+	}
+	if v, ok := any(c.Address).(runtime.Validator); ok {
+		if err := v.Validate(); err != nil {
+			errors = errors.Append("Address", err)
+		}
+	}
+	if c.Contacts != nil {
+		if v, ok := any(c.Contacts).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append("Contacts", err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+type Company_Contacts []Company_Contacts_Item
+
+type Company_Contacts_Item struct {
+	Name  *string `json:"name,omitempty"`
+	Email *string `json:"email,omitempty"`
+	Phone *string `json:"phone,omitempty"`
+}
+
+type Search_Response_OneOf struct {
+	runtime.Either[User, SearchItem]
+}
+
+func (s *Search_Response_OneOf) Validate() error {
+	if s.IsA() {
+		if v, ok := any(s.A).(runtime.Validator); ok {
+			return v.Validate()
+		}
+	}
+	if s.IsB() {
+		if v, ok := any(s.B).(runtime.Validator); ok {
+			return v.Validate()
+		}
+	}
+	return nil
 }
 
 var typesValidator *validator.Validate

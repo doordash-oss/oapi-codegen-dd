@@ -3,6 +3,8 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // RouterOption is a function that configures the router.
@@ -19,47 +21,42 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 	}
 }
 
-// NewRouter creates a new http.ServeMux with the given handler implementation.
-func NewRouter(impl HandlerInterface, opts ...RouterOption) *http.ServeMux {
+// NewRouter creates a new chi.Router with the given service implementation.
+func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 	cfg := &routerConfig{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(impl)
+	adapter := NewHTTPAdapter(svc)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", applyMiddleware(http.HandlerFunc(adapter.HealthCheck), cfg.middlewares...))
-	mux.HandleFunc("GET /users", applyMiddleware(http.HandlerFunc(adapter.ListUsers), cfg.middlewares...))
-	mux.HandleFunc("POST /users", applyMiddleware(http.HandlerFunc(adapter.CreateUser), cfg.middlewares...))
-	mux.HandleFunc("POST /users/import", applyMiddleware(http.HandlerFunc(adapter.ImportUsers), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{id}", applyMiddleware(http.HandlerFunc(adapter.GetUser), cfg.middlewares...))
-	mux.HandleFunc("DELETE /users/{id}", applyMiddleware(http.HandlerFunc(adapter.DeleteUser), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{id}/avatar", applyMiddleware(http.HandlerFunc(adapter.GetUserAvatar), cfg.middlewares...))
-	mux.HandleFunc("PUT /users/{id}/avatar", applyMiddleware(http.HandlerFunc(adapter.UploadUserAvatar), cfg.middlewares...))
-	mux.HandleFunc("POST /contact", applyMiddleware(http.HandlerFunc(adapter.SubmitContactForm), cfg.middlewares...))
-	mux.HandleFunc("POST /notes", applyMiddleware(http.HandlerFunc(adapter.CreateNote), cfg.middlewares...))
-	mux.HandleFunc("POST /xml-data", applyMiddleware(http.HandlerFunc(adapter.ProcessXMLData), cfg.middlewares...))
-	mux.HandleFunc("GET /export", applyMiddleware(http.HandlerFunc(adapter.ExportData), cfg.middlewares...))
-	mux.HandleFunc("POST /oauth/token", applyMiddleware(http.HandlerFunc(adapter.GetOAuthToken), cfg.middlewares...))
-	mux.HandleFunc("GET /items/{type}", applyMiddleware(http.HandlerFunc(adapter.GetItemsByType), cfg.middlewares...))
-	mux.HandleFunc("GET /search", applyMiddleware(http.HandlerFunc(adapter.Search), cfg.middlewares...))
-	mux.HandleFunc("GET /status", applyMiddleware(http.HandlerFunc(adapter.GetStatus), cfg.middlewares...))
-	mux.HandleFunc("POST /images", applyMiddleware(http.HandlerFunc(adapter.UploadImage), cfg.middlewares...))
-	mux.HandleFunc("GET /products", applyMiddleware(http.HandlerFunc(adapter.ListProducts), cfg.middlewares...))
-	mux.HandleFunc("GET /categories/{categoryId}", applyMiddleware(http.HandlerFunc(adapter.GetCategory), cfg.middlewares...))
-	mux.HandleFunc("GET /items/{active}/{rating}", applyMiddleware(http.HandlerFunc(adapter.GetItemsByStatus), cfg.middlewares...))
-	mux.HandleFunc("GET /users/{userId}/posts/{postId}", applyMiddleware(http.HandlerFunc(adapter.GetUserPost), cfg.middlewares...))
-	mux.HandleFunc("POST /orders", applyMiddleware(http.HandlerFunc(adapter.CreateOrder), cfg.middlewares...))
-	mux.HandleFunc("POST /companies", applyMiddleware(http.HandlerFunc(adapter.CreateCompany), cfg.middlewares...))
-
-	return mux
-}
-
-// applyMiddleware wraps a handler with the given middleware chain.
-func applyMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	for i := len(middlewares) - 1; i >= 0; i-- {
-		h = middlewares[i](h)
+	r := chi.NewRouter()
+	for _, mw := range cfg.middlewares {
+		r.Use(mw)
 	}
-	return h.ServeHTTP
+	r.Method("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
+	r.Method("GET", "/users", http.HandlerFunc(adapter.ListUsers))
+	r.Method("POST", "/users", http.HandlerFunc(adapter.CreateUser))
+	r.Method("POST", "/users/import", http.HandlerFunc(adapter.ImportUsers))
+	r.Method("GET", "/users/{id}", http.HandlerFunc(adapter.GetUser))
+	r.Method("DELETE", "/users/{id}", http.HandlerFunc(adapter.DeleteUser))
+	r.Method("GET", "/users/{id}/avatar", http.HandlerFunc(adapter.GetUserAvatar))
+	r.Method("PUT", "/users/{id}/avatar", http.HandlerFunc(adapter.UploadUserAvatar))
+	r.Method("POST", "/contact", http.HandlerFunc(adapter.SubmitContactForm))
+	r.Method("POST", "/notes", http.HandlerFunc(adapter.CreateNote))
+	r.Method("POST", "/xml-data", http.HandlerFunc(adapter.ProcessXMLData))
+	r.Method("GET", "/export", http.HandlerFunc(adapter.ExportData))
+	r.Method("POST", "/oauth/token", http.HandlerFunc(adapter.GetOAuthToken))
+	r.Method("GET", "/items/{type}", http.HandlerFunc(adapter.GetItemsByType))
+	r.Method("GET", "/search", http.HandlerFunc(adapter.Search))
+	r.Method("GET", "/status", http.HandlerFunc(adapter.GetStatus))
+	r.Method("POST", "/images", http.HandlerFunc(adapter.UploadImage))
+	r.Method("GET", "/products", http.HandlerFunc(adapter.ListProducts))
+	r.Method("GET", "/categories/{categoryId}", http.HandlerFunc(adapter.GetCategory))
+	r.Method("GET", "/items/{active}/{rating}", http.HandlerFunc(adapter.GetItemsByStatus))
+	r.Method("GET", "/users/{userId}/posts/{postId}", http.HandlerFunc(adapter.GetUserPost))
+	r.Method("POST", "/orders", http.HandlerFunc(adapter.CreateOrder))
+	r.Method("POST", "/companies", http.HandlerFunc(adapter.CreateCompany))
+
+	return r
 }

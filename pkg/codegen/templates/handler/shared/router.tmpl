@@ -18,15 +18,6 @@ limitations under the License.
 // RouterOption is a function that configures the router.
 type RouterOption func(*routerConfig)
 
-type routerConfig struct {
-    middlewares []func(http.Handler) http.Handler
-}
-
-// WithMiddleware adds middleware to the router.
-func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
-    return func(cfg *routerConfig) {
-        cfg.middlewares = append(cfg.middlewares, mw)
-    }
-}
+{{template "router-config" .}}
 
 {{template "new-router" .}}

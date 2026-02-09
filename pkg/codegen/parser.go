@@ -16,7 +16,6 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
-	"io/fs"
 	"os"
 	"slices"
 	"sort"
@@ -135,7 +134,8 @@ type TplOperationsContext struct {
 // NewParser creates a new Parser with the provided ParseConfig and ParseContext.
 func NewParser(cfg Configuration, ctx *ParseContext) (*Parser, error) {
 	cfg = cfg.WithDefaults()
-	tpl, err := loadTemplates()
+
+	tpl, err := loadTemplates(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("loading templates: %w", err)
 	}
@@ -239,8 +239,8 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			typesOut["handler"] = out
 		} else {
-			// In multi-file mode, generate three separate files from shared templates
-			for _, tmpl := range []string{"handler", "adapter", "router"} {
+			// In multi-file mode, generate separate files from shared templates
+			for _, tmpl := range []string{"adapter", "router"} {
 				out, err := p.ParseTemplates([]string{sharedPrefix + tmpl + ".tmpl"}, opsCtx)
 				if err != nil {
 					return nil, fmt.Errorf("error generating code for %s: %w", tmpl, err)
@@ -254,7 +254,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 
 		// Generate shared templates (router-agnostic)
-		for _, tmpl := range []string{"middleware", "response-data", "handler-options"} {
+		for _, tmpl := range []string{"response-data", "service-options"} {
 			out, err := p.ParseTemplates([]string{sharedPrefix + tmpl + ".tmpl"}, opsCtx)
 			if err != nil {
 				return nil, fmt.Errorf("error generating code for %s: %w", tmpl, err)
@@ -269,8 +269,27 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			typesOut[strcase.ToSnake(tmpl)] = formatted
 		}
 
-		// Generate handler implementation stub (scaffold once - only written if file doesn't exist)
-		out, err := p.ParseTemplates([]string{sharedPrefix + "handler-impl.tmpl"}, opsCtx)
+		// Generate middleware - try framework-specific template first, fall back to shared
+		middlewareTmpl := templatePrefix + "middleware.tmpl"
+		middlewareOut, err := p.ParseTemplates([]string{middlewareTmpl}, opsCtx)
+		if err != nil {
+			// Fall back to shared middleware template
+			middlewareOut, err = p.ParseTemplates([]string{sharedPrefix + "middleware.tmpl"}, opsCtx)
+			if err != nil {
+				return nil, fmt.Errorf("error generating code for middleware: %w", err)
+			}
+		}
+		formattedMiddleware := middlewareOut
+		if !useSingleFile {
+			formattedMiddleware, err = FormatCode(middlewareOut)
+			if err != nil {
+				return nil, err
+			}
+		}
+		typesOut["middleware"] = formattedMiddleware
+
+		// Generate service implementation stub (scaffold once - only written if file doesn't exist)
+		out, err := p.ParseTemplates([]string{sharedPrefix + "service.tmpl"}, opsCtx)
 		if err != nil {
 			return nil, fmt.Errorf("error generating code for handler implementation: %w", err)
 		}
@@ -281,7 +300,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				return nil, err
 			}
 		}
-		typesOut["handler_impl"] = formatted
+		typesOut["service"] = formatted
 
 		// Generate server main.go if server generation is enabled
 		if p.cfg.Generate.Handler.Server != nil {
@@ -291,10 +310,18 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			serverCtx := opsCtx
 			serverCtx.ServerOptions = &serverOpts
-			out, err := p.ParseTemplates([]string{sharedPrefix + "server.tmpl"}, serverCtx)
+
+			// Try framework-specific server template first, fall back to shared
+			serverTmpl := templatePrefix + "server.tmpl"
+			out, err := p.ParseTemplates([]string{serverTmpl}, serverCtx)
 			if err != nil {
-				return nil, fmt.Errorf("error generating code for server: %w", err)
+				// Fall back to shared server template
+				out, err = p.ParseTemplates([]string{sharedPrefix + "server.tmpl"}, serverCtx)
+				if err != nil {
+					return nil, fmt.Errorf("error generating code for server: %w", err)
+				}
 			}
+
 			formatted, err := FormatCode(out)
 			if err != nil {
 				return nil, err
@@ -481,32 +508,51 @@ func (p *Parser) ParseTemplates(templates []string, data any) (string, error) {
 	return strings.Join(generatedTemplates, "\n"), nil
 }
 
-func loadTemplates() (*template.Template, error) {
+func loadTemplates(cfg Configuration) (*template.Template, error) {
 	tpl := template.New("templates").Funcs(TemplateFunctions)
 
-	err := fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
+	// Load templates from specific directories in order:
+	// 1. Root templates (templates/*.tmpl)
+	// 2. Handler shared templates (templates/handler/shared/*.tmpl)
+	// 3. Selected framework templates (templates/handler/{kind}/*.tmpl)
+	dirs := []string{
+		"templates",
+		"templates/handler/shared",
+	}
+
+	// Add framework-specific directory if handler is configured
+	if cfg.Generate != nil && cfg.Generate.Handler != nil && cfg.Generate.Handler.Kind != "" {
+		dirs = append(dirs, "templates/handler/"+string(cfg.Generate.Handler.Kind))
+	}
+
+	for _, dir := range dirs {
+		entries, err := templates.ReadDir(dir)
 		if err != nil {
-			return fmt.Errorf("error walking directory %s: %w", path, err)
-		}
-		if d.IsDir() {
-			return nil
+			// Skip if directory doesn't exist
+			continue
 		}
 
-		buf, err := templates.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("error reading file '%s': %w", path, err)
-		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
 
-		templateName := strings.TrimPrefix(path, "templates/")
-		tmpl := tpl.New(templateName)
-		_, err = tmpl.Parse(string(buf))
-		if err != nil {
-			return fmt.Errorf("parsing template '%s': %w", path, err)
-		}
-		return nil
-	})
+			path := dir + "/" + entry.Name()
+			buf, err := templates.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("error reading file '%s': %w", path, err)
+			}
 
-	return tpl, err
+			templateName := strings.TrimPrefix(path, "templates/")
+			tmpl := tpl.New(templateName)
+			_, err = tmpl.Parse(string(buf))
+			if err != nil {
+				return nil, fmt.Errorf("parsing template '%s': %w", path, err)
+			}
+		}
+	}
+
+	return tpl, nil
 }
 
 // FormatCode formats the provided Go code.

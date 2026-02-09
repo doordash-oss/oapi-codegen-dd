@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+package: api
+output:
+  directory: api
+  use-single-file: true
+error-mapping:
+  CreateOrderErrorResponse: message
+generate:
+  handler:
+    kind: echo
+    server:
+      directory: server
+      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/same-pkg-single-file/api

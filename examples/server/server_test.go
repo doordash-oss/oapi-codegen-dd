@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	chiapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/chi/other-pkg-mult-files/api"
-	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/stdhttp/same-pkg-single-file/api"
+	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/same-pkg-single-file/api"
+	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/std-http/same-pkg-single-file/api"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,8 +24,13 @@ type serverTestCase struct {
 
 func testServers() []serverTestCase {
 	return []serverTestCase{
-		{"chi", func() http.Handler { return chiapi.NewRouter(chiapi.NewHandler()) }},
-		{"std-http", func() http.Handler { return stdhttpapi.NewRouter(stdhttpapi.NewHandler()) }},
+		{"chi", func() http.Handler { return chiapi.NewRouter(chiapi.NewService()) }},
+		{"std-http", func() http.Handler { return stdhttpapi.NewRouter(stdhttpapi.NewService()) }},
+		{"echo", func() http.Handler {
+			e := echo.New()
+			echoapi.NewRouter(e, echoapi.NewService())
+			return e
+		}},
 	}
 }
 
@@ -188,7 +195,7 @@ func TestUploadImage_WildcardContentType(t *testing.T) {
 
 func TestListUsersResponseHeaders(t *testing.T) {
 	// Only chi implementation sets response headers
-	h := chiapi.NewRouter(chiapi.NewHandler())
+	h := chiapi.NewRouter(chiapi.NewService())
 	req := httptest.NewRequest("GET", "/users", nil)
 	req.Header.Set("X-Request-ID", "test-123")
 	rr := httptest.NewRecorder()
@@ -201,7 +208,7 @@ func TestListUsersResponseHeaders(t *testing.T) {
 
 func TestSearch_UnionTypeResponse(t *testing.T) {
 	// Only chi implementation has full union type handling
-	h := chiapi.NewRouter(chiapi.NewHandler())
+	h := chiapi.NewRouter(chiapi.NewService())
 
 	// Test returning a SearchItem
 	req := httptest.NewRequest("GET", "/search?q=test-query", nil)
@@ -227,7 +234,7 @@ func TestSearch_UnionTypeResponse(t *testing.T) {
 
 func TestUploadAndGetAvatar(t *testing.T) {
 	// Only chi implementation has full avatar handling
-	h := chiapi.NewRouter(chiapi.NewHandler())
+	h := chiapi.NewRouter(chiapi.NewService())
 
 	avatarData := []byte("fake-image-data")
 	req := httptest.NewRequest("PUT", "/users/1/avatar", bytes.NewReader(avatarData))

@@ -12,15 +12,15 @@ import (
 	"syscall"
 	"time"
 
-	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/stdhttp/same-pkg-single-file/api"
+	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/std-http/same-pkg-single-file/api"
 )
 
 func main() {
-	// Create your handler implementation
-	h := handler.NewHandler()
+	// Create your service implementation
+	svc := handler.NewService()
 
 	// Create router with all available middleware
-	router := handler.NewRouter(h,
+	router := handler.NewRouter(svc,
 		handler.WithMiddleware(handler.RecoveryMiddleware),
 		handler.WithMiddleware(handler.RequestIDMiddleware),
 		handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),

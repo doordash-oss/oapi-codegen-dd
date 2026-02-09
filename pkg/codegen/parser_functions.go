@@ -46,6 +46,7 @@ var TemplateFunctions = template.FuncMap{
 	},
 	"filterOmitEmpty": filterOmitEmpty,
 	"deref":           derefBool,
+	"replace":         strings.ReplaceAll,
 }
 
 // uppercaseFirstCharacter Uppercases the first character in a string.

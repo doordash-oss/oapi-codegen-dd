@@ -67,9 +67,11 @@ var (
 var specsFS embed.FS
 
 type testResult struct {
-	name        string
-	passed      bool
-	stage       string // "read", "generate", "write", "mod-init", "mod-tidy", "build"
+	name   string
+	passed bool
+
+	// "read", "generate", "write", "mod-init", "mod-tidy", "build"
+	stage       string
 	err         string
 	tmpDir      string
 	linesOfCode int

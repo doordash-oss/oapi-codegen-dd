@@ -15,40 +15,45 @@ limitations under the License.
 */}}
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
-{{- $handlerName := $config.Generate.Handler.Name -}}
+{{- $serviceName := $config.Generate.Handler.Name -}}
 {{- $modelsPrefix := "" -}}
 {{- if $config.Generate.Handler.ModelsPackageAlias }}{{ $modelsPrefix = printf "%s." $config.Generate.Handler.ModelsPackageAlias }}{{ end -}}
 {{- $validateRequest := $config.Generate.Handler.Validation.Request -}}
 {{- $validateResponse := $config.Generate.Handler.Validation.Response -}}
 {{- template "handler-header" $ }}
 
-// HTTPAdapter adapts the {{ $handlerName }}Interface to HTTP handlers.
+// {{ $serviceName }}Interface defines the service interface for business logic.
+type {{ $serviceName }}Interface interface {
+{{- range $operations }}{{ $op := . }}
+    {{ toGoComment $op.Summary $op.ID }}
+    {{- if $op.HasRequestOptions }}
+        {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }})
+    {{- else }}
+        {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }})
+    {{- end }}
+{{- end }}
+}
+
+// HTTPAdapter adapts the {{ $serviceName }}Interface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-    impl {{ $handlerName }}Interface
+    svc {{ $serviceName }}Interface
 }
 
-// NewHTTPAdapter creates a new HTTPAdapter wrapping the given implementation.
-func NewHTTPAdapter(impl {{ $handlerName }}Interface) *HTTPAdapter {
-    return &HTTPAdapter{impl: impl}
+// NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
+func NewHTTPAdapter(svc {{ $serviceName }}Interface) *HTTPAdapter {
+    return &HTTPAdapter{svc: svc}
 }
 
-// returnParseError writes a 400 Bad Request response if err is not nil.
-// Returns true if an error was written (caller should return), false otherwise.
-func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
-    if err != nil {
-        http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
-        return true
-    }
-    return false
-}
+{{template "handle-parse-error" .}}
 
 // HTTP handler adapters - parse request, call interface, write response
 {{ range $operations }}{{ $op := . }}
-func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
+// {{ $op.ID | ucFirst }} handles {{ $op.Method }} {{ $op.Path }}
+func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
 {{- if $op.HasRequestOptions }}
-    opts := &{{ $op.ID | ucFirst }}HandlerRequestOptions{}
+    opts := &{{ $op.ID | ucFirst }}ServiceRequestOptions{}
     opts.RawRequest = r
 {{- end }}
 
@@ -299,43 +304,25 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 
 {{- if $validateRequest }}
 {{- if $op.HasRequestOptions }}
-
-    // Validate request
-    if err := opts.Validate(); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
+    {{template "handle-validation-error" .}}
 {{- end }}
 {{- end }}
 
 // Call business logic
 {{- if $op.HasRequestOptions }}
     {{- if $op.Response.Success }}
-        resp, err := h.impl.{{ $op.ID }}(ctx, opts)
+        resp, err := a.svc.{{ $op.ID }}(ctx, opts)
     {{- else }}
-        err := h.impl.{{ $op.ID }}(ctx, opts)
+        err := a.svc.{{ $op.ID }}(ctx, opts)
     {{- end }}
 {{- else }}
     {{- if $op.Response.Success }}
-        resp, err := h.impl.{{ $op.ID }}(ctx)
+        resp, err := a.svc.{{ $op.ID }}(ctx)
     {{- else }}
-        err := h.impl.{{ $op.ID }}(ctx)
+        err := a.svc.{{ $op.ID }}(ctx)
     {{- end }}
 {{- end }}
-if err != nil {
-    code := http.StatusInternalServerError
-    {{- if $op.Response.Error }}
-        {{- if not (or $op.Response.Error.Schema.DefineViaAlias $op.Response.Error.Schema.IsAnyType) }}
-            if _, ok := err.(*{{ $modelsPrefix }}{{ $op.Response.Error.ResponseName }}); ok {
-                code = {{ $op.Response.Error.StatusCode }}
-            }
-        {{- end }}
-    {{- end }}
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(code)
-    _ = json.NewEncoder(w).Encode(err)
-    return
-}
+{{template "handle-service-error" (dict "Op" $op "ModelsPrefix" $modelsPrefix)}}
 
 {{- if $op.Response.Success }}
     {{ if $validateResponse }}

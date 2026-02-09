@@ -21,48 +21,42 @@ limitations under the License.
 package main
 
 import (
-    "fmt"
     "log"
-    "net/http"
     "os"
     "os/signal"
     "syscall"
     "time"
 
+    "github.com/labstack/echo/v4"
+    "github.com/labstack/echo/v4/middleware"
     handler "{{ $server.HandlerPackage }}"
 )
 
 func main() {
+    // Create Echo instance
+    e := echo.New()
+
+    // Add Echo middleware
+    e.Use(middleware.Recover())
+    e.Use(middleware.RequestID())
+    e.Use(middleware.Logger())
+    e.Use(middleware.CORS())
+    e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+        Timeout: {{ $server.Timeout }} * time.Second,
+    }))
+
     // Create your service implementation
     svc := handler.New{{ $config.Generate.Handler.Name }}()
 
-    // Create router with all available middleware
-    router := handler.NewRouter(svc,
-        handler.WithMiddleware(handler.RecoveryMiddleware),
-        handler.WithMiddleware(handler.RequestIDMiddleware),
-        handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),
-        handler.WithMiddleware(handler.CORSMiddleware(handler.DefaultCORSConfig())),
-        handler.WithMiddleware(handler.TimeoutMiddleware({{ $server.Timeout }}*time.Second)),
-    )
+    // Register routes
+    handler.NewRouter(e, svc)
 
-    // Configure server
-    port := {{ $server.Port }}
-    addr := fmt.Sprintf(":%d", port)
-    timeout := {{ $server.Timeout }} * time.Second
-
-    server := &http.Server{
-        Addr:         addr,
-        Handler:      router,
-        ReadTimeout:  timeout,
-        WriteTimeout: timeout,
-        IdleTimeout:  2 * timeout,
-    }
-
-    // Start server in goroutine
+    // Start server
+    port := "{{ $server.Port }}"
     go func() {
-        log.Printf("Starting server on %s", addr)
-        if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-            log.Fatalf("Server error: %v", err)
+        log.Printf("Starting server on :%s", port)
+        if err := e.Start(":" + port); err != nil {
+            log.Printf("Server stopped: %v", err)
         }
     }()
 

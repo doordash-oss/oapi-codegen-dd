@@ -18,9 +18,9 @@ import (
 // ScaffoldOnceFiles are files generated once and not overwritten on regeneration.
 // Users can modify these files freely. Keys with "/" are matched as suffixes.
 var ScaffoldOnceFiles = map[string]bool{
-	"handler_impl": true,
-	"middleware":   true,
-	"/main":        true,
+	"service":    true,
+	"middleware": true,
+	"/main":      true,
 }
 
 // Configuration defines code generation customizations.
@@ -98,7 +98,7 @@ func (o Configuration) WithDefaults() Configuration {
 		// Fill in Handler defaults if Handler is configured
 		if o.Generate.Handler != nil {
 			if o.Generate.Handler.Name == "" {
-				o.Generate.Handler.Name = "Handler"
+				o.Generate.Handler.Name = "Service"
 			}
 			if o.Generate.Handler.Kind == "" {
 				o.Generate.Handler.Kind = HandlerKindChi
@@ -340,6 +340,8 @@ type HandlerKind string
 const (
 	// HandlerKindChi generates handlers for the chi router.
 	HandlerKindChi HandlerKind = "chi"
+	// HandlerKindEcho generates handlers for the Echo framework.
+	HandlerKindEcho HandlerKind = "echo"
 	// HandlerKindStdHTTP generates handlers for Go's standard library http.ServeMux (Go 1.22+).
 	HandlerKindStdHTTP HandlerKind = "std-http"
 )
@@ -347,7 +349,7 @@ const (
 // IsValid returns true if the handler kind is a supported value.
 func (k HandlerKind) IsValid() bool {
 	switch k {
-	case HandlerKindChi, HandlerKindStdHTTP:
+	case HandlerKindChi, HandlerKindEcho, HandlerKindStdHTTP:
 		return true
 	default:
 		return false
@@ -356,7 +358,7 @@ func (k HandlerKind) IsValid() bool {
 
 // HandlerOptions specifies options for handler/server code generation.
 type HandlerOptions struct {
-	// Name is the name of the handler interface. Defaults to "Handler".
+	// Name is the name of the service interface. Defaults to "Service".
 	Name string `yaml:"name"`
 
 	// Kind specifies the router/framework to generate for. Defaults to "chi".
@@ -385,6 +387,9 @@ type ServerOptions struct {
 	// Port is the port the server listens on. Defaults to 8080.
 	Port int `yaml:"port"`
 
+	// Timeout is the request timeout in seconds. Defaults to 30.
+	Timeout int `yaml:"timeout"`
+
 	// HandlerPackage is the full import path of the handler package.
 	// Required when server generation is enabled.
 	HandlerPackage string `yaml:"handler-package"`
@@ -397,6 +402,9 @@ func (o ServerOptions) WithDefaults() ServerOptions {
 	}
 	if o.Port == 0 {
 		o.Port = 8080
+	}
+	if o.Timeout == 0 {
+		o.Timeout = 30
 	}
 	return o
 }

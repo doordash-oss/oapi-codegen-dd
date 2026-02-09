@@ -15,7 +15,7 @@ limitations under the License.
 */}}
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
-{{- $handlerName := $config.Generate.Handler.Name -}}
+{{- $serviceName := $config.Generate.Handler.Name -}}
 {{- $modelsPrefix := "" -}}
 {{- if $config.Generate.Handler.ModelsPackageAlias }}{{ $modelsPrefix = printf "%s." $config.Generate.Handler.ModelsPackageAlias }}{{ end -}}
 // Package {{ $config.PackageName }} This file is generated ONCE as a starting point and will NOT be overwritten.
@@ -30,26 +30,24 @@ import (
 	{{- end}}
 )
 
-// {{ $handlerName }} handles API requests.
-// Implement the interface methods to handle each operation.
-type {{ $handlerName }} struct {
-	// Add your dependencies here (database, services, etc.)
+// {{ $serviceName }} implements the {{ $serviceName }}Interface.
+// Add your dependencies here (database, clients, etc.)
+type {{ $serviceName }} struct {
 }
 
-// New{{ $handlerName }} creates a new {{ $handlerName }}.
-func New{{ $handlerName }}() *{{ $handlerName }} {
-	return &{{ $handlerName }}{}
+// New{{ $serviceName }} creates a new {{ $serviceName }}.
+func New{{ $serviceName }}() *{{ $serviceName }} {
+	return &{{ $serviceName }}{}
 }
 
-// Ensure {{ $handlerName }} implements {{ $handlerName }}Interface.
-var _ {{ $handlerName }}Interface = (*{{ $handlerName }})(nil)
+// Ensure {{ $serviceName }} implements {{ $serviceName }}Interface.
+var _ {{ $serviceName }}Interface = (*{{ $serviceName }})(nil)
 
-// Interface method implementations - fill in your business logic
 {{- range $operations }}{{ $op := . }}
 
-{{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
+// {{ $op.ID }} handles {{ $op.Method }} {{ $op.Path }}{{if and (not $config.Generate.OmitDescription) $op.Summary }} - {{ $op.Summary }}{{end}}
 {{- if $op.HasRequestOptions }}
-func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}HandlerRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func (s *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
 	{{- if $op.Response.Success.IsRaw }}
@@ -68,7 +66,7 @@ func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID |
 	{{- end }}
 }
 {{- else }}
-func (h *{{ $handlerName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func (s *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
 	return New{{ $op.ID | ucFirst }}ResponseData(new({{ $modelsPrefix }}{{ $op.Response.Success.ResponseName }})), nil

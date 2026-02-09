@@ -2,6 +2,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,17 +10,68 @@ import (
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/chi/other-pkg-mult-files/types"
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
+	"github.com/go-chi/chi/v5"
 )
 
-// HTTPAdapter adapts the HandlerInterface to HTTP handlers.
-// This struct is generated and should not be modified.
-type HTTPAdapter struct {
-	impl HandlerInterface
+// ServiceInterface defines the service interface for business logic.
+type ServiceInterface interface {
+	// HealthCheck Health check endpoint
+	HealthCheck(ctx context.Context) (*HealthCheckResponseData, error)
+	// ListUsers List all users
+	ListUsers(ctx context.Context, opts *ListUsersServiceRequestOptions) (*ListUsersResponseData, error)
+	// CreateUser Create a new user via JSON
+	CreateUser(ctx context.Context, opts *CreateUserServiceRequestOptions) (*CreateUserResponseData, error)
+	// ImportUsers Import users from CSV file
+	ImportUsers(ctx context.Context, opts *ImportUsersServiceRequestOptions) (*ImportUsersResponseData, error)
+	// GetUser Get a user by ID
+	GetUser(ctx context.Context, opts *GetUserServiceRequestOptions) (*GetUserResponseData, error)
+	// DeleteUser Delete a user
+	DeleteUser(ctx context.Context, opts *DeleteUserServiceRequestOptions) (*DeleteUserResponseData, error)
+	// GetUserAvatar Get user avatar image
+	GetUserAvatar(ctx context.Context, opts *GetUserAvatarServiceRequestOptions) (*GetUserAvatarResponseData, error)
+	// UploadUserAvatar Upload user avatar
+	UploadUserAvatar(ctx context.Context, opts *UploadUserAvatarServiceRequestOptions) (*UploadUserAvatarResponseData, error)
+	// SubmitContactForm Submit contact form
+	SubmitContactForm(ctx context.Context, opts *SubmitContactFormServiceRequestOptions) (*SubmitContactFormResponseData, error)
+	// CreateNote Create a note from plain text
+	CreateNote(ctx context.Context, opts *CreateNoteServiceRequestOptions) (*CreateNoteResponseData, error)
+	// ProcessXMLData Process XML data (demonstrates custom content type handling)
+	ProcessXMLData(ctx context.Context, opts *ProcessXMLDataServiceRequestOptions) (*ProcessXMLDataResponseData, error)
+	// ExportData Export all data as binary archive
+	ExportData(ctx context.Context) (*ExportDataResponseData, error)
+	// GetOAuthToken Get OAuth token (form-encoded response)
+	GetOAuthToken(ctx context.Context, opts *GetOAuthTokenServiceRequestOptions) (*GetOAuthTokenResponseData, error)
+	// GetItemsByType Get items by type (tests reserved Go keyword as path param)
+	GetItemsByType(ctx context.Context, opts *GetItemsByTypeServiceRequestOptions) (*GetItemsByTypeResponseData, error)
+	// Search Search with union type response (oneOf)
+	Search(ctx context.Context, opts *SearchServiceRequestOptions) (*SearchResponseData, error)
+	// GetStatus Get status (uses reusable response)
+	GetStatus(ctx context.Context) (*GetStatusResponseData, error)
+	// UploadImage Upload image (wildcard content type)
+	UploadImage(ctx context.Context, opts *UploadImageServiceRequestOptions) (*UploadImageResponseData, error)
+	// ListProducts List products with various query param types
+	ListProducts(ctx context.Context, opts *ListProductsServiceRequestOptions) (*ListProductsResponseData, error)
+	// GetCategory Get a category by ID (integer path param)
+	GetCategory(ctx context.Context, opts *GetCategoryServiceRequestOptions) (*GetCategoryResponseData, error)
+	// GetItemsByStatus Get items by active status and rating (boolean + number path params)
+	GetItemsByStatus(ctx context.Context, opts *GetItemsByStatusServiceRequestOptions) (*GetItemsByStatusResponseData, error)
+	// GetUserPost Get a specific post by a user
+	GetUserPost(ctx context.Context, opts *GetUserPostServiceRequestOptions) (*GetUserPostResponseData, error)
+	// CreateOrder Create an order (demonstrates typed error responses)
+	CreateOrder(ctx context.Context, opts *CreateOrderServiceRequestOptions) (*CreateOrderResponseData, error)
+	// CreateCompany Create a company with nested address
+	CreateCompany(ctx context.Context, opts *CreateCompanyServiceRequestOptions) (*CreateCompanyResponseData, error)
 }
 
-// NewHTTPAdapter creates a new HTTPAdapter wrapping the given implementation.
-func NewHTTPAdapter(impl HandlerInterface) *HTTPAdapter {
-	return &HTTPAdapter{impl: impl}
+// HTTPAdapter adapts the ServiceInterface to HTTP handlers.
+// This struct is generated and should not be modified.
+type HTTPAdapter struct {
+	svc ServiceInterface
+}
+
+// NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
+func NewHTTPAdapter(svc ServiceInterface) *HTTPAdapter {
+	return &HTTPAdapter{svc: svc}
 }
 
 // returnParseError writes a 400 Bad Request response if err is not nil.
@@ -34,11 +86,12 @@ func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
 
 // HTTP handler adapters - parse request, call interface, write response
 
-func (h *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
+// HealthCheck handles GET /health
+func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Call business logic
-	resp, err := h.impl.HealthCheck(ctx)
+	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -78,9 +131,10 @@ func (h *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
+// ListUsers handles GET /users
+func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ListUsersHandlerRequestOptions{}
+	opts := &ListUsersServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -111,7 +165,7 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.ListUsers(ctx, opts)
+	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -151,9 +205,10 @@ func (h *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
+// CreateUser handles POST /users
+func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateUserHandlerRequestOptions{}
+	opts := &CreateUserServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -172,7 +227,7 @@ func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.CreateUser(ctx, opts)
+	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -212,9 +267,10 @@ func (h *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
+// ImportUsers handles POST /users/import
+func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ImportUsersHandlerRequestOptions{}
+	opts := &ImportUsersServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -242,7 +298,7 @@ func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.ImportUsers(ctx, opts)
+	resp, err := a.svc.ImportUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -282,14 +338,15 @@ func (h *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
+// GetUser handles GET /users/{id}
+func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserHandlerRequestOptions{}
+	opts := &GetUserServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetUserPath{}
-	pathParamIDStr := r.PathValue("id")
+	pathParamIDStr := chi.URLParam(r, "id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
@@ -300,7 +357,7 @@ func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetUser(ctx, opts)
+	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -340,14 +397,15 @@ func (h *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
+// DeleteUser handles DELETE /users/{id}
+func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &DeleteUserHandlerRequestOptions{}
+	opts := &DeleteUserServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.DeleteUserPath{}
-	pathParamIDStr := r.PathValue("id")
+	pathParamIDStr := chi.URLParam(r, "id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
@@ -358,7 +416,7 @@ func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.DeleteUser(ctx, opts)
+	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -394,14 +452,15 @@ func (h *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(status)
 }
 
-func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
+// GetUserAvatar handles GET /users/{id}/avatar
+func (a *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserAvatarHandlerRequestOptions{}
+	opts := &GetUserAvatarServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetUserAvatarPath{}
-	pathParamIDStr := r.PathValue("id")
+	pathParamIDStr := chi.URLParam(r, "id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 
@@ -412,7 +471,7 @@ func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetUserAvatar(ctx, opts)
+	resp, err := a.svc.GetUserAvatar(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		if _, ok := err.(*types.GetUserAvatarErrorResponse); ok {
@@ -460,14 +519,15 @@ func (h *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
+// UploadUserAvatar handles PUT /users/{id}/avatar
+func (a *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &UploadUserAvatarHandlerRequestOptions{}
+	opts := &UploadUserAvatarServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.UploadUserAvatarPath{}
-	pathParamIDStr := r.PathValue("id")
+	pathParamIDStr := chi.URLParam(r, "id")
 	pathParams.ID = pathParamIDStr
 	opts.PathParams = pathParams
 	// Parse request body
@@ -480,7 +540,7 @@ func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.UploadUserAvatar(ctx, opts)
+	resp, err := a.svc.UploadUserAvatar(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -516,9 +576,10 @@ func (h *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(status)
 }
 
-func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) {
+// SubmitContactForm handles POST /contact
+func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &SubmitContactFormHandlerRequestOptions{}
+	opts := &SubmitContactFormServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -547,7 +608,7 @@ func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Call business logic
-	resp, err := h.impl.SubmitContactForm(ctx, opts)
+	resp, err := a.svc.SubmitContactForm(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -587,9 +648,10 @@ func (h *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
+// CreateNote handles POST /notes
+func (a *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateNoteHandlerRequestOptions{}
+	opts := &CreateNoteServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -609,7 +671,7 @@ func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.CreateNote(ctx, opts)
+	resp, err := a.svc.CreateNote(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -649,9 +711,10 @@ func (h *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
+// ProcessXMLData handles POST /xml-data
+func (a *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ProcessXMLDataHandlerRequestOptions{}
+	opts := &ProcessXMLDataServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -664,7 +727,7 @@ func (h *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.ProcessXMLData(ctx, opts)
+	resp, err := a.svc.ProcessXMLData(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -705,11 +768,12 @@ func (h *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
+// ExportData handles GET /export
+func (a *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Call business logic
-	resp, err := h.impl.ExportData(ctx)
+	resp, err := a.svc.ExportData(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -754,9 +818,10 @@ func (h *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
+// GetOAuthToken handles POST /oauth/token
+func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetOAuthTokenHandlerRequestOptions{}
+	opts := &GetOAuthTokenServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -785,7 +850,7 @@ func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetOAuthToken(ctx, opts)
+	resp, err := a.svc.GetOAuthToken(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -828,14 +893,15 @@ func (h *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
+// GetItemsByType handles GET /items/{type}
+func (a *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetItemsByTypeHandlerRequestOptions{}
+	opts := &GetItemsByTypeServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByTypePath{}
-	pathParamTypeStr := r.PathValue("type")
+	pathParamTypeStr := chi.URLParam(r, "type")
 	pathParams.Type = pathParamTypeStr
 	opts.PathParams = pathParams
 
@@ -846,7 +912,7 @@ func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetItemsByType(ctx, opts)
+	resp, err := a.svc.GetItemsByType(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -886,9 +952,10 @@ func (h *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
+// Search handles GET /search
+func (a *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &SearchHandlerRequestOptions{}
+	opts := &SearchServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -907,7 +974,7 @@ func (h *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.Search(ctx, opts)
+	resp, err := a.svc.Search(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -947,11 +1014,12 @@ func (h *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
+// GetStatus handles GET /status
+func (a *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Call business logic
-	resp, err := h.impl.GetStatus(ctx)
+	resp, err := a.svc.GetStatus(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -991,9 +1059,10 @@ func (h *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
+// UploadImage handles POST /images
+func (a *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &UploadImageHandlerRequestOptions{}
+	opts := &UploadImageServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1006,7 +1075,7 @@ func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.UploadImage(ctx, opts)
+	resp, err := a.svc.UploadImage(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -1046,9 +1115,10 @@ func (h *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
+// ListProducts handles GET /products
+func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &ListProductsHandlerRequestOptions{}
+	opts := &ListProductsServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse query parameters
@@ -1093,7 +1163,7 @@ func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.ListProducts(ctx, opts)
+	resp, err := a.svc.ListProducts(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -1133,14 +1203,15 @@ func (h *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
+// GetCategory handles GET /categories/{categoryId}
+func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetCategoryHandlerRequestOptions{}
+	opts := &GetCategoryServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetCategoryPath{}
-	pathParamCategoryIDStr := r.PathValue("categoryId")
+	pathParamCategoryIDStr := chi.URLParam(r, "categoryId")
 
 	pathParamCategoryID, err := runtime.ParseString[int](pathParamCategoryIDStr)
 	if returnParseError(w, "categoryId", err) {
@@ -1182,7 +1253,7 @@ func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetCategory(ctx, opts)
+	resp, err := a.svc.GetCategory(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -1222,21 +1293,22 @@ func (h *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
+// GetItemsByStatus handles GET /items/{active}/{rating}
+func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetItemsByStatusHandlerRequestOptions{}
+	opts := &GetItemsByStatusServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetItemsByStatusPath{}
-	pathParamActiveStr := r.PathValue("active")
+	pathParamActiveStr := chi.URLParam(r, "active")
 
 	pathParamActive, err := runtime.ParseString[bool](pathParamActiveStr)
 	if returnParseError(w, "active", err) {
 		return
 	}
 	pathParams.Active = pathParamActive
-	pathParamRatingStr := r.PathValue("rating")
+	pathParamRatingStr := chi.URLParam(r, "rating")
 
 	pathParamRating, err := runtime.ParseString[float32](pathParamRatingStr)
 	if returnParseError(w, "rating", err) {
@@ -1252,7 +1324,7 @@ func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetItemsByStatus(ctx, opts)
+	resp, err := a.svc.GetItemsByStatus(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -1292,16 +1364,17 @@ func (h *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
+// GetUserPost handles GET /users/{userId}/posts/{postId}
+func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &GetUserPostHandlerRequestOptions{}
+	opts := &GetUserPostServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse path parameters
 	pathParams := &types.GetUserPostPath{}
-	pathParamUserIDStr := r.PathValue("userId")
+	pathParamUserIDStr := chi.URLParam(r, "userId")
 	pathParams.UserID = pathParamUserIDStr
-	pathParamPostIDStr := r.PathValue("postId")
+	pathParamPostIDStr := chi.URLParam(r, "postId")
 	pathParams.PostID = pathParamPostIDStr
 	opts.PathParams = pathParams
 
@@ -1312,7 +1385,7 @@ func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.GetUserPost(ctx, opts)
+	resp, err := a.svc.GetUserPost(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -1352,9 +1425,10 @@ func (h *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
+// CreateOrder handles POST /orders
+func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateOrderHandlerRequestOptions{}
+	opts := &CreateOrderServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1373,7 +1447,7 @@ func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.CreateOrder(ctx, opts)
+	resp, err := a.svc.CreateOrder(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")
@@ -1413,9 +1487,10 @@ func (h *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
+// CreateCompany handles POST /companies
+func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	opts := &CreateCompanyHandlerRequestOptions{}
+	opts := &CreateCompanyServiceRequestOptions{}
 	opts.RawRequest = r
 
 	// Parse request body
@@ -1434,7 +1509,7 @@ func (h *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call business logic
-	resp, err := h.impl.CreateCompany(ctx, opts)
+	resp, err := a.svc.CreateCompany(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
 		w.Header().Set("Content-Type", "application/json")

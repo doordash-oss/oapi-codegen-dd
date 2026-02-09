@@ -16,11 +16,11 @@ import (
 )
 
 func main() {
-	// Create your handler implementation
-	h := handler.NewHandler()
+	// Create your service implementation
+	svc := handler.NewService()
 
 	// Create router with all available middleware
-	router := handler.NewRouter(h,
+	router := handler.NewRouter(svc,
 		handler.WithMiddleware(handler.RecoveryMiddleware),
 		handler.WithMiddleware(handler.RequestIDMiddleware),
 		handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),
@@ -31,13 +31,14 @@ func main() {
 	// Configure server
 	port := 8080
 	addr := fmt.Sprintf(":%d", port)
+	timeout := 30 * time.Second
 
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+		IdleTimeout:  2 * timeout,
 	}
 
 	// Start server in goroutine

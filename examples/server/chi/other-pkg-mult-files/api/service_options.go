@@ -5,19 +5,20 @@ package api
 import (
 	"net/http"
 
+	"github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/chi/other-pkg-mult-files/types"
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 )
 
-// ListUsersHandlerRequestOptions holds all parameters for the ListUsers operation.
-type ListUsersHandlerRequestOptions struct {
-	Query  *ListUsersQuery
-	Header *ListUsersHeaders
+// ListUsersServiceRequestOptions holds all parameters for the ListUsers operation.
+type ListUsersServiceRequestOptions struct {
+	Query  *types.ListUsersQuery
+	Header *types.ListUsersHeaders
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ListUsersHandlerRequestOptions) Validate() error {
+func (o *ListUsersServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Query != nil {
@@ -42,15 +43,15 @@ func (o *ListUsersHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateUserHandlerRequestOptions holds all parameters for the CreateUser operation.
-type CreateUserHandlerRequestOptions struct {
-	Body *CreateUserBody
+// CreateUserServiceRequestOptions holds all parameters for the CreateUser operation.
+type CreateUserServiceRequestOptions struct {
+	Body *types.CreateUserBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateUserHandlerRequestOptions) Validate() error {
+func (o *CreateUserServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -67,15 +68,15 @@ func (o *CreateUserHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// ImportUsersHandlerRequestOptions holds all parameters for the ImportUsers operation.
-type ImportUsersHandlerRequestOptions struct {
-	Body *ImportUsersBody
+// ImportUsersServiceRequestOptions holds all parameters for the ImportUsers operation.
+type ImportUsersServiceRequestOptions struct {
+	Body *types.ImportUsersBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ImportUsersHandlerRequestOptions) Validate() error {
+func (o *ImportUsersServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -92,15 +93,15 @@ func (o *ImportUsersHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetUserHandlerRequestOptions holds all parameters for the GetUser operation.
-type GetUserHandlerRequestOptions struct {
-	PathParams *GetUserPath
+// GetUserServiceRequestOptions holds all parameters for the GetUser operation.
+type GetUserServiceRequestOptions struct {
+	PathParams *types.GetUserPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetUserHandlerRequestOptions) Validate() error {
+func (o *GetUserServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -117,15 +118,15 @@ func (o *GetUserHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// DeleteUserHandlerRequestOptions holds all parameters for the DeleteUser operation.
-type DeleteUserHandlerRequestOptions struct {
-	PathParams *DeleteUserPath
+// DeleteUserServiceRequestOptions holds all parameters for the DeleteUser operation.
+type DeleteUserServiceRequestOptions struct {
+	PathParams *types.DeleteUserPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *DeleteUserHandlerRequestOptions) Validate() error {
+func (o *DeleteUserServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -142,15 +143,15 @@ func (o *DeleteUserHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetUserAvatarHandlerRequestOptions holds all parameters for the GetUserAvatar operation.
-type GetUserAvatarHandlerRequestOptions struct {
-	PathParams *GetUserAvatarPath
+// GetUserAvatarServiceRequestOptions holds all parameters for the GetUserAvatar operation.
+type GetUserAvatarServiceRequestOptions struct {
+	PathParams *types.GetUserAvatarPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetUserAvatarHandlerRequestOptions) Validate() error {
+func (o *GetUserAvatarServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -167,15 +168,15 @@ func (o *GetUserAvatarHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// UploadUserAvatarHandlerRequestOptions holds all parameters for the UploadUserAvatar operation.
-type UploadUserAvatarHandlerRequestOptions struct {
-	PathParams *UploadUserAvatarPath
+// UploadUserAvatarServiceRequestOptions holds all parameters for the UploadUserAvatar operation.
+type UploadUserAvatarServiceRequestOptions struct {
+	PathParams *types.UploadUserAvatarPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *UploadUserAvatarHandlerRequestOptions) Validate() error {
+func (o *UploadUserAvatarServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -192,15 +193,15 @@ func (o *UploadUserAvatarHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// SubmitContactFormHandlerRequestOptions holds all parameters for the SubmitContactForm operation.
-type SubmitContactFormHandlerRequestOptions struct {
-	Body *SubmitContactFormBody
+// SubmitContactFormServiceRequestOptions holds all parameters for the SubmitContactForm operation.
+type SubmitContactFormServiceRequestOptions struct {
+	Body *types.SubmitContactFormBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *SubmitContactFormHandlerRequestOptions) Validate() error {
+func (o *SubmitContactFormServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -217,15 +218,15 @@ func (o *SubmitContactFormHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateNoteHandlerRequestOptions holds all parameters for the CreateNote operation.
-type CreateNoteHandlerRequestOptions struct {
-	Body *CreateNoteBody
+// CreateNoteServiceRequestOptions holds all parameters for the CreateNote operation.
+type CreateNoteServiceRequestOptions struct {
+	Body *types.CreateNoteBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateNoteHandlerRequestOptions) Validate() error {
+func (o *CreateNoteServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -242,14 +243,14 @@ func (o *CreateNoteHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// ProcessXMLDataHandlerRequestOptions holds all parameters for the ProcessXMLData operation.
-type ProcessXMLDataHandlerRequestOptions struct {
+// ProcessXMLDataServiceRequestOptions holds all parameters for the ProcessXMLData operation.
+type ProcessXMLDataServiceRequestOptions struct {
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ProcessXMLDataHandlerRequestOptions) Validate() error {
+func (o *ProcessXMLDataServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if len(errors) == 0 {
@@ -259,15 +260,15 @@ func (o *ProcessXMLDataHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetOAuthTokenHandlerRequestOptions holds all parameters for the GetOAuthToken operation.
-type GetOAuthTokenHandlerRequestOptions struct {
-	Body *GetOAuthTokenBody
+// GetOAuthTokenServiceRequestOptions holds all parameters for the GetOAuthToken operation.
+type GetOAuthTokenServiceRequestOptions struct {
+	Body *types.GetOAuthTokenBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetOAuthTokenHandlerRequestOptions) Validate() error {
+func (o *GetOAuthTokenServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -284,15 +285,15 @@ func (o *GetOAuthTokenHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetItemsByTypeHandlerRequestOptions holds all parameters for the GetItemsByType operation.
-type GetItemsByTypeHandlerRequestOptions struct {
-	PathParams *GetItemsByTypePath
+// GetItemsByTypeServiceRequestOptions holds all parameters for the GetItemsByType operation.
+type GetItemsByTypeServiceRequestOptions struct {
+	PathParams *types.GetItemsByTypePath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetItemsByTypeHandlerRequestOptions) Validate() error {
+func (o *GetItemsByTypeServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -309,15 +310,15 @@ func (o *GetItemsByTypeHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// SearchHandlerRequestOptions holds all parameters for the Search operation.
-type SearchHandlerRequestOptions struct {
-	Query *SearchQuery
+// SearchServiceRequestOptions holds all parameters for the Search operation.
+type SearchServiceRequestOptions struct {
+	Query *types.SearchQuery
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *SearchHandlerRequestOptions) Validate() error {
+func (o *SearchServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Query != nil {
@@ -334,14 +335,14 @@ func (o *SearchHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// UploadImageHandlerRequestOptions holds all parameters for the UploadImage operation.
-type UploadImageHandlerRequestOptions struct {
+// UploadImageServiceRequestOptions holds all parameters for the UploadImage operation.
+type UploadImageServiceRequestOptions struct {
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *UploadImageHandlerRequestOptions) Validate() error {
+func (o *UploadImageServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if len(errors) == 0 {
@@ -351,15 +352,15 @@ func (o *UploadImageHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// ListProductsHandlerRequestOptions holds all parameters for the ListProducts operation.
-type ListProductsHandlerRequestOptions struct {
-	Query *ListProductsQuery
+// ListProductsServiceRequestOptions holds all parameters for the ListProducts operation.
+type ListProductsServiceRequestOptions struct {
+	Query *types.ListProductsQuery
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *ListProductsHandlerRequestOptions) Validate() error {
+func (o *ListProductsServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Query != nil {
@@ -376,16 +377,16 @@ func (o *ListProductsHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetCategoryHandlerRequestOptions holds all parameters for the GetCategory operation.
-type GetCategoryHandlerRequestOptions struct {
-	PathParams *GetCategoryPath
-	Header     *GetCategoryHeaders
+// GetCategoryServiceRequestOptions holds all parameters for the GetCategory operation.
+type GetCategoryServiceRequestOptions struct {
+	PathParams *types.GetCategoryPath
+	Header     *types.GetCategoryHeaders
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetCategoryHandlerRequestOptions) Validate() error {
+func (o *GetCategoryServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -410,15 +411,15 @@ func (o *GetCategoryHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetItemsByStatusHandlerRequestOptions holds all parameters for the GetItemsByStatus operation.
-type GetItemsByStatusHandlerRequestOptions struct {
-	PathParams *GetItemsByStatusPath
+// GetItemsByStatusServiceRequestOptions holds all parameters for the GetItemsByStatus operation.
+type GetItemsByStatusServiceRequestOptions struct {
+	PathParams *types.GetItemsByStatusPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetItemsByStatusHandlerRequestOptions) Validate() error {
+func (o *GetItemsByStatusServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -435,15 +436,15 @@ func (o *GetItemsByStatusHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// GetUserPostHandlerRequestOptions holds all parameters for the GetUserPost operation.
-type GetUserPostHandlerRequestOptions struct {
-	PathParams *GetUserPostPath
+// GetUserPostServiceRequestOptions holds all parameters for the GetUserPost operation.
+type GetUserPostServiceRequestOptions struct {
+	PathParams *types.GetUserPostPath
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *GetUserPostHandlerRequestOptions) Validate() error {
+func (o *GetUserPostServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.PathParams != nil {
@@ -460,15 +461,15 @@ func (o *GetUserPostHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateOrderHandlerRequestOptions holds all parameters for the CreateOrder operation.
-type CreateOrderHandlerRequestOptions struct {
-	Body *CreateOrderBody
+// CreateOrderServiceRequestOptions holds all parameters for the CreateOrder operation.
+type CreateOrderServiceRequestOptions struct {
+	Body *types.CreateOrderBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateOrderHandlerRequestOptions) Validate() error {
+func (o *CreateOrderServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
@@ -485,15 +486,15 @@ func (o *CreateOrderHandlerRequestOptions) Validate() error {
 	return errors
 }
 
-// CreateCompanyHandlerRequestOptions holds all parameters for the CreateCompany operation.
-type CreateCompanyHandlerRequestOptions struct {
-	Body *CreateCompanyBody
+// CreateCompanyServiceRequestOptions holds all parameters for the CreateCompany operation.
+type CreateCompanyServiceRequestOptions struct {
+	Body *types.CreateCompanyBody
 	// RawRequest provides access to the underlying HTTP request for custom content type handling.
 	RawRequest *http.Request
 }
 
 // Validate validates all the fields in the options.
-func (o *CreateCompanyHandlerRequestOptions) Validate() error {
+func (o *CreateCompanyServiceRequestOptions) Validate() error {
 	var errors runtime.ValidationErrors
 
 	if o.Body != nil {
