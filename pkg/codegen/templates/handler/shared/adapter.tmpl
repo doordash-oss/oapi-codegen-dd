@@ -369,7 +369,7 @@ if err != nil {
         w.WriteHeader(status)
     {{- else if $op.Response.Success.ContentType }}
         w.Header().Set("Content-Type", "{{ escapeGoString $op.Response.Success.ContentType }}")
-    {{- if or (eq $op.Response.Success.ContentType "application/json") (hasPrefix $op.Response.Success.ContentType "application/json;") (hasSuffix $op.Response.Success.ContentType "+json") }}
+    {{- if or (eq $op.Response.Success.ContentType "application/json") (hasPrefix $op.Response.Success.ContentType "application/json;") (hasSuffix $op.Response.Success.ContentType "+json") (contains $op.Response.Success.ContentType "+json;") }}
         w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
             _ = json.NewEncoder(w).Encode(resp.Body)

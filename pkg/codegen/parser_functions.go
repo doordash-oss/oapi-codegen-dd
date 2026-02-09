@@ -36,6 +36,7 @@ var TemplateFunctions = template.FuncMap{
 	"fst":            fst,
 	"hasPrefix":      strings.HasPrefix,
 	"hasSuffix":      strings.HasSuffix,
+	"contains":       strings.Contains,
 	"str":            str,
 	"dict":           dict,
 	"slice":          func() []any { return []any{} },
