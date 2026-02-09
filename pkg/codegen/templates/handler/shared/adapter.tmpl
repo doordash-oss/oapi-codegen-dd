@@ -250,8 +250,17 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 if values := r.MultipartForm.Value["{{ .JsonFieldName }}"]; len(values) > 0 {
                     {{- if .Schema.ArrayType }}
                     {{/* Array type - assign all values */}}
-                    {{- if eq .Schema.ArrayType.GoType "string" }}
+                    {{- if eq .Schema.ArrayType.TypeDecl "string" }}
                     body.{{ .GoName }} = values
+                    {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
+                    {{/* String-based enum array - convert each element */}}
+                    {
+                        result := make([]{{ .Schema.ArrayType.TypeDecl }}, len(values))
+                        for i, v := range values {
+                            result[i] = {{ .Schema.ArrayType.TypeDecl }}(v)
+                        }
+                        body.{{ .GoName }} = result
+                    }
                     {{- else }}
                     body.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
                     {{- end }}
