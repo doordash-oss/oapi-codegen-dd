@@ -38,7 +38,7 @@ func NewRouter(impl {{ $handlerName }}Interface, opts ...RouterOption) chi.Route
     }
 
     {{- range $operations }}{{ $op := . }}
-        r.Method("{{ $op.Method }}", "{{ $op.Path }}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+        r.Method("{{ $op.Method }}", "{{ escapeGoString $op.Path }}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
     {{- end }}
 
     return r

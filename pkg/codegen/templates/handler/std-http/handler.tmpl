@@ -35,7 +35,7 @@ func NewRouter(impl {{ $handlerName }}Interface, opts ...RouterOption) *http.Ser
     mux := http.NewServeMux()
 
     {{- range $operations }}{{ $op := . }}
-        mux.HandleFunc("{{ $op.Method }} {{ $op.Path }}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
+        mux.HandleFunc("{{ $op.Method }} {{ escapeGoString $op.Path }}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
     {{- end }}
 
     return mux
