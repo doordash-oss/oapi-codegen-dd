@@ -168,6 +168,15 @@ func (pd ParameterDefinition) IsPointerType() bool {
 	// This matches the logic in newConstraints: nullable := !required || hasNilType || deref(schema.Nullable)
 	// The parameter can be required but still nullable if schema.Nullable is true.
 	schema := pd.Spec.Schema.Schema()
+
+	// Special case for booleans: required booleans are not pointers even if nullable: true
+	// This matches newConstraints behavior where required booleans have nullable = hasNilType
+	// to avoid validation always failing with `false` value.
+	if schema != nil && pd.Required && slices.Contains(schema.Type, "boolean") {
+		// Only make it a pointer if there's an explicit "null" in the type array
+		return slices.Contains(schema.Type, "null")
+	}
+
 	if schema != nil && schema.Nullable != nil && *schema.Nullable {
 		return true
 	}
