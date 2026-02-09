@@ -105,5 +105,5 @@ func NewRouter(e *echo.Echo, svc {{ $serviceName }}Interface, opts ...RouterOpti
 }
 {{end}}
 
-{{template "handler/shared/adapter.tmpl" .}}
-{{template "handler/shared/router.tmpl" .}}
+{{template "handler/adapter.tmpl" .}}
+{{template "handler/router.tmpl" .}}

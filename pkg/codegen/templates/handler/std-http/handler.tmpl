@@ -102,5 +102,5 @@ func applyMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Hand
 }
 {{end}}
 
-{{template "handler/shared/adapter.tmpl" .}}
-{{template "handler/shared/router.tmpl" .}}
+{{template "handler/adapter.tmpl" .}}
+{{template "handler/router.tmpl" .}}

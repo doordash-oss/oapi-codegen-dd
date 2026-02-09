@@ -228,7 +228,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		// Determine which templates to use based on handler kind
 		handlerKind := p.cfg.Generate.Handler.Kind
 		templatePrefix := "handler/" + string(handlerKind) + "/"
-		sharedPrefix := "handler/shared/"
+		sharedPrefix := "handler/"
 
 		// Generate handler files
 		if useSingleFile {
@@ -513,11 +513,11 @@ func loadTemplates(cfg Configuration) (*template.Template, error) {
 
 	// Load templates from specific directories in order:
 	// 1. Root templates (templates/*.tmpl)
-	// 2. Handler shared templates (templates/handler/shared/*.tmpl)
+	// 2. Handler shared templates (templates/handler/*.tmpl)
 	// 3. Selected framework templates (templates/handler/{kind}/*.tmpl)
 	dirs := []string{
 		"templates",
-		"templates/handler/shared",
+		"templates/handler",
 	}
 
 	// Add framework-specific directory if handler is configured
