@@ -111,7 +111,16 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{/* Array query params: use query["key"] to get all values */}}
             if values, ok := query["{{ escapeGoString .ParamName }}"]; ok {
                 {{- if eq .Schema.ArrayType.TypeDecl "string" }}
+                    {{- if hasPrefix .Schema.GoType "[]*" }}
+                    {{/* Nullable string array - convert each element to pointer */}}
+                    result := make([]*string, len(values))
+                    for i := range values {
+                        result[i] = &values[i]
+                    }
+                    queryParams.{{ .GoName }} = result
+                    {{- else }}
                     queryParams.{{ .GoName }} = values
+                    {{- end }}
                 {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
                     {{/* String-based enum array - convert each element */}}
                     result := make([]{{ $modelsPrefix }}{{ .Schema.ArrayType.TypeDecl }}, len(values))
