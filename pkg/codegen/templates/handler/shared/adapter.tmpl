@@ -394,9 +394,13 @@ if err != nil {
             {{- else if eq $op.Response.Success.Schema.GoType "string" }}
             {{/* String type - convert to []byte */}}
             _, _ = w.Write([]byte(*resp.Body))
-            {{- else }}
+            {{- else if hasPrefix $op.Response.Success.Schema.GoType "*[]byte" }}
             {{/* Pointer to []byte */}}
             _, _ = w.Write(*resp.Body)
+            {{- else }}
+            // NOTE: application/octet-stream with struct schema - this may be a spec issue.
+            // octet-stream typically expects binary data, falling back to JSON encoding.
+            _ = json.NewEncoder(w).Encode(resp.Body)
             {{- end }}
         }
     {{- else if eq $op.Response.Success.ContentType "application/x-www-form-urlencoded" }}
