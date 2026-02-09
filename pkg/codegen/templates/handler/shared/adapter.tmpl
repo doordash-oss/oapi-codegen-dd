@@ -95,10 +95,10 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- $paramVar := printf "queryParam%s" .GoName }}
         {{- if .IsJson }}
             {{/* JSON-encoded query param: parse as JSON */}}
-            if {{ $paramVar }}Str := query.Get("{{ .ParamName }}"); {{ $paramVar }}Str != "" {
+            if {{ $paramVar }}Str := query.Get("{{ escapeGoString .ParamName }}"); {{ $paramVar }}Str != "" {
                 var {{ $paramVar }} {{ $modelsPrefix }}{{ .Schema.TypeDecl }}
                 if err := json.Unmarshal([]byte({{ $paramVar }}Str), &{{ $paramVar }}); err != nil {
-                    http.Error(w, fmt.Sprintf("invalid JSON for parameter {{ .ParamName }}: %v", err), http.StatusBadRequest)
+                    http.Error(w, fmt.Sprintf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %v", err), http.StatusBadRequest)
                     return
                 }
             {{- if .IsPointerType }}
@@ -109,7 +109,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             }
         {{- else if .Schema.ArrayType }}
             {{/* Array query params: use query["key"] to get all values */}}
-            if values, ok := query["{{ .ParamName }}"]; ok {
+            if values, ok := query["{{ escapeGoString .ParamName }}"]; ok {
                 {{- if eq .Schema.ArrayType.TypeDecl "string" }}
                     queryParams.{{ .GoName }} = values
                 {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
@@ -121,14 +121,14 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     queryParams.{{ .GoName }} = result
                 {{- else }}
                     parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
-                    if returnParseError(w, "{{ .ParamName }}", err) {
+                    if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
                         return
                     }
                     queryParams.{{ .GoName }} = parsed
                 {{- end }}
             }
         {{- else }}
-            if {{ $paramVar }}Str := query.Get("{{ .ParamName }}"); {{ $paramVar }}Str != "" {
+            if {{ $paramVar }}Str := query.Get("{{ escapeGoString .ParamName }}"); {{ $paramVar }}Str != "" {
             {{- if eq .Schema.TypeDecl "string" }}
                 {{ $paramVar }} := {{ $paramVar }}Str
             {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
@@ -136,7 +136,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- else }}
                 {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-                if returnParseError(w, "{{ .ParamName }}", err) {
+                if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
                     return
                 }
             {{- end }}
@@ -157,7 +157,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     headers := r.Header
     {{- range $op.Header.Params }}
     {{- $paramVar := printf "headerParam%s" .GoName }}
-    if headerValues := headers[http.CanonicalHeaderKey("{{ .ParamName }}")]; len(headerValues) > 0 {
+    if headerValues := headers[http.CanonicalHeaderKey("{{ escapeGoString .ParamName }}")]; len(headerValues) > 0 {
         {{- if eq .Schema.TypeDecl "string" }}
             {{ $paramVar }} := headerValues[0]
         {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
@@ -165,7 +165,7 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{ $paramVar }} := {{ $modelsPrefix }}{{ .Schema.TypeDecl }}(headerValues[0])
         {{- else }}
             {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-            if returnParseError(w, "{{ .ParamName }}", err) {
+            if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
                 return
             }
         {{- end }}
