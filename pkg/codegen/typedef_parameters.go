@@ -132,12 +132,20 @@ func (pd ParameterDefinition) IsPointerType() bool {
 		return false
 	}
 
-	// Check if the underlying OpenAPI schema is an array type
+	// Check if the underlying OpenAPI schema is an array or map type
 	// This handles named type aliases like "type ExpandPublication = []string"
+	// or "type DateFilter = map[string]string"
 	if pd.Spec != nil && pd.Spec.Schema != nil {
 		schema := pd.Spec.Schema.Schema()
-		if schema != nil && slices.Contains(schema.Type, "array") {
-			return false
+		if schema != nil {
+			// Array types are not pointers
+			if slices.Contains(schema.Type, "array") {
+				return false
+			}
+			// Object types with additionalProperties generate maps, which are not pointers
+			if slices.Contains(schema.Type, "object") && schema.AdditionalProperties != nil {
+				return false
+			}
 		}
 	}
 
