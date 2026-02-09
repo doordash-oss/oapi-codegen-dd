@@ -590,6 +590,21 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 		}, nil
 	}
 
+	// Handle format: binary without explicit type - treat as runtime.File
+	// Some specs define binary responses with just format: binary and no type
+	if schema.Format == "binary" {
+		constraints := newConstraints(schema, ConstraintsContext{
+			specLocation: options.specLocation,
+		})
+		return GoSchema{
+			GoType:         "runtime.File",
+			DefineViaAlias: true,
+			Description:    schema.Description,
+			OpenAPISchema:  schema,
+			Constraints:    constraints,
+		}, nil
+	}
+
 	// Handle objects and empty schemas first as a special case
 	if t == nil || slices.Contains(t, "object") {
 		res, err := createObjectSchema(schema, options)
