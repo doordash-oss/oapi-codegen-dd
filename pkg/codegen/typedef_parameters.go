@@ -278,6 +278,12 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 	}
 	specLocation := SpecLocation(strings.ToLower(objectParams[0].In))
 
+	// Check if the type name already exists (e.g., from components/schemas).
+	// If it does, generate a unique name to avoid conflicts.
+	if options.typeTracker.Exists(typeName) {
+		typeName = options.typeTracker.generateUniqueName(typeName)
+	}
+
 	var (
 		typeDefs   []TypeDefinition
 		properties []Property
