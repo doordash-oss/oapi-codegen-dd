@@ -332,7 +332,7 @@ if err != nil {
     {{- if eq $op.Response.SuccessStatusCode 204 }}
         w.WriteHeader(status)
     {{- else if $op.Response.Success.ContentType }}
-        w.Header().Set("Content-Type", "{{ $op.Response.Success.ContentType }}")
+        w.Header().Set("Content-Type", "{{ escapeGoString $op.Response.Success.ContentType }}")
     {{- if or (eq $op.Response.Success.ContentType "application/json") (hasPrefix $op.Response.Success.ContentType "application/json;") (hasSuffix $op.Response.Success.ContentType "+json") }}
         w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
