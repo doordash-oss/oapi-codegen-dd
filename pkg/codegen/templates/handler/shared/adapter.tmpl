@@ -110,17 +110,26 @@ func (h *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- else if .Schema.ArrayType }}
             {{/* Array query params: use query["key"] to get all values */}}
             if values, ok := query["{{ escapeGoString .ParamName }}"]; ok {
-                {{- if eq .Schema.ArrayType.TypeDecl "string" }}
-                    {{- if hasPrefix .Schema.GoType "[]*" }}
-                    {{/* Nullable string array - convert each element to pointer */}}
+                {{- if hasPrefix .Schema.GoType "[]*" }}
+                    {{/* Nullable array - parse and convert each element to pointer */}}
+                    {{- if eq .Schema.ArrayType.TypeDecl "string" }}
                     result := make([]*string, len(values))
                     for i := range values {
                         result[i] = &values[i]
                     }
-                    queryParams.{{ .GoName }} = result
                     {{- else }}
-                    queryParams.{{ .GoName }} = values
+                    parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
+                    if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
+                        return
+                    }
+                    result := make({{ .Schema.GoType }}, len(parsed))
+                    for i := range parsed {
+                        result[i] = &parsed[i]
+                    }
                     {{- end }}
+                    queryParams.{{ .GoName }} = result
+                {{- else if eq .Schema.ArrayType.TypeDecl "string" }}
+                    queryParams.{{ .GoName }} = values
                 {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
                     {{/* String-based enum array - convert each element */}}
                     result := make([]{{ $modelsPrefix }}{{ .Schema.ArrayType.TypeDecl }}, len(values))
