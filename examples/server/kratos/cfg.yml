@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: api
+output:
+  directory: api
+  use-single-file: true
+error-mapping:
+  CreateUserErrorResponse: message
+generate:
+  handler:
+    kind: kratos
+    output:
+      overwrite: true
+    middleware: {}
+    server:
+      directory: server
+      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/kratos/api
+

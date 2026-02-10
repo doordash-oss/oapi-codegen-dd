@@ -1,0 +1,74 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/* Kratos specific template blocks */}}
+
+{{define "router-import"}}kratoshttp "github.com/go-kratos/kratos/v2/transport/http"
+    "github.com/gorilla/mux"{{end}}
+
+{{define "get-path-param"}}mux.Vars(r)["{{ . }}"]{{end}}
+
+{{define "router-config"}}
+type routerConfig struct {
+    middlewares []func(http.Handler) http.Handler
+}
+
+// WithMiddleware adds middleware to the router.
+func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+{{end}}
+
+{{define "new-router"}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $serviceName := $config.Generate.Handler.Name -}}
+// RegisterRoutes registers all routes with the given Kratos HTTP server.
+// It creates a gorilla/mux router and mounts it using HandlePrefix.
+func RegisterRoutes(server *kratoshttp.Server, svc {{ $serviceName }}Interface, opts ...RouterOption) {
+    router := NewRouter(svc, opts...)
+    server.HandlePrefix("/", router)
+}
+
+// NewRouter creates a new http.Handler with the given service implementation.
+// This is useful for testing without starting a full Kratos server.
+func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handler {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    adapter := NewHTTPAdapter(svc)
+    r := mux.NewRouter()
+
+    {{- range $operations }}{{ $op := . }}
+    r.HandleFunc("{{ $op.Path }}", adapter.{{ $op.ID | ucFirst }}).Methods("{{ $op.Method }}")
+    {{- end }}
+
+    // Apply middlewares
+    var handler http.Handler = r
+    for i := len(cfg.middlewares) - 1; i >= 0; i-- {
+        handler = cfg.middlewares[i](handler)
+    }
+
+    return handler
+}
+{{end}}
+
+{{template "handler/adapter.tmpl" .}}
+{{template "handler/router.tmpl" .}}
+

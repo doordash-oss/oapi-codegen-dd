@@ -188,7 +188,7 @@ Each framework's `server.tmpl` must demonstrate proper middleware setup:
 5. **Timeout** - Request timeout handling
 6. **Custom middleware** - Wire up `handler.ExampleMiddleware()` when `$config.Generate.Handler.Middleware` is set
 
-Use the framework's native middleware where available. See `echo/server.tmpl` for reference.
+Use the framework's native middleware where available. If the framework provides built-in middleware for 4+ of the above (e.g., Kratos has recovery, logging, tracing, metrics), you must still generate at least one example middleware in `middleware.tmpl` to demonstrate the pattern, and wire it up in `server.tmpl`. See `echo/server.tmpl` for reference.
 
 ### 3. Add standalone example
 Create `examples/server/<framework>/` with:
