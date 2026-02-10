@@ -20,6 +20,7 @@ import (
 	gozeroapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/go-zero/testcase"
 	goframeapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/goframe/testcase"
 	gorillamuxapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gorilla-mux/testcase"
+	hertzapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/hertz/testcase"
 	kratosapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/kratos/testcase"
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/std-http/testcase"
 	"github.com/gin-gonic/gin"
@@ -133,6 +134,7 @@ func testServers() []serverTestCase {
 		{"go-zero", httpHandler{gozeroapi.NewRouter(gozeroapi.NewService())}},
 		{"goframe", httpHandler{goframeapi.Handler(goframeapi.NewService())}},
 		{"gorilla-mux", httpHandler{gorillamuxapi.NewRouter(gorillamuxapi.NewService())}},
+		{"hertz", httpHandler{hertzapi.Handler(hertzapi.NewService())}},
 		{"kratos", httpHandler{kratosapi.NewRouter(kratosapi.NewService())}},
 		{"fasthttp", fasthttpHandler{fasthttpapi.Handler(fasthttpapi.NewService())}},
 	}

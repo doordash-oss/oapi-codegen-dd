@@ -332,6 +332,7 @@ const (
 	HandlerKindGoFrame    HandlerKind = "goframe"
 	HandlerKindGoZero     HandlerKind = "go-zero"
 	HandlerKindGorillaMux HandlerKind = "gorilla-mux"
+	HandlerKindHertz      HandlerKind = "hertz"
 	HandlerKindKratos     HandlerKind = "kratos"
 	HandlerKindStdHTTP    HandlerKind = "std-http"
 )
@@ -339,7 +340,7 @@ const (
 // IsValid returns true if the handler kind is a supported value.
 func (k HandlerKind) IsValid() bool {
 	switch k {
-	case HandlerKindBeego, HandlerKindChi, HandlerKindEcho, HandlerKindFastHTTP, HandlerKindFiber, HandlerKindGin, HandlerKindGoFrame, HandlerKindGoZero, HandlerKindGorillaMux, HandlerKindKratos, HandlerKindStdHTTP:
+	case HandlerKindBeego, HandlerKindChi, HandlerKindEcho, HandlerKindFastHTTP, HandlerKindFiber, HandlerKindGin, HandlerKindGoFrame, HandlerKindGoZero, HandlerKindGorillaMux, HandlerKindHertz, HandlerKindKratos, HandlerKindStdHTTP:
 		return true
 	default:
 		return false
