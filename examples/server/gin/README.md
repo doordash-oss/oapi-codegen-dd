@@ -10,6 +10,17 @@ This example demonstrates server code generation using [Gin](https://github.com/
 - Built-in middleware available: `gin.Recovery()`, `gin.Logger()`, etc.
 - Set `gin.SetMode(gin.ReleaseMode)` for production
 
+## Integrating with Existing Server
+
+If you already have a Gin engine, register the generated routes:
+
+```go
+import handler "your/module/api"
+
+svc := handler.NewService()
+handler.NewRouter(r, svc)
+```
+
 ## Running the Server
 
 ```bash

@@ -9,6 +9,23 @@ This example demonstrates server code generation using [Chi](https://github.com/
 - Chi is 100% compatible with `net/http` - no custom context types
 - Middleware is added via `router.Use()`
 
+## Integrating with Existing Server
+
+If you already have a chi router, mount the generated router:
+
+```go
+import handler "your/module/api"
+
+svc := handler.NewService()
+apiRouter := handler.NewRouter(svc)
+
+// Mount under a prefix
+r.Mount("/api", apiRouter)
+
+// Or use directly
+r.Mount("/", apiRouter)
+```
+
 ## Running the Server
 
 ```bash

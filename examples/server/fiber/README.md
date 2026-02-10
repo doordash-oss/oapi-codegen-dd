@@ -10,6 +10,17 @@ This example demonstrates server code generation using [Fiber](https://github.co
 - The adapter converts between Fiber's context and standard `http.Request`/`http.ResponseWriter`
 - Built-in middleware available: `recover.New()`, `logger.New()`, `cors.New()`, etc.
 
+## Integrating with Existing Server
+
+If you already have a Fiber app, register the generated routes:
+
+```go
+import handler "your/module/api"
+
+svc := handler.NewService()
+handler.NewRouter(app, svc)
+```
+
 ## Running the Server
 
 ```bash

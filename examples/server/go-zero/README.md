@@ -1,23 +1,27 @@
-# Echo Server Example
+# go-zero Server Example
 
-This example demonstrates server code generation using [Echo](https://github.com/labstack/echo), a high-performance, minimalist Go web framework.
+This example demonstrates server code generation using [go-zero](https://github.com/zeromicro/go-zero), a cloud-native Go microservices framework.
 
 ## Description
 
-- Echo uses `echo.MiddlewareFunc` for middleware
-- Path parameters are extracted via `c.Param("paramName")`
-- Echo has its own context type (`echo.Context`) with convenience methods
-- Built-in middleware available: `middleware.Recover()`, `middleware.Logger()`, `middleware.CORS()`, etc.
+- go-zero uses `rest.Middleware` (`func(next http.HandlerFunc) http.HandlerFunc`) for middleware
+- Path parameters are extracted via `pathvar.Vars(r)["paramName"]`
+- Routes are registered via `server.AddRoutes([]rest.Route{...})`
+- Built-in features: recovery, logging, timeout, circuit breaker, rate limiting, load shedding
+- Server created with `rest.MustNewServer(rest.RestConf{...})`
 
 ## Integrating with Existing Server
 
-If you already have an Echo instance, register the generated routes:
+If you already have a go-zero server, register the generated routes:
 
 ```go
 import handler "your/module/api"
 
+// Create your service implementation
 svc := handler.NewService()
-handler.NewRouter(e, svc)
+
+// Register routes with your existing server
+handler.RegisterRoutes(server, svc)
 ```
 
 ## Running the Server
@@ -67,3 +71,4 @@ curl http://localhost:8080/users/123
 ```bash
 curl -X DELETE http://localhost:8080/users/123
 ```
+

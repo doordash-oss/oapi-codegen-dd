@@ -16,6 +16,7 @@ import (
 	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo/testcase"
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
 	ginapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gin/testcase"
+	gozeroapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/go-zero/testcase"
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/std-http/testcase"
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v3"
@@ -80,6 +81,7 @@ func testServers() []serverTestCase {
 			fiberapi.NewRouter(app, fiberapi.NewService())
 			return app
 		}()}},
+		{"go-zero", httpHandler{gozeroapi.NewRouter(gozeroapi.NewService())}},
 	}
 }
 

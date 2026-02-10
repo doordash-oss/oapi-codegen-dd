@@ -1,0 +1,66 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{define "server-main"}}
+{{- $config := .Config -}}
+{{- $server := .ServerOptions -}}
+{{- /* Types prefix: when models-package-alias is set, types are in a separate package */ -}}
+{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
+{{- $typesPrefix := "handler." -}}
+{{- if $modelsAlias -}}
+{{- $typesPrefix = printf "%s." $modelsAlias -}}
+{{- end -}}
+// Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
+// Modify it freely to customize your server setup.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
+package main
+
+import (
+    "log"
+    "time"
+
+    "github.com/zeromicro/go-zero/rest"
+    handler "{{ $server.HandlerPackage }}"
+)
+
+func main() {
+    // Configure go-zero server
+    // go-zero has built-in: recovery, logging, timeout, tracing, circuit breaker,
+    // rate limiting, load shedding. Configure via RestConf or rest.WithXxx() options.
+    c := rest.RestConf{
+        Host:    "0.0.0.0",
+        Port:    {{ $server.Port }},
+        Timeout: {{ $server.Timeout }} * int64(time.Second/time.Millisecond), // in milliseconds
+    }
+
+    server := rest.MustNewServer(c,
+        rest.WithCors("*"),
+    )
+    defer server.Stop()
+
+    // Add custom middleware from the generated scaffold
+    server.Use(handler.ExampleMiddleware())
+
+    // Create your service implementation
+    svc := handler.New{{ $config.Generate.Handler.Name }}()
+
+    // Register routes
+    {{ $typesPrefix }}RegisterRoutes(server, svc)
+
+    log.Printf("Starting go-zero server on :%d", {{ $server.Port }})
+    server.Start()
+}
+{{end}}
+{{template "server-main" .}}

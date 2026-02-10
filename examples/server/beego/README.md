@@ -9,6 +9,17 @@ This example demonstrates server code generation using [Beego](https://github.co
 - Routes are registered on `*web.ControllerRegister` (accessed via `app.Handlers`)
 - Path parameters are extracted from beego's context and copied to the standard `http.Request`
 
+## Integrating with Existing Server
+
+If you already have a Beego server, register the generated routes:
+
+```go
+import handler "your/module/api"
+
+svc := handler.NewService()
+handler.RegisterRoutes(app.Handlers, svc)
+```
+
 ## Running the Server
 
 ```bash

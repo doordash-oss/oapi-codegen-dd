@@ -10,6 +10,24 @@ This example demonstrates server code generation using Go's [standard library ne
 - Middleware uses the standard `func(http.Handler) http.Handler` pattern
 - Compatible with any `net/http` compatible middleware
 
+## Integrating with Existing Server
+
+If you already have an `http.ServeMux`, use the generated router:
+
+```go
+import handler "your/module/api"
+
+svc := handler.NewService()
+mux := handler.NewRouter(svc)
+
+// Use directly
+http.ListenAndServe(":8080", mux)
+
+// Or mount under a prefix using Handle
+mainMux := http.NewServeMux()
+mainMux.Handle("/api/", http.StripPrefix("/api", mux))
+```
+
 ## Running the Server
 
 ```bash
