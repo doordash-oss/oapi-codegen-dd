@@ -40,6 +40,9 @@ package {{ .Config.PackageName }}
 
 import (
     "net/http"
+    {{- range .Config.AdditionalImports}}
+    {{.Alias}} "{{.Package}}"
+    {{- end}}
 )
 {{- end -}}
 {{- end -}}

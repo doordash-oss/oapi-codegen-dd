@@ -29,21 +29,6 @@ const (
 	generatedFilePerm = 0644
 )
 
-// isScaffoldOnce checks if a file name matches any scaffold-once pattern.
-// For keys with "/" (like "/main"), it uses suffix matching.
-func isScaffoldOnce(name string) bool {
-	for key := range codegen.ScaffoldOnceFiles {
-		if strings.Contains(key, "/") {
-			if strings.HasSuffix(name, key) {
-				return true
-			}
-		} else if name == key {
-			return true
-		}
-	}
-	return false
-}
-
 var (
 	flagConfigFile string
 	flagPrintUsage bool
@@ -128,28 +113,41 @@ func main() {
 		return
 	}
 
-	dir := destDir
 	if destFile != "" {
-		dir = filepath.Dir(destFile)
 		if err = os.WriteFile(destFile, []byte(code.GetCombined()), generatedFilePerm); err != nil {
 			errExit("Error writing file: %v", err)
 		}
 	}
 
 	for name, contents := range code {
-		isScaffold := isScaffoldOnce(name)
+		isScaffold := codegen.IsScaffoldFile(name)
+		actualName := name
+		if isScaffold {
+			actualName = codegen.ScaffoldFileName(name)
+		}
+
+		// Skip "all" key (combined output for single-file mode)
+		if name == "all" {
+			continue
+		}
+
+		// In single-file mode, only write scaffold files
 		if destFile != "" && !isScaffold {
 			continue
 		}
 
-		// Server files (e.g., "server/main") are written relative to cwd,
-		// not the handler output directory, since they're a separate main package.
-		outDir := dir
-		if strings.HasSuffix(name, "/main") {
-			outDir = "."
+		// Determine file path
+		var filePath string
+		if strings.Contains(actualName, "/") {
+			// Files with "/" have their full path already (e.g., "server/main")
+			filePath = actualName + ".go"
+		} else if destDir != "" {
+			filePath = filepath.Join(destDir, actualName+".go")
+		} else {
+			filePath = filepath.Join(filepath.Dir(destFile), actualName+".go")
 		}
-		filePath := filepath.Join(outDir, name+".go")
 
+		// Skip scaffold files if they exist and overwrite is not set
 		if isScaffold && (cfg.Generate == nil || !cfg.Generate.OverwriteScaffolded) {
 			if _, err := os.Stat(filePath); err == nil {
 				continue

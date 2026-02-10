@@ -238,32 +238,57 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Name of the generated handler interface. Defaults to 'Handler'."
+          "description": "Name of the generated service interface. Defaults to 'Service'."
         },
         "kind": {
           "type": "string",
-          "enum": [
-            "chi",
-            "echo",
-            "fiber",
-            "gin",
-            "std-http",
-          ],
-          "description": "Router/framework to generate for. Defaults to 'chi'."
+          "enum": ["chi", "echo", "fiber", "gin", "std-http"],
+          "description": "Router/framework to generate for. Required."
         },
         "models-package-alias": {
           "type": "string",
-          "description": "Package alias to prefix model types with. If empty, models are assumed to be in the same package. Example: 'models' will generate 'models.User' instead of 'User'."
+          "description": "Package alias to prefix model types with. Used when models are generated separately (generate.models: false). Example: 'types' will generate 'types.User' instead of 'User'."
         },
         "validation": {
           "$ref": "#/definitions/HandlerValidation",
           "description": "Validation options for request/response validation in handlers."
+        },
+        "output": {
+          "$ref": "#/definitions/ScaffoldOutput",
+          "description": "Output options for scaffolded handler files (service.go, middleware.go). Falls back to root output if not set."
+        },
+        "middleware": {
+          "$ref": "#/definitions/MiddlewareOptions",
+          "description": "Middleware generation options. If set, generates a scaffold middleware.go."
         },
         "server": {
           "$ref": "#/definitions/ServerOptions",
           "description": "Server generation options. If set, generates a scaffold server/main.go."
         }
       },
+      "required": ["kind"]
+    },
+    "ScaffoldOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Output options for scaffolded files (service.go, middleware.go).",
+      "properties": {
+        "directory": {
+          "type": "string",
+          "description": "Output directory, relative to the spec/config file location."
+        },
+        "package": {
+          "type": "string",
+          "description": "Package name for the generated file."
+        }
+      },
+      "required": []
+    },
+    "MiddlewareOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for generating middleware.go. Currently empty but allows for future extensibility.",
+      "properties": {},
       "required": []
     },
     "ServerOptions": {
@@ -272,7 +297,7 @@
       "properties": {
         "directory": {
           "type": "string",
-          "description": "Directory for the generated server main.go. Defaults to '.'"
+          "description": "Directory for the generated server main.go. Defaults to 'server'."
         },
         "port": {
           "type": "integer",
@@ -281,7 +306,7 @@
         },
         "handler-package": {
           "type": "string",
-          "description": "Import path for the handler package."
+          "description": "Import path for the handler package. Required."
         }
       },
       "required": ["handler-package"]

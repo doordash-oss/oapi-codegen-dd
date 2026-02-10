@@ -16,6 +16,12 @@ limitations under the License.
 {{define "server-main"}}
 {{- $config := .Config -}}
 {{- $server := .ServerOptions -}}
+{{- /* Types prefix: when models-package-alias is set, types are in a separate package */ -}}
+{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
+{{- $typesPrefix := "handler." -}}
+{{- if $modelsAlias -}}
+{{- $typesPrefix = printf "%s." $modelsAlias -}}
+{{- end -}}
 // Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to customize your server setup.
 // To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
@@ -45,15 +51,17 @@ func main() {
     e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
         Timeout: {{ $server.Timeout }} * time.Second,
     }))
+    {{- if $config.Generate.Handler.Middleware }}
 
     // Add custom middleware from generated scaffold
     e.Use(handler.ExampleMiddleware())
+    {{- end }}
 
     // Create your service implementation
     svc := handler.New{{ $config.Generate.Handler.Name }}()
 
     // Register routes
-    handler.NewRouter(e, svc)
+    {{ $typesPrefix }}NewRouter(e, svc)
 
     // Start server
     port := "{{ $server.Port }}"

@@ -1,8 +1,0 @@
-# yaml-language-server: $schema=../../../../configuration-schema.json
-package: types
-output:
-  directory: types
-  use-single-file: true
-error-mapping:
-  CreateUserErrorResponse: message
-  GetUserErrorResponse: message

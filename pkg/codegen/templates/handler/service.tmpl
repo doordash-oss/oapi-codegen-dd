@@ -16,12 +16,17 @@ limitations under the License.
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
 {{- $serviceName := $config.Generate.Handler.Name -}}
+{{- $packageName := .PackageName -}}
+{{- /* Models prefix: when using models-package-alias, model types need prefix */ -}}
+{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
 {{- $modelsPrefix := "" -}}
-{{- if $config.Generate.Handler.ModelsPackageAlias }}{{ $modelsPrefix = printf "%s." $config.Generate.Handler.ModelsPackageAlias }}{{ end -}}
-// Package {{ $config.PackageName }} This file is generated ONCE as a starting point and will NOT be overwritten.
+{{- if $modelsAlias -}}
+{{- $modelsPrefix = printf "%s." $modelsAlias -}}
+{{- end -}}
+// Package {{ $packageName }} This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to add your business logic.
-// To regenerate, delete this file or set output.scaffold-once-overwrite: true in config.
-package {{ $config.PackageName }}
+// To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
+package {{ $packageName }}
 
 import (
 	"context"

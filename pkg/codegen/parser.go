@@ -33,24 +33,26 @@ import (
 //go:embed templates
 var templates embed.FS
 
-// isScaffoldOnce checks if a file name is a scaffold-once file.
-// For keys with "/" it matches by suffix, otherwise exact match.
-func isScaffoldOnce(name string) bool {
-	if ScaffoldOnceFiles[name] {
-		return true
-	}
-	for key := range ScaffoldOnceFiles {
-		if strings.Contains(key, "/") && strings.HasSuffix(name, key) {
-			return true
-		}
-	}
-	return false
-}
-
+// GeneratedCode is a map of file names to generated code content.
+// Scaffold files (service, middleware, server/main) are prefixed with "scaffold:" in the key.
 type GeneratedCode map[string]string
 
+// GetCombined returns the combined single-file output (the "all" key).
 func (g GeneratedCode) GetCombined() string {
 	return g["all"]
+}
+
+// scaffoldPrefix is the prefix used to identify scaffold files in GeneratedCode.
+const scaffoldPrefix = "scaffold:"
+
+// IsScaffoldFile returns true if the file name indicates a scaffold file.
+func IsScaffoldFile(name string) bool {
+	return strings.HasPrefix(name, scaffoldPrefix)
+}
+
+// ScaffoldFileName returns the actual file name without the scaffold prefix.
+func ScaffoldFileName(name string) string {
+	return strings.TrimPrefix(name, scaffoldPrefix)
 }
 
 // Parser uses the provided ParseContext to generate Go code for the API.
@@ -129,6 +131,7 @@ type TplOperationsContext struct {
 	Config        Configuration
 	WithHeader    bool
 	ServerOptions *ServerOptions
+	PackageName   string
 }
 
 // NewParser creates a new Parser with the provided ParseConfig and ParseContext.
@@ -166,9 +169,13 @@ func NewParser(cfg Configuration, ctx *ParseContext) (*Parser, error) {
 // It returns a map of generated code for each type of definition.
 func (p *Parser) Parse() (GeneratedCode, error) {
 	typesOut := make(map[string]string)
+	scaffoldOut := make(map[string]string)
 
 	useSingleFile := p.cfg.Output != nil && p.cfg.Output.UseSingleFile
 	withHeader := !useSingleFile
+
+	// Only generate models if Models is not explicitly false
+	shouldGenerateModels := p.cfg.Generate == nil || p.cfg.Generate.Models == nil || *p.cfg.Generate.Models
 	if useSingleFile {
 		out, err := p.ParseTemplates([]string{"header-inc.tmpl"}, EnumContext{
 			Imports:    p.ctx.Imports,
@@ -180,8 +187,8 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 		typesOut["header"] = out
 
-		// Generate validator declaration for single file mode
-		if !p.cfg.Generate.Validation.Skip {
+		// Generate validator declaration for single file mode (only if generating models)
+		if shouldGenerateModels && !p.cfg.Generate.Validation.Skip {
 			out, err := p.ParseTemplates([]string{"common.tmpl"}, EnumContext{
 				Imports:    p.ctx.Imports,
 				Config:     p.cfg,
@@ -253,7 +260,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 		}
 
-		// Generate shared templates (router-agnostic)
+		// Generate shared templates (router-agnostic) - these are regenerated files
 		for _, tmpl := range []string{"response-data", "service-options"} {
 			out, err := p.ParseTemplates([]string{sharedPrefix + tmpl + ".tmpl"}, opsCtx)
 			if err != nil {
@@ -269,29 +276,57 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			typesOut[strcase.ToSnake(tmpl)] = formatted
 		}
 
-		// Generate middleware - try framework-specific template first, fall back to shared
-		middlewareTmpl := templatePrefix + "middleware.tmpl"
-		middlewareOut, err := p.ParseTemplates([]string{middlewareTmpl}, opsCtx)
-		if err != nil {
-			// Fall back to shared middleware template
-			middlewareOut, err = p.ParseTemplates([]string{sharedPrefix + "middleware.tmpl"}, opsCtx)
-			if err != nil {
-				return nil, fmt.Errorf("error generating code for middleware: %w", err)
-			}
+		// Resolve scaffold output once for service and middleware
+		scaffoldOutput := p.cfg.Generate.Handler.ResolveScaffoldOutput(p.cfg.Output)
+		scaffoldPackage := scaffoldOutput.Package
+		if scaffoldPackage == "" {
+			scaffoldPackage = p.cfg.PackageName
 		}
-		formattedMiddleware := middlewareOut
-		if !useSingleFile {
-			formattedMiddleware, err = FormatCode(middlewareOut)
-			if err != nil {
-				return nil, err
-			}
-		}
-		typesOut["middleware"] = formattedMiddleware
 
-		// Generate service implementation stub (scaffold once - only written if file doesn't exist)
-		out, err := p.ParseTemplates([]string{sharedPrefix + "service.tmpl"}, opsCtx)
+		// Generate middleware if enabled - scaffolded file
+		if p.cfg.Generate.Handler.Middleware != nil {
+			middlewareCtx := &TplOperationsContext{
+				Operations:  p.ctx.Operations,
+				Imports:     p.ctx.Imports,
+				Config:      p.cfg,
+				WithHeader:  withHeader,
+				PackageName: scaffoldPackage,
+			}
+			middlewareTmpl := templatePrefix + "middleware.tmpl"
+			middlewareOut, err := p.ParseTemplates([]string{middlewareTmpl}, middlewareCtx)
+			if err != nil {
+				// Fall back to shared middleware template
+				middlewareOut, err = p.ParseTemplates([]string{sharedPrefix + "middleware.tmpl"}, middlewareCtx)
+				if err != nil {
+					return nil, fmt.Errorf("error generating code for middleware: %w", err)
+				}
+			}
+			formattedMiddleware := middlewareOut
+			if !useSingleFile {
+				formattedMiddleware, err = FormatCode(middlewareOut)
+				if err != nil {
+					return nil, err
+				}
+			}
+			// Use directory path as key if scaffold has different output directory
+			middlewareKey := "middleware"
+			if scaffoldOutput.Directory != "" && scaffoldOutput.Directory != p.cfg.Output.Directory {
+				middlewareKey = scaffoldOutput.Directory + "/middleware"
+			}
+			scaffoldOut[middlewareKey] = formattedMiddleware
+		}
+
+		// Generate service implementation stub - scaffolded file
+		serviceCtx := &TplOperationsContext{
+			Operations:  p.ctx.Operations,
+			Imports:     p.ctx.Imports,
+			Config:      p.cfg,
+			WithHeader:  withHeader,
+			PackageName: scaffoldPackage,
+		}
+		out, err := p.ParseTemplates([]string{sharedPrefix + "service.tmpl"}, serviceCtx)
 		if err != nil {
-			return nil, fmt.Errorf("error generating code for handler implementation: %w", err)
+			return GeneratedCode{}, fmt.Errorf("error generating code for handler implementation: %w", err)
 		}
 		formatted := out
 		if !useSingleFile {
@@ -300,16 +335,28 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				return nil, err
 			}
 		}
-		typesOut["service"] = formatted
+		// Use directory path as key if scaffold has different output directory
+		serviceKey := "service"
+		if scaffoldOutput.Directory != "" && scaffoldOutput.Directory != p.cfg.Output.Directory {
+			serviceKey = scaffoldOutput.Directory + "/service"
+		}
+		scaffoldOut[serviceKey] = formatted
 
-		// Generate server main.go if server generation is enabled
+		// Generate server main.go if server generation is enabled - scaffolded file
 		if p.cfg.Generate.Handler.Server != nil {
 			serverOpts := p.cfg.Generate.Handler.Server.WithDefaults()
 			if err := serverOpts.Validate(); err != nil {
 				return nil, fmt.Errorf("invalid server options: %w", err)
 			}
-			serverCtx := opsCtx
-			serverCtx.ServerOptions = &serverOpts
+			serverOutput := p.cfg.Generate.Handler.ResolveServerOutput()
+			serverCtx := &TplOperationsContext{
+				Operations:    p.ctx.Operations,
+				Imports:       p.ctx.Imports,
+				Config:        p.cfg,
+				WithHeader:    withHeader,
+				ServerOptions: &serverOpts,
+				PackageName:   serverOutput.Package,
+			}
 
 			// Try framework-specific server template first, fall back to shared
 			serverTmpl := templatePrefix + "server.tmpl"
@@ -326,12 +373,12 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			if err != nil {
 				return nil, err
 			}
-			typesOut[serverOpts.Directory+"/main"] = formatted
+			scaffoldOut[serverOutput.Directory+"/main"] = formatted
 		}
 	}
 
-	// Generate validator file if validation is not skipped and not using single file
-	if !useSingleFile && !p.cfg.Generate.Validation.Skip {
+	// Generate validator file if validation is not skipped, not using single file, and generating models
+	if shouldGenerateModels && !useSingleFile && !p.cfg.Generate.Validation.Skip {
 		out, err := p.ParseTemplates([]string{"common.tmpl"}, EnumContext{
 			Imports:    p.ctx.Imports,
 			Config:     p.cfg,
@@ -346,8 +393,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 		typesOut["common"] = formatted
 	}
-
-	if len(p.ctx.Enums) > 0 {
+	if shouldGenerateModels && len(p.ctx.Enums) > 0 {
 		out, err := p.ParseTemplates([]string{"enums.tmpl"}, EnumContext{
 			Enums:       p.ctx.Enums,
 			Imports:     p.ctx.Imports,
@@ -385,7 +431,6 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 	}
 
 	// Only generate model types if Models is not explicitly false
-	shouldGenerateModels := p.cfg.Generate == nil || p.cfg.Generate.Models == nil || *p.cfg.Generate.Models
 	if shouldGenerateModels {
 		for sl, tds := range p.ctx.TypeDefinitions {
 			if len(tds) == 0 {
@@ -447,9 +492,6 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			delete(typesOut, "header")
 		}
 
-		// Store scaffold-once files to keep separate
-		scaffoldFiles := make(map[string]string)
-
 		// sort the types out by name
 		typeNames := make([]string, 0, len(typesOut))
 		for name := range typesOut {
@@ -459,18 +501,11 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		sort.Strings(typeNames)
 
 		for _, name := range typeNames {
-			// Skip scaffold-once files - they should remain separate
-			if isScaffoldOnce(name) {
-				scaffoldFiles[name] = typesOut[name]
-				delete(typesOut, name)
-				continue
-			}
 			code, ok := typesOut[name]
 			if !ok {
 				continue
 			}
 			res += code + "\n"
-			delete(typesOut, name)
 		}
 
 		formatted, err := FormatCode(res)
@@ -479,11 +514,11 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			return nil, err
 		}
 		typesOut = map[string]string{"all": formatted}
+	}
 
-		// Add back scaffold-once files
-		for name, code := range scaffoldFiles {
-			typesOut[name] = code
-		}
+	// Merge scaffold files into the main map with prefix
+	for name, content := range scaffoldOut {
+		typesOut[scaffoldPrefix+name] = content
 	}
 
 	return typesOut, nil

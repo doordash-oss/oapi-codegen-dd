@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../../../../configuration-schema.json
+package: testcase
+output:
+  use-single-file: true
+  filename: adapter.gen.go
+generate:
+  models: false
+  handler:
+    kind: fiber

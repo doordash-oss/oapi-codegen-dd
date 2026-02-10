@@ -17,6 +17,12 @@ limitations under the License.
 {{define "server-main"}}
 {{- $config := .Config -}}
 {{- $server := .ServerOptions -}}
+{{- /* Types prefix: when models-package-alias is set, types are in a separate package */ -}}
+{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
+{{- $typesPrefix := "handler." -}}
+{{- if $modelsAlias -}}
+{{- $typesPrefix = printf "%s." $modelsAlias -}}
+{{- end -}}
 // Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to customize your server setup.
 // To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
@@ -38,14 +44,20 @@ func main() {
     // Create your service implementation
     svc := handler.New{{ $config.Generate.Handler.Name }}()
 
-    // Create router with all available middleware
-    router := handler.NewRouter(svc,
-        handler.WithMiddleware(handler.RecoveryMiddleware),
-        handler.WithMiddleware(handler.RequestIDMiddleware),
-        handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),
-        handler.WithMiddleware(handler.CORSMiddleware(handler.DefaultCORSConfig())),
-        handler.WithMiddleware(handler.TimeoutMiddleware({{ $server.Timeout }}*time.Second)),
+    // Create router
+    {{- if $config.Generate.Handler.Middleware }}
+    // With middleware from handler package
+    router := {{ $typesPrefix }}NewRouter(svc,
+        {{ $typesPrefix }}WithMiddleware(handler.RecoveryMiddleware),
+        {{ $typesPrefix }}WithMiddleware(handler.RequestIDMiddleware),
+        {{ $typesPrefix }}WithMiddleware(handler.LoggingMiddleware(log.Printf)),
+        {{ $typesPrefix }}WithMiddleware(handler.CORSMiddleware(handler.DefaultCORSConfig())),
+        {{ $typesPrefix }}WithMiddleware(handler.TimeoutMiddleware({{ $server.Timeout }}*time.Second)),
     )
+    {{- else }}
+    // Add your middleware here
+    router := {{ $typesPrefix }}NewRouter(svc)
+    {{- end }}
 
     // Configure server
     port := {{ $server.Port }}

@@ -15,14 +15,12 @@ limitations under the License.
 */}}
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
-{{- $modelsPrefix := "" -}}
-{{- if $config.Generate.Handler.ModelsPackageAlias }}{{ $modelsPrefix = printf "%s." $config.Generate.Handler.ModelsPackageAlias }}{{ end -}}
+{{- /* Response data is generated in the same package as models, so no prefix needed */ -}}
 {{- template "response-data-header" $ }}
 
 {{ range $operations }}{{ $op := . }}
 {{- if $op.Response.Success }}
 {{- $bodyType := $op.Response.Success.ResponseName -}}
-{{- if and $modelsPrefix (ne $bodyType "struct{}") }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
 {{- $isRawResponse := $op.Response.Success.IsRaw }}
 // {{ $op.ID | ucFirst }}ResponseData wraps the success response with optional headers and status override.
 {{- $isByteSlice := eq $op.Response.Success.Schema.GoType "[]byte" }}

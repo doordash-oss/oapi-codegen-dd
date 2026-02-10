@@ -15,14 +15,6 @@ import (
 	"time"
 )
 
-// ScaffoldOnceFiles are files generated once and not overwritten on regeneration.
-// Users can modify these files freely. Keys with "/" are matched as suffixes.
-var ScaffoldOnceFiles = map[string]bool{
-	"service":    true,
-	"middleware": true,
-	"/main":      true,
-}
-
 // Configuration defines code generation customizations.
 // PackageName to generate the code under.
 // CopyrightHeader is the header to add to the generated code. Use without //.
@@ -190,9 +182,6 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 					}
 					if other.Generate.Handler.Kind != "" {
 						o.Generate.Handler.Kind = other.Generate.Handler.Kind
-					}
-					if other.Generate.Handler.ModelsPackageAlias != "" {
-						o.Generate.Handler.ModelsPackageAlias = other.Generate.Handler.ModelsPackageAlias
 					}
 					if other.Generate.Handler.Validation.Request {
 						o.Generate.Handler.Validation.Request = other.Generate.Handler.Validation.Request
@@ -369,22 +358,92 @@ type HandlerOptions struct {
 	// Supported values: "chi"
 	Kind HandlerKind `yaml:"kind"`
 
-	// ModelsPackageAlias is the package alias to prefix model types with.
-	// If empty, models are assumed to be in the same package.
-	// Example: "models" will generate "models.User" instead of "User".
-	ModelsPackageAlias string `yaml:"models-package-alias"`
-
 	// Validation specifies options for request/response validation in handlers.
 	Validation HandlerValidation `yaml:"validation"`
+
+	// ModelsPackageAlias is the package alias to prefix model types with.
+	// Used when models are generated separately (generate.models: false).
+	// Example: "types" will generate "types.User" instead of "User".
+	ModelsPackageAlias string `yaml:"models-package-alias"`
+
+	// Output specifies output for scaffolded handler files (service.go, middleware.go).
+	// Falls back to root output if nil.
+	Output *ScaffoldOutput `yaml:"output"`
+
+	// Middleware specifies options for generating middleware.go.
+	// If nil, no middleware is generated.
+	Middleware *MiddlewareOptions `yaml:"middleware"`
 
 	// Server specifies options for generating a runnable server main.go.
 	// If nil, no server is generated.
 	Server *ServerOptions `yaml:"server"`
 }
 
+// ResolveScaffoldOutput returns the output config for scaffold files (service.go, middleware.go).
+// Uses handler.output if set, otherwise falls back to root output.
+func (o HandlerOptions) ResolveScaffoldOutput(rootOutput *Output) ScaffoldOutput {
+	if o.Output != nil {
+		return *o.Output
+	}
+	return ScaffoldOutput{
+		Directory: rootOutput.Directory,
+		Package:   "", // will use root package name
+	}
+}
+
+// ResolveServerOutput returns the output config for server/main.go.
+// Uses server.directory if set, otherwise defaults to "server".
+// Package is always "main" for server.
+func (o HandlerOptions) ResolveServerOutput() ScaffoldOutput {
+	dir := "server"
+	if o.Server != nil && o.Server.Directory != "" {
+		dir = o.Server.Directory
+	}
+	return ScaffoldOutput{
+		Directory: dir,
+		Package:   "main",
+	}
+}
+
+// Validate returns an error if the handler options are invalid.
+func (o HandlerOptions) Validate() error {
+	if o.Kind == "" {
+		return ErrHandlerKindRequired
+	}
+	if !o.Kind.IsValid() {
+		return fmt.Errorf("%w: %q", ErrHandlerKindUnsupported, o.Kind)
+	}
+	return nil
+}
+
+// HandlerValidation specifies validation options for handlers.
+type HandlerValidation struct {
+	// Request enables validation of incoming requests. Defaults to false.
+	Request bool `yaml:"request"`
+
+	// Response enables validation of outgoing responses. Defaults to false.
+	// Useful for contract testing.
+	Response bool `yaml:"response"`
+}
+
+// MiddlewareOptions specifies options for generating middleware.go.
+// Currently empty but allows for future extensibility.
+type MiddlewareOptions struct {
+}
+
+// ScaffoldOutput specifies output options for scaffolded files.
+// Scaffold files are always generated as separate files (not merged).
+type ScaffoldOutput struct {
+	// Directory is the output directory, relative to the spec/config file location.
+	Directory string `yaml:"directory"`
+
+	// Package is the package name for the generated file.
+	Package string `yaml:"package"`
+}
+
 // ServerOptions specifies options for generating a runnable server main.go.
 type ServerOptions struct {
-	// Directory is the directory to generate the server main.go in.
+	// Directory is the output directory for server/main.go.
 	// Defaults to "server".
 	Directory string `yaml:"directory"`
 
@@ -419,27 +478,6 @@ func (o ServerOptions) Validate() error {
 		return ErrServerHandlerPackageRequired
 	}
 	return nil
-}
-
-// Validate returns an error if the handler options are invalid.
-func (o HandlerOptions) Validate() error {
-	if o.Kind == "" {
-		return ErrHandlerKindRequired
-	}
-	if !o.Kind.IsValid() {
-		return fmt.Errorf("%w: %q", ErrHandlerKindUnsupported, o.Kind)
-	}
-	return nil
-}
-
-// HandlerValidation specifies validation options for handlers.
-type HandlerValidation struct {
-	// Request enables validation of incoming requests. Defaults to false.
-	Request bool `yaml:"request"`
-
-	// Response enables validation of outgoing responses. Defaults to false.
-	// Useful for contract testing.
-	Response bool `yaml:"response"`
 }
 
 // NewDefaultConfiguration creates a new default Configuration.

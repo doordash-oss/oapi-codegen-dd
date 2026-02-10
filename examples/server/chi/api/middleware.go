@@ -1,23 +1,7 @@
-{{/*
-Copyright 2026 DoorDash, Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/}}
-{{- $packageName := .PackageName -}}
-// Package {{ $packageName }} This file is generated ONCE as a starting point and will NOT be overwritten.
+// Package api This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to add your middleware logic.
 // To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
-package {{ $packageName }}
+package api
 
 import (
 	"context"
