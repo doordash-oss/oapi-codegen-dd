@@ -20,6 +20,36 @@ svc := handler.NewService()
 handler.RegisterRoutes(app.Handlers, svc)
 ```
 
+## Integrating with Beego Project Structure
+
+For projects using Beego's standard MVC layout (`bee new`), the generated code maps as follows:
+
+```
+├── conf/
+│   └── app.conf
+├── controllers/      # ← gen.go (adapter, routes)
+├── models/           # ← generated request/response types (in gen.go)
+├── routers/
+│   └── router.go     # ← call RegisterRoutes() here
+├── services/         # ← service.go (business logic) - create this
+└── main.go
+```
+
+Example integration in `routers/router.go`:
+
+```go
+import (
+    "your/module/controllers"
+    "your/module/services"
+    beego "github.com/beego/beego/v2/server/web"
+)
+
+func init() {
+    svc := services.NewService()
+    controllers.RegisterRoutes(beego.BeeApp.Handlers, svc)
+}
+```
+
 ## Running the Server
 
 ```bash
