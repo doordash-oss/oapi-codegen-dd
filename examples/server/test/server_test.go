@@ -14,6 +14,7 @@ import (
 	beegoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/beego/testcase"
 	chiapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/chi/testcase"
 	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo/testcase"
+	fasthttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fasthttp/testcase"
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
 	ginapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gin/testcase"
 	gozeroapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/go-zero/testcase"
@@ -24,6 +25,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/valyala/fasthttp"
 )
 
 type serverTestCase struct {
@@ -58,6 +60,50 @@ func (f fiberHandler) Do(req *http.Request) (*http.Response, error) {
 	return f.app.Test(req)
 }
 
+// fasthttpHandler wraps a fasthttp.RequestHandler for testing.
+type fasthttpHandler struct {
+	h fasthttp.RequestHandler
+}
+
+func (f fasthttpHandler) Do(req *http.Request) (*http.Response, error) {
+	// Convert http.Request to fasthttp.RequestCtx
+	ctx := &fasthttp.RequestCtx{}
+
+	// Set method and URI
+	ctx.Request.Header.SetMethod(req.Method)
+	ctx.Request.SetRequestURI(req.URL.String())
+
+	// Copy headers
+	for k, v := range req.Header {
+		for _, vv := range v {
+			ctx.Request.Header.Add(k, vv)
+		}
+	}
+
+	// Copy body
+	if req.Body != nil {
+		body, _ := io.ReadAll(req.Body)
+		ctx.Request.SetBody(body)
+	}
+
+	// Call the handler
+	f.h(ctx)
+
+	// Convert response back to http.Response
+	resp := &http.Response{
+		StatusCode: ctx.Response.StatusCode(),
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewReader(ctx.Response.Body())),
+	}
+
+	// Copy response headers
+	ctx.Response.Header.VisitAll(func(key, value []byte) {
+		resp.Header.Add(string(key), string(value))
+	})
+
+	return resp, nil
+}
+
 func testServers() []serverTestCase {
 	// Initialize beego for testing
 	web.BConfig.RunMode = web.DEV
@@ -84,6 +130,7 @@ func testServers() []serverTestCase {
 		}()}},
 		{"go-zero", httpHandler{gozeroapi.NewRouter(gozeroapi.NewService())}},
 		{"kratos", httpHandler{kratosapi.NewRouter(kratosapi.NewService())}},
+		{"fasthttp", fasthttpHandler{fasthttpapi.Handler(fasthttpapi.NewService())}},
 	}
 }
 

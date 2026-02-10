@@ -29,7 +29,7 @@ r.Mount("/", apiRouter)
 ## Running the Server
 
 ```bash
-go run ./server/main.go
+go run ./server
 ```
 
 The server starts on port 8080.

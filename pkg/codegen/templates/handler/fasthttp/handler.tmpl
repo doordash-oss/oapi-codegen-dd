@@ -1,0 +1,122 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/* fasthttp framework template blocks */}}
+
+{{define "router-import"}}"github.com/fasthttp/router"
+    "github.com/valyala/fasthttp"
+    "github.com/valyala/fasthttp/fasthttpadaptor"{{end}}
+
+{{/* fasthttp uses {name} for path params, accessed via ctx.UserValue */}}
+{{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
+
+{{define "router-config"}}
+type routerConfig struct {
+    middlewares []func(fasthttp.RequestHandler) fasthttp.RequestHandler
+}
+
+// WithMiddleware adds middleware to the router.
+func WithMiddleware(mw func(fasthttp.RequestHandler) fasthttp.RequestHandler) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+
+// fasthttpHandler wraps an http.HandlerFunc with path param injection for fasthttp.
+func fasthttpHandler(h http.HandlerFunc, pathParams ...string) fasthttp.RequestHandler {
+    return func(ctx *fasthttp.RequestCtx) {
+        // Convert fasthttp request to net/http request, injecting path params
+        fasthttpadaptor.NewFastHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            // Copy path params from fasthttp context to http.Request
+            for _, param := range pathParams {
+                if v := ctx.UserValue(param); v != nil {
+                    r.SetPathValue(param, v.(string))
+                }
+            }
+            h(w, r)
+        })(ctx)
+    }
+}
+{{end}}
+
+{{define "new-router"}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $serviceName := $config.Generate.Handler.Name -}}
+// NewRouter creates a new fasthttp router with the given service implementation.
+func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *router.Router {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    httpAdapter := NewHTTPAdapter(svc)
+    r := router.New()
+
+    {{- range $operations }}{{ $op := . }}
+        {{- if $op.PathParams }}
+        r.{{ $op.Method }}("{{ $op.Path }}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
+        {{- else }}
+        r.{{ $op.Method }}("{{ $op.Path }}", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
+        {{- end }}
+    {{- end }}
+
+    // Apply middlewares (in reverse order so first added is outermost)
+    handler := r.Handler
+    for i := len(cfg.middlewares) - 1; i >= 0; i-- {
+        handler = cfg.middlewares[i](handler)
+    }
+
+    // Create a wrapper router that uses the middleware-wrapped handler
+    if len(cfg.middlewares) > 0 {
+        wrapper := router.New()
+        wrapper.NotFound = handler
+        return wrapper
+    }
+
+    return r
+}
+
+// Handler returns the fasthttp.RequestHandler for use with fasthttp.ListenAndServe.
+func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) fasthttp.RequestHandler {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    httpAdapter := NewHTTPAdapter(svc)
+    r := router.New()
+
+    {{- range $operations }}{{ $op := . }}
+        {{- if $op.PathParams }}
+        r.{{ $op.Method }}("{{ $op.Path }}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
+        {{- else }}
+        r.{{ $op.Method }}("{{ $op.Path }}", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
+        {{- end }}
+    {{- end }}
+
+    // Apply middlewares (in reverse order so first added is outermost)
+    handler := r.Handler
+    for i := len(cfg.middlewares) - 1; i >= 0; i-- {
+        handler = cfg.middlewares[i](handler)
+    }
+
+    return handler
+}
+{{end}}
+
+{{template "handler/adapter.tmpl" .}}
+{{template "handler/router.tmpl" .}}
+

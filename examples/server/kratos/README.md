@@ -59,7 +59,7 @@ func NewHTTPServer(c *conf.Server, svc *service.YourService) *http.Server {
 ## Running the Server
 
 ```bash
-go run ./server/main.go
+go run ./server
 ```
 
 The server starts on port 8080.
