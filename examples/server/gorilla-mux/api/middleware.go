@@ -1,0 +1,153 @@
+// Package api This file is generated ONCE as a starting point and will NOT be overwritten.
+// Modify it freely to add your middleware logic.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
+package api
+
+import (
+	"context"
+	"crypto/rand"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// RequestIDKey is the context key for the request ID.
+type RequestIDKey struct{}
+
+// RequestIDMiddleware adds a unique request ID to each request.
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get("X-Request-ID")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+		ctx := context.WithValue(r.Context(), RequestIDKey{}, requestID)
+		w.Header().Set("X-Request-ID", requestID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// GetRequestID returns the request ID from the context.
+func GetRequestID(ctx context.Context) string {
+	if id, ok := ctx.Value(RequestIDKey{}).(string); ok {
+		return id
+	}
+	return ""
+}
+
+func generateRequestID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)
+}
+
+// RecoveryMiddleware recovers from panics and returns a 500 error.
+func RecoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+// LoggingMiddleware logs incoming requests.
+// logger should be a function that accepts format string and args (like log.Printf).
+func LoggingMiddleware(logger func(format string, args ...any)) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+
+			// Wrap response writer to capture status code
+			wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+			next.ServeHTTP(wrapped, r)
+
+			duration := time.Since(start)
+			logger("%s %s %d %v", r.Method, r.URL.Path, wrapped.statusCode, duration)
+		})
+	}
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// CORSConfig holds CORS configuration options.
+type CORSConfig struct {
+	AllowOrigins     []string
+	AllowMethods     []string
+	AllowHeaders     []string
+	AllowCredentials bool
+	MaxAge           int
+}
+
+// DefaultCORSConfig returns a permissive CORS configuration.
+func DefaultCORSConfig() CORSConfig {
+	return CORSConfig{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
+		AllowCredentials: false,
+		MaxAge:           86400,
+	}
+}
+
+// CORSMiddleware handles Cross-Origin Resource Sharing.
+func CORSMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+
+			// Check if origin is allowed
+			allowed := false
+			for _, o := range cfg.AllowOrigins {
+				if o == "*" || o == origin {
+					allowed = true
+					break
+				}
+			}
+
+			if allowed && origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				if cfg.AllowCredentials {
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+				}
+			}
+
+			// Handle preflight
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
+				w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
+				if cfg.MaxAge > 0 {
+					w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.MaxAge))
+				}
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// TimeoutMiddleware adds a timeout to the request context.
+func TimeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), timeout)
+			defer cancel()
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}

@@ -18,6 +18,7 @@ import (
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
 	ginapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gin/testcase"
 	gozeroapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/go-zero/testcase"
+	gorillamuxapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gorilla-mux/testcase"
 	kratosapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/kratos/testcase"
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/std-http/testcase"
 	"github.com/gin-gonic/gin"
@@ -129,6 +130,7 @@ func testServers() []serverTestCase {
 			return app
 		}()}},
 		{"go-zero", httpHandler{gozeroapi.NewRouter(gozeroapi.NewService())}},
+		{"gorilla-mux", httpHandler{gorillamuxapi.NewRouter(gorillamuxapi.NewService())}},
 		{"kratos", httpHandler{kratosapi.NewRouter(kratosapi.NewService())}},
 		{"fasthttp", fasthttpHandler{fasthttpapi.Handler(fasthttpapi.NewService())}},
 	}
