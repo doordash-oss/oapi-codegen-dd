@@ -6,9 +6,10 @@ output:
 error-mapping:
   CreateUserErrorResponse: message
 generate:
-  overwrite-scaffolded: true
   handler:
     kind: chi
+    output:
+      overwrite: true
     middleware: {}
     server:
       directory: server

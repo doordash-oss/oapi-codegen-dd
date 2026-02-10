@@ -16,6 +16,7 @@ limitations under the License.
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
 {{- $serviceName := $config.Generate.Handler.Name -}}
+{{- $receiver := $serviceName | fst | lower -}}
 {{- $packageName := .PackageName -}}
 {{- /* Models prefix: when using models-package-alias, model types need prefix */ -}}
 {{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
@@ -25,7 +26,7 @@ limitations under the License.
 {{- end -}}
 // Package {{ $packageName }} This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to add your business logic.
-// To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
 package {{ $packageName }}
 
 import (
@@ -45,25 +46,25 @@ func New{{ $serviceName }}() *{{ $serviceName }} {
 	return &{{ $serviceName }}{}
 }
 
-// Ensure {{ $serviceName }} implements {{ $serviceName }}Interface.
-var _ {{ $serviceName }}Interface = (*{{ $serviceName }})(nil)
+// Ensure {{ $serviceName }} implements {{ $modelsPrefix }}{{ $serviceName }}Interface.
+var _ {{ $modelsPrefix }}{{ $serviceName }}Interface = (*{{ $serviceName }})(nil)
 
 {{- range $operations }}{{ $op := . }}
 
 // {{ $op.ID }} handles {{ $op.Method }} {{ $op.Path }}{{if and (not $config.Generate.OmitDescription) $op.Summary }} - {{ $op.Summary }}{{end}}
 {{- if $op.HasRequestOptions }}
-func (s *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
 	{{- if $op.Response.Success.IsRaw }}
-	return New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
 	{{- else }}
 	{{- $bodyType := $op.Response.Success.ResponseName -}}
 	{{- if eq $bodyType "struct{}" }}
-	return New{{ $op.ID | ucFirst }}ResponseData(nil), nil
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(nil), nil
 	{{- else }}
 	{{- if $modelsPrefix }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
-	return New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
 	{{- end }}
 	{{- end }}
 	{{- else }}
@@ -71,10 +72,10 @@ func (s *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $op.ID |
 	{{- end }}
 }
 {{- else }}
-func (s *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
-	return New{{ $op.ID | ucFirst }}ResponseData(new({{ $modelsPrefix }}{{ $op.Response.Success.ResponseName }})), nil
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $modelsPrefix }}{{ $op.Response.Success.ResponseName }})), nil
 	{{- else }}
 	return nil
 	{{- end }}

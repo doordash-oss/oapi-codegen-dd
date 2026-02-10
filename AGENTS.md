@@ -13,14 +13,26 @@
 
 ### Key config options
 - `output.use-single-file: true` - Generate all code in one file (default) vs multiple files
+- `output.directory` - Output directory (when `use-single-file: false`, package name is appended as subdirectory)
 - `generate.client: true` - Generate HTTP client code
+- `generate.models: false` - Skip model generation (when models are in separate package)
 - `generate.validation.skip: true` - Skip Validate() method generation
 - `generate.validation.response: true` - Generate Validate() for response types (useful for contract testing)
 - `generate.always-prefix-enum-values: true` - Prefix enum constants with type name (default)
 - `generate.default-int-type: int64` - Use int64 instead of int for integer types
+- `generate.handler.output.overwrite: true` - Force regeneration of scaffold files (service.go, middleware.go)
 - `skip-prune: true` - Keep unused types (normally pruned)
 - `error-mapping` - Map response types to implement error interface (key: type name, value: json path to message)
 - `filter.include/exclude` - Filter paths, tags, operation-ids, extensions
+
+### Handler/Server generation config
+- `generate.handler.kind` - Router framework: `chi`, `echo`, `fiber`, `gin`, `std-http` (required)
+- `generate.handler.name` - Service interface name (default: "Service")
+- `generate.handler.models-package-alias` - Prefix for model types when models are in separate package
+- `generate.handler.validation.request/response` - Enable request/response validation in handlers
+- `generate.handler.output.directory/package` - Output for scaffold files (service.go, middleware.go)
+- `generate.handler.middleware: {}` - Enable middleware.go generation
+- `generate.handler.server` - Enable server/main.go generation with `directory`, `port`, `timeout`, `handler-package`
 
 ## Verifying changes
 - After making changes to the code generator, ensure to run `make generate` which regenerates the code for all OpenAPI specs in `examples/`
@@ -35,6 +47,7 @@
 - Re-run with `SPEC=<path-to-spec.yml> make test-integration` to focus on a specific spec
 - Never run all integration tests at once - always use SPEC= to limit scope
 - Example: `make test-integration SPEC=3.0/github.com/ghes-3.5.1.1.4.yml`
+- **Never run oapi-codegen in the project root directory** - always use `/tmp` or run via `make test-integration`
 
 ### Common failure types and resolutions
 
@@ -138,3 +151,61 @@ Central registry for managing type names and references:
 - When multiple schemas would generate the same Go type name, the generator appends numbers (e.g., `Foo`, `Foo2`, `Foo3`)
 - This happens at registration time via `generateUniqueName()`
 - Conflicts can arise from: same names in different paths, `x-go-name` collisions, inline type extraction
+
+## Adding a New Server Framework
+
+When adding support for a new router/framework (e.g., `mux`), follow these steps:
+
+### 1. Add HandlerKind constant
+In `pkg/codegen/configuration.go`:
+- Add new constant: `HandlerKindMux HandlerKind = "mux"` (keep constants in alphabetical order)
+- Update `IsValid()` switch to include the new kind
+
+In `configuration-schema.json`:
+- Add the new kind to the `enum` array in `HandlerOptions.kind` (keep in alphabetical order)
+
+### 2. Create framework-specific templates
+Create directory `pkg/codegen/templates/handler/<framework>/` with:
+- `handler.tmpl` - **Required**. Main handler template that includes shared templates via `{{template "..."}}`. See existing frameworks for pattern.
+- `server.tmpl` - Optional. Override if framework needs custom server setup (e.g., Echo, Fiber, Gin have custom ones)
+- `middleware.tmpl` - Optional. Override if framework needs custom middleware pattern (e.g., Echo has custom one)
+
+Templates use `{{define "handler-<framework>"}}` blocks. The shared templates in `pkg/codegen/templates/handler/` provide common functionality:
+- `adapter.tmpl` - Request/response adapter
+- `router.tmpl` - Router registration
+- `service.tmpl` - Service interface scaffold
+- `service-options.tmpl` - Service request options
+- `response-data.tmpl` - Response data types
+- `middleware.tmpl` - Default middleware scaffold
+- `server.tmpl` - Default server main.go
+
+### 3. Add standalone example
+Create `examples/server/<framework>/` with:
+- `cfg.yml` - Config with `generate.handler.kind: <framework>` and `generate.handler.output.overwrite: true`
+- `generate.go` - `//go:generate` directive
+- Generated files will be created in `api/` and `server/` subdirectories
+
+**Important**: Standalone examples must have `generate.handler.output.overwrite: true` so scaffold files (service.go, middleware.go) are regenerated when the API spec changes.
+
+### 4. Add test case
+Create `examples/server/test/<framework>/testcase/` with:
+- `cfg.yml` - Config for test case
+- `generate.go` - Generate directive that copies shared service.go.src:
+  ```go
+  //go:generate cp ../../testcase/gen.go ./gen.go
+  //go:generate cp ../../testcase/service.go.src ./service.go
+  //go:generate go run github.com/doordash-oss/oapi-codegen-dd/v3/cmd/oapi-codegen -config cfg.yml ../../../api.yml
+  ```
+
+### 5. Update test file
+In `examples/server/test/server_test.go`:
+- Add import for new testcase package
+- Add new framework to the `frameworks` slice in test functions
+
+### 6. Regenerate and test
+```bash
+make generate                    # Regenerate all examples
+cd examples && go build ./...    # Verify builds
+cd examples && go test ./...     # Run tests including new framework
+make lint                        # Check for lint issues
+```

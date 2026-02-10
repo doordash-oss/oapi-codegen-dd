@@ -301,12 +301,10 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 					return nil, fmt.Errorf("error generating code for middleware: %w", err)
 				}
 			}
-			formattedMiddleware := middlewareOut
-			if !useSingleFile {
-				formattedMiddleware, err = FormatCode(middlewareOut)
-				if err != nil {
-					return nil, err
-				}
+			// Scaffold files are always separate files, so always format them
+			formattedMiddleware, err := FormatCode(middlewareOut)
+			if err != nil {
+				return nil, err
 			}
 			// Use directory path as key if scaffold has different output directory
 			middlewareKey := "middleware"
@@ -328,12 +326,10 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		if err != nil {
 			return GeneratedCode{}, fmt.Errorf("error generating code for handler implementation: %w", err)
 		}
-		formatted := out
-		if !useSingleFile {
-			formatted, err = FormatCode(out)
-			if err != nil {
-				return nil, err
-			}
+		// Scaffold files are always separate files, so always format them
+		formatted, err := FormatCode(out)
+		if err != nil {
+			return nil, err
 		}
 		// Use directory path as key if scaffold has different output directory
 		serviceKey := "service"

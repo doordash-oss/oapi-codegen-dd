@@ -293,10 +293,6 @@ type GenerateOptions struct {
 
 	// Validation specifies options for Validate() method generation.
 	Validation ValidationOptions `yaml:"validation"`
-
-	// OverwriteScaffolded forces regeneration of scaffold-once files (e.g., handler_impl, middleware).
-	// Normally these files are only generated if they don't exist. Defaults to false.
-	OverwriteScaffolded bool `yaml:"overwrite-scaffolded"`
 }
 
 type ValidationOptions struct {
@@ -439,6 +435,10 @@ type ScaffoldOutput struct {
 
 	// Package is the package name for the generated file.
 	Package string `yaml:"package"`
+
+	// Overwrite forces regeneration of scaffold-once files (e.g., service.go, middleware.go).
+	// Normally these files are only generated if they don't exist. Defaults to false.
+	Overwrite bool `yaml:"overwrite"`
 }
 
 // ServerOptions specifies options for generating a runnable server main.go.

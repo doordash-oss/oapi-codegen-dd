@@ -1,6 +1,6 @@
 // Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to customize your server setup.
-// To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
 package main
 
 import (
@@ -27,7 +27,7 @@ func main() {
 		LogURI:    true,
 		LogMethod: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			c.Logger().Infof("%s %s %d", v.Method, v.URI, v.Status)
+			log.Printf("%s %s %d", v.Method, v.URI, v.Status)
 			return nil
 		},
 	}))
@@ -35,9 +35,6 @@ func main() {
 	e.Use(middleware.ContextTimeoutWithConfig(middleware.ContextTimeoutConfig{
 		Timeout: 30 * time.Second,
 	}))
-
-	// Add custom middleware from generated scaffold
-	e.Use(handler.ExampleMiddleware())
 
 	// Create your service implementation
 	svc := handler.NewService()

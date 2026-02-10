@@ -1,0 +1,854 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Server Handler Example
+  description: Demonstrates various content types and HTTP methods
+paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check endpoint
+      responses:
+        200:
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: List all users
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: X-Request-ID
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Unique request identifier for tracing
+      responses:
+        200:
+          description: List of users
+          headers:
+            X-Total-Count:
+              description: Total number of users
+              schema:
+                type: integer
+            X-Page-Token:
+              description: Token for next page
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      summary: Create a new user via JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        201:
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/import:
+    post:
+      operationId: importUsers
+      summary: Import users from CSV file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file with user data
+                overwrite:
+                  type: boolean
+                  description: Overwrite existing users
+      responses:
+        200:
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getUser
+      summary: Get a user by ID
+      responses:
+        200:
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteUser
+      summary: Delete a user
+      responses:
+        204:
+          description: User deleted
+
+  /users/{id}/avatar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getUserAvatar
+      summary: Get user avatar image
+      responses:
+        200:
+          description: Avatar image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Avatar not found
+          content:
+            text/plain:
+              schema:
+                type: string
+    put:
+      operationId: uploadUserAvatar
+      summary: Upload user avatar
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        204:
+          description: Avatar uploaded
+
+  /contact:
+    post:
+      operationId: submitContactForm
+      summary: Submit contact form
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - message
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                message:
+                  type: string
+      responses:
+        200:
+          description: Form submitted
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+
+  /notes:
+    post:
+      operationId: createNote
+      summary: Create a note from plain text
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        201:
+          description: Note created
+          content:
+            text/plain:
+              schema:
+                type: integer
+
+  /xml-data:
+    post:
+      operationId: processXmlData
+      summary: Process XML data (demonstrates custom content type handling)
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              $ref: "#/components/schemas/XmlPayload"
+      responses:
+        200:
+          description: Processed XML response
+          content:
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/XmlPayload"
+
+  /export:
+    get:
+      operationId: exportData
+      summary: Export all data as binary archive
+      responses:
+        200:
+          description: Binary archive
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /oauth/token:
+    post:
+      operationId: getOAuthToken
+      summary: Get OAuth token (form-encoded response)
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - grant_type
+                - client_id
+              properties:
+                grant_type:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+      responses:
+        200:
+          description: Token response in form-urlencoded format
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+
+  /items/{type}:
+    get:
+      operationId: getItemsByType
+      summary: Get items by type (tests reserved Go keyword as path param)
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Items of the specified type
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /search:
+    get:
+      operationId: search
+      summary: Search with union type response (oneOf)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Search results - can be users or items
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/User"
+                  - $ref: "#/components/schemas/SearchItem"
+
+  /status:
+    get:
+      operationId: getStatus
+      summary: Get status (uses reusable response)
+      responses:
+        200:
+          $ref: "#/components/responses/StatusResponse"
+
+  /images:
+    post:
+      operationId: uploadImage
+      summary: Upload image (wildcard content type)
+      requestBody:
+        required: true
+        content:
+          image/*:
+            schema:
+              type: string
+              format: binary
+      responses:
+        201:
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  url:
+                    type: string
+
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products with various query param types
+      parameters:
+        - name: ids
+          in: query
+          description: Filter by product IDs (string array)
+          schema:
+            type: array
+            items:
+              type: string
+        - name: tags
+          in: query
+          description: Filter by tags (string array)
+          schema:
+            type: array
+            items:
+              type: string
+        - name: categoryIds
+          in: query
+          description: Filter by category IDs (integer array)
+          schema:
+            type: array
+            items:
+              type: integer
+        - name: minPrice
+          in: query
+          description: Minimum price (number/float)
+          schema:
+            type: number
+        - name: active
+          in: query
+          description: Filter by active status (boolean)
+          schema:
+            type: boolean
+      responses:
+        200:
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /categories/{categoryId}:
+    get:
+      operationId: getCategory
+      summary: Get a category by ID (integer path param)
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Include-Products
+          in: header
+          description: Include products count (boolean header)
+          schema:
+            type: boolean
+        - name: X-Max-Depth
+          in: header
+          description: Max depth for nested categories (integer header)
+          schema:
+            type: integer
+        - name: X-Price-Threshold
+          in: header
+          description: Price threshold filter (number header)
+          schema:
+            type: number
+      responses:
+        200:
+          description: Category found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /items/{type}/{rating}:
+    get:
+      operationId: getItemsByStatus
+      summary: Get items by type and rating (string + number path params)
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: rating
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: Items matching criteria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /users/{id}/posts/{postId}:
+    get:
+      operationId: getUserPost
+      summary: Get a specific post by a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: The post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        404:
+          description: User or post not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create an order (demonstrates typed error responses)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        201:
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        400:
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        409:
+          description: Conflict (e.g., duplicate order)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+
+  /companies:
+    post:
+      operationId: createCompany
+      summary: Create a company with nested address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompanyRequest"
+      responses:
+        201:
+          description: Company created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+components:
+  responses:
+    StatusResponse:
+      description: Status response with headers
+      headers:
+        X-Server-Version:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+              uptime:
+                type: integer
+
+  schemas:
+    SearchItem:
+      type: object
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+
+    CreateUserRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+
+    ImportResult:
+      type: object
+      properties:
+        imported:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    ContactResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        ticketId:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+
+    NoteResponse:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    XmlPayload:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+
+    Category:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+
+    Post:
+      type: object
+      required:
+        - id
+        - userId
+        - title
+        - content
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    NotFoundError:
+      type: object
+      required:
+        - code
+        - message
+        - resource
+      properties:
+        code:
+          type: string
+          example: "NOT_FOUND"
+        message:
+          type: string
+        resource:
+          type: string
+          description: The resource type that was not found
+
+    ValidationError:
+      type: object
+      required:
+        - code
+        - message
+        - fields
+      properties:
+        code:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+        fields:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              error:
+                type: string
+
+    ConflictError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: "CONFLICT"
+        message:
+          type: string
+        existingId:
+          type: string
+          description: ID of the conflicting resource
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+
+    Order:
+      type: object
+      required:
+        - id
+        - productId
+        - quantity
+        - status
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered]
+        createdAt:
+          type: string
+          format: date-time
+
+    Address:
+      type: object
+      required:
+        - street
+        - city
+        - country
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    CreateCompanyRequest:
+      type: object
+      required:
+        - name
+        - address
+      properties:
+        name:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        contacts:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+              phone:
+                type: string
+
+    Company:
+      type: object
+      required:
+        - id
+        - name
+        - address
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        contacts:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+              phone:
+                type: string
+        createdAt:
+          type: string
+          format: date-time

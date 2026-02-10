@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+package: models
+output:
+  directory: models
+  use-single-file: true
+  filename: types.gen.go

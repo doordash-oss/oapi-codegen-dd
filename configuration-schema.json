@@ -113,10 +113,6 @@
         "validation": {
           "$ref": "#/definitions/ValidationOptions",
           "description": "Validation specifies options for Validate() method generation."
-        },
-        "overwrite-scaffolded": {
-          "type": "boolean",
-          "description": "OverwriteScaffolded forces regeneration of scaffold-once files (e.g., handler_impl, middleware). Normally these files are only generated if they don't exist. Defaults to false."
         }
       },
       "required": []
@@ -280,6 +276,10 @@
         "package": {
           "type": "string",
           "description": "Package name for the generated file."
+        },
+        "overwrite": {
+          "type": "boolean",
+          "description": "Force regeneration of scaffold-once files (e.g., service.go, middleware.go). Normally these files are only generated if they don't exist. Defaults to false."
         }
       },
       "required": []

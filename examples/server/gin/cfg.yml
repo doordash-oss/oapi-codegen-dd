@@ -8,6 +8,8 @@ error-mapping:
 generate:
   handler:
     kind: gin
+    output:
+      overwrite: true
     server:
       directory: server
       handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/gin/api

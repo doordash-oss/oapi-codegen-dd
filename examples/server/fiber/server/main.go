@@ -1,6 +1,6 @@
 // Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to customize your server setup.
-// To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
 package main
 
 import (
@@ -30,9 +30,6 @@ func main() {
 	app.Use(recover.New())
 	app.Use(requestid.New())
 	app.Use(logger.New())
-
-	// Add custom middleware from generated scaffold
-	app.Use(handler.ExampleMiddleware())
 
 	// Create your service implementation
 	svc := handler.NewService()

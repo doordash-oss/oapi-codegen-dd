@@ -1,6 +1,6 @@
 // Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to customize your server setup.
-// To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
 package main
 
 import (
@@ -19,25 +19,21 @@ func main() {
 	// Create your service implementation
 	svc := handler.NewService()
 
-	// Create router with all available middleware
-	router := handler.NewRouter(svc,
-		handler.WithMiddleware(handler.RecoveryMiddleware),
-		handler.WithMiddleware(handler.RequestIDMiddleware),
-		handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),
-		handler.WithMiddleware(handler.CORSMiddleware(handler.DefaultCORSConfig())),
-		handler.WithMiddleware(handler.TimeoutMiddleware(30*time.Second)),
-	)
+	// Create router
+	// Add your middleware here
+	router := handler.NewRouter(svc)
 
 	// Configure server
 	port := 8080
 	addr := fmt.Sprintf(":%d", port)
+	timeout := 30 * time.Second
 
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+		IdleTimeout:  2 * timeout,
 	}
 
 	// Start server in goroutine

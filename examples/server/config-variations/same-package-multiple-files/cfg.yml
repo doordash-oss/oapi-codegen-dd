@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+package: api
+output:
+  use-single-file: false
+generate:
+  handler:
+    kind: chi
+    output:
+      overwrite: true

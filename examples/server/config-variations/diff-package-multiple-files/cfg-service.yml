@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+package: models
+output:
+  use-single-file: false
+additional-imports:
+  - package: "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/config-variations/diff-package-multiple-files/models"
+generate:
+  models: false
+  handler:
+    kind: chi
+    models-package-alias: models
+    output:
+      overwrite: true
+      directory: service
+      package: service

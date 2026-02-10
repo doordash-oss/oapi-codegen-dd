@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+package: api
+output:
+  use-single-file: true
+  filename: types.gen.go
+generate:
+  handler:
+    kind: chi
+    name: CustomServiceName
+    output:
+      overwrite: true

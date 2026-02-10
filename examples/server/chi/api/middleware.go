@@ -1,6 +1,6 @@
 // Package api This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to add your middleware logic.
-// To regenerate, delete this file or set generate.overwrite-scaffolded: true in config.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
 package api
 
 import (

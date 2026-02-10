@@ -148,7 +148,9 @@ func main() {
 		}
 
 		// Skip scaffold files if they exist and overwrite is not set
-		if isScaffold && (cfg.Generate == nil || !cfg.Generate.OverwriteScaffolded) {
+		scaffoldOverwrite := cfg.Generate != nil && cfg.Generate.Handler != nil &&
+			cfg.Generate.Handler.Output != nil && cfg.Generate.Handler.Output.Overwrite
+		if isScaffold && !scaffoldOverwrite {
 			if _, err := os.Stat(filePath); err == nil {
 				continue
 			}

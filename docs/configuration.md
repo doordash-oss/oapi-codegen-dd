@@ -10,11 +10,11 @@ Create a configuration file (e.g., `cfg.yaml`) and reference it when running oap
 go run github.com/doordash-oss/oapi-codegen-dd/v3/cmd/oapi-codegen --config cfg.yaml spec.yaml
 ```
 
-> [!TIP]
-> Use the JSON schema for IDE autocomplete and validation:
-> ```yaml
-> # yaml-language-server: $schema=https://raw.githubusercontent.com/doordash/oapi-codegen/HEAD/configuration-schema.json
-> ```
+!!! tip
+    Use the JSON schema for IDE autocomplete and validation:
+    ```yaml
+    # yaml-language-server: $schema=https://raw.githubusercontent.com/doordash/oapi-codegen/HEAD/configuration-schema.json
+    ```
 
 ## Configuration Options
 
@@ -59,6 +59,9 @@ output:
   use-single-file: false
 ```
 
+!!! note
+    When `use-single-file: false`, the generator automatically creates a subdirectory named after the `package` value. For example, with `package: api` and `directory: "."`, files are written to `./api/`. To control the exact output location, set `directory` explicitly (e.g., `directory: api`).
+
 #### `output.directory`
 **Type:** `string` | **Default:** `"."`
 
@@ -68,6 +71,9 @@ Directory where generated files should be placed.
 output:
   directory: "./generated"
 ```
+
+!!! note
+    When `use-single-file: false`, the package name is appended as a subdirectory. For example, `directory: "./generated"` with `package: api` outputs to `./generated/api/`. When `use-single-file: true`, files are written directly to the specified directory.
 
 #### `output.filename`
 **Type:** `string` | **Default:** `"gen.go"`
@@ -123,6 +129,28 @@ generate:
   always-prefix-enum-values: false
 ```
 
+#### `generate.models`
+**Type:** `boolean` | **Default:** `true`
+
+Generate model types. Set to `false` when models are generated in a separate package and you only want to generate client or handler code.
+
+```yaml
+generate:
+  models: false
+```
+
+#### `generate.handler.output.overwrite`
+**Type:** `boolean` | **Default:** `false`
+
+Force regeneration of scaffold-once files (e.g., `service.go`, `middleware.go`). Normally these files are only generated if they don't exist.
+
+```yaml
+generate:
+  handler:
+    output:
+      overwrite: true
+```
+
 ### Validation Settings
 
 #### `generate.validation.skip`
@@ -157,6 +185,131 @@ generate:
   validation:
     response: true
 ```
+
+### Handler/Server Generation
+
+Generate server-side handler code with a service interface pattern. Supports multiple router frameworks.
+
+#### `generate.handler.kind`
+**Type:** `string` | **Required**
+
+The router/framework to generate handler code for. Supported values:
+
+- `chi` - [go-chi/chi](https://github.com/go-chi/chi)
+- `echo` - [labstack/echo](https://github.com/labstack/echo)
+- `fiber` - [gofiber/fiber](https://github.com/gofiber/fiber)
+- `gin` - [gin-gonic/gin](https://github.com/gin-gonic/gin)
+- `std-http` - Go standard library `net/http`
+
+```yaml
+generate:
+  handler:
+    kind: chi
+```
+
+#### `generate.handler.name`
+**Type:** `string` | **Default:** `"Service"`
+
+Name of the generated service interface.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    name: "APIService"
+```
+
+#### `generate.handler.models-package-alias`
+**Type:** `string` | **Default:** `""`
+
+Package alias to prefix model types with. Used when models are generated in a separate package (`generate.models: false`).
+
+```yaml
+generate:
+  models: false
+  handler:
+    kind: chi
+    models-package-alias: types
+```
+
+This generates `types.User` instead of `User` in the handler code.
+
+#### `generate.handler.validation.request`
+**Type:** `boolean` | **Default:** `false`
+
+Enable validation of incoming requests in handlers.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    validation:
+      request: true
+```
+
+#### `generate.handler.validation.response`
+**Type:** `boolean` | **Default:** `false`
+
+Enable validation of outgoing responses in handlers. Useful for contract testing.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    validation:
+      response: true
+```
+
+#### `generate.handler.output`
+**Type:** `object` | **Default:** uses root `output` settings
+
+Output settings for scaffolded handler files (`service.go`, `middleware.go`).
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    output:
+      directory: api
+      package: api
+```
+
+#### `generate.handler.middleware`
+**Type:** `object` | **Default:** `null`
+
+Enable generation of `middleware.go` scaffold file. If not set, no middleware file is generated.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    middleware: {}
+```
+
+#### `generate.handler.server`
+**Type:** `object` | **Default:** `null`
+
+Enable generation of a runnable `server/main.go` file.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    server:
+      directory: server
+      port: 8080
+      timeout: 30
+      handler-package: github.com/myorg/myapi/api
+```
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `directory` | `string` | `"server"` | Output directory for `main.go` |
+| `port` | `integer` | `8080` | Port the server listens on |
+| `timeout` | `integer` | `30` | Request timeout in seconds |
+| `handler-package` | `string` | *required* | Full import path of the handler package |
+
+See [examples/server/](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/server){:target="_blank"} for complete examples of handler generation with different frameworks.
 
 ## Filtering
 
