@@ -238,7 +238,7 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["beego", "chi", "echo", "fasthttp", "fiber", "gin", "go-zero", "gorilla-mux", "kratos", "std-http"],
+          "enum": ["beego", "chi", "echo", "fasthttp", "fiber", "gin", "goframe", "go-zero", "gorilla-mux", "kratos", "std-http"],
           "description": "Router/framework to generate for. Required."
         },
         "models-package-alias": {

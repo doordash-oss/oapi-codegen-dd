@@ -1,0 +1,82 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/* GoFrame (gogf/gf) framework template blocks */}}
+
+{{define "router-import"}}"github.com/gogf/gf/v2/net/ghttp"{{end}}
+
+{{/* GoFrame uses r.PathValue() since we copy params from GoFrame request to http.Request */}}
+{{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
+
+{{define "router-config"}}
+type routerConfig struct {
+    middlewares []ghttp.HandlerFunc
+}
+
+// WithMiddleware adds middleware to the router.
+func WithMiddleware(mw ghttp.HandlerFunc) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+{{end}}
+
+{{define "new-router"}}
+{{- $config := .Config -}}
+{{- $operations := .Operations -}}
+{{- $serviceName := $config.Generate.Handler.Name -}}
+// NewRouter registers routes on the given GoFrame server with the service implementation.
+func NewRouter(s *ghttp.Server, svc {{ $serviceName }}Interface, opts ...RouterOption) {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    adapter := NewHTTPAdapter(svc)
+
+    // Apply middleware to all routes
+    for _, mw := range cfg.middlewares {
+        s.Use(mw)
+    }
+
+    {{- range $operations }}{{ $op := . }}
+        s.BindHandler("{{ $op.Method | caps }}:{{ escapeGoString $op.Path }}", func(r *ghttp.Request) {
+            {{- if $op.PathParams }}
+            // Copy path params to request for http.Handler compatibility
+            {{- range $op.PathParams.Schema.Properties }}
+            r.Request.SetPathValue("{{ .JsonFieldName }}", r.Get("{{ .JsonFieldName }}").String())
+            {{- end }}
+            {{- end }}
+            adapter.{{ $op.ID | ucFirst }}(r.Response.Writer, r.Request)
+        })
+    {{- end }}
+}
+
+// Handler returns an http.Handler for use with net/http or testing.
+// This provides a standard http.Handler interface without requiring a GoFrame server.
+func Handler(svc {{ $serviceName }}Interface) http.Handler {
+    adapter := NewHTTPAdapter(svc)
+    mux := http.NewServeMux()
+
+    {{- range $operations }}{{ $op := . }}
+        mux.HandleFunc("{{ $op.Method | caps }} {{ $op.Path }}", adapter.{{ $op.ID | ucFirst }})
+    {{- end }}
+
+    return mux
+}
+{{end}}
+
+{{template "handler/adapter.tmpl" .}}
+{{template "handler/router.tmpl" .}}

@@ -18,6 +18,7 @@ import (
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
 	ginapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gin/testcase"
 	gozeroapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/go-zero/testcase"
+	goframeapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/goframe/testcase"
 	gorillamuxapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/gorilla-mux/testcase"
 	kratosapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/kratos/testcase"
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/std-http/testcase"
@@ -98,9 +99,9 @@ func (f fasthttpHandler) Do(req *http.Request) (*http.Response, error) {
 	}
 
 	// Copy response headers
-	ctx.Response.Header.VisitAll(func(key, value []byte) {
+	for key, value := range ctx.Response.Header.All() {
 		resp.Header.Add(string(key), string(value))
-	})
+	}
 
 	return resp, nil
 }
@@ -130,6 +131,7 @@ func testServers() []serverTestCase {
 			return app
 		}()}},
 		{"go-zero", httpHandler{gozeroapi.NewRouter(gozeroapi.NewService())}},
+		{"goframe", httpHandler{goframeapi.Handler(goframeapi.NewService())}},
 		{"gorilla-mux", httpHandler{gorillamuxapi.NewRouter(gorillamuxapi.NewService())}},
 		{"kratos", httpHandler{kratosapi.NewRouter(kratosapi.NewService())}},
 		{"fasthttp", fasthttpHandler{fasthttpapi.Handler(fasthttpapi.NewService())}},

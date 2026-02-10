@@ -270,7 +270,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			if !useSingleFile {
 				formatted, err = FormatCode(out)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("error formatting %s: %w", tmpl, err)
 				}
 			}
 			typesOut[strcase.ToSnake(tmpl)] = formatted
@@ -304,8 +304,9 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			// Scaffold files are always separate files, so always format them
 			formattedMiddleware, err := FormatCode(middlewareOut)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error formatting middleware: %w", err)
 			}
+
 			// Use directory path as key if scaffold has different output directory
 			middlewareKey := "middleware"
 			if scaffoldOutput.Directory != "" && scaffoldOutput.Directory != p.cfg.Output.Directory {
@@ -326,11 +327,13 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		if err != nil {
 			return GeneratedCode{}, fmt.Errorf("error generating code for handler implementation: %w", err)
 		}
+
 		// Scaffold files are always separate files, so always format them
 		formatted, err := FormatCode(out)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error formatting service: %w", err)
 		}
+
 		// Use directory path as key if scaffold has different output directory
 		serviceKey := "service"
 		if scaffoldOutput.Directory != "" && scaffoldOutput.Directory != p.cfg.Output.Directory {
@@ -367,7 +370,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 
 			formatted, err := FormatCode(out)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error formatting server: %w", err)
 			}
 			scaffoldOut[serverOutput.Directory+"/main"] = formatted
 		}
@@ -590,7 +593,7 @@ func loadTemplates(cfg Configuration) (*template.Template, error) {
 // It optimizes imports and formats the code using gofmt.
 func FormatCode(src string) (string, error) {
 	src = strings.Trim(src, "\n") + "\n"
-	if src == "" {
+	if src == "\n" || src == "" {
 		return src, nil
 	}
 
