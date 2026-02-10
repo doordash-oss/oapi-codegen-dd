@@ -17,12 +17,42 @@ If you already have a go-zero server, register the generated routes:
 ```go
 import handler "your/module/api"
 
-// Create your service implementation
 svc := handler.NewService()
-
-// Register routes with your existing server
 handler.RegisterRoutes(server, svc)
 ```
+
+## Integrating with go-zero Project Structure
+
+For projects using go-zero's standard layout (`goctl api new`), the generated code maps as follows:
+
+```
+├── internal
+│   ├── handler/          # ← gen.go (adapter, routes)
+│   ├── logic/            # ← service.go (business logic)
+│   ├── svc/              # ← pass dependencies to NewService()
+│   └── types/            # ← generated request/response types (in gen.go)
+```
+
+Example integration in `greet.go`:
+
+```go
+import (
+    "your/module/internal/handler"
+    "your/module/internal/svc"
+)
+
+func main() {
+    // ... server setup ...
+
+    ctx := svc.NewServiceContext(c)
+    svc := handler.NewServiceWithContext(ctx) // implement this wrapper
+    handler.RegisterRoutes(server, svc)
+
+    server.Start()
+}
+```
+
+The `ServiceInterface` can wrap your `svc.ServiceContext` to access config, redis, etc.
 
 ## Running the Server
 
