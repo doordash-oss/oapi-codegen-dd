@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/beego/beego/v2/server/web"
+	beegoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/beego/testcase"
 	chiapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/chi/testcase"
 	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo/testcase"
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
@@ -55,7 +57,11 @@ func (f fiberHandler) Do(req *http.Request) (*http.Response, error) {
 }
 
 func testServers() []serverTestCase {
+	// Initialize beego for testing
+	web.BConfig.RunMode = web.DEV
+
 	return []serverTestCase{
+		{"beego", httpHandler{beegoapi.NewRouter(beegoapi.NewService())}},
 		{"chi", httpHandler{chiapi.NewRouter(chiapi.NewService())}},
 		{"std-http", httpHandler{stdhttpapi.NewRouter(stdhttpapi.NewService())}},
 		{"echo", httpHandler{func() http.Handler {

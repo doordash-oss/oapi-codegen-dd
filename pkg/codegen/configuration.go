@@ -323,6 +323,8 @@ type Client struct {
 type HandlerKind string
 
 const (
+	// HandlerKindBeego generates handlers for the Beego framework.
+	HandlerKindBeego HandlerKind = "beego"
 	// HandlerKindChi generates handlers for the chi router.
 	HandlerKindChi HandlerKind = "chi"
 	// HandlerKindEcho generates handlers for the Echo framework.
@@ -338,7 +340,7 @@ const (
 // IsValid returns true if the handler kind is a supported value.
 func (k HandlerKind) IsValid() bool {
 	switch k {
-	case HandlerKindChi, HandlerKindEcho, HandlerKindFiber, HandlerKindGin, HandlerKindStdHTTP:
+	case HandlerKindBeego, HandlerKindChi, HandlerKindEcho, HandlerKindFiber, HandlerKindGin, HandlerKindStdHTTP:
 		return true
 	default:
 		return false

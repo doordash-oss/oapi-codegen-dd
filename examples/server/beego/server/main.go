@@ -1,0 +1,89 @@
+// Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
+// Modify it freely to customize your server setup.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/beego/beego/v2/server/web"
+	beecontext "github.com/beego/beego/v2/server/web/context"
+	"github.com/beego/beego/v2/server/web/filter/cors"
+	handler "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/beego/api"
+	"github.com/google/uuid"
+)
+
+func main() {
+	// Configure Beego
+	web.BConfig.Listen.HTTPPort = 8080
+	web.BConfig.RunMode = web.PROD
+	web.BConfig.CopyRequestBody = true
+	web.BConfig.RecoverPanic = true // Recovery middleware
+
+	// Create Beego app
+	app := web.NewHttpSever()
+
+	// Add middleware via InsertFilter
+
+	// 1. Request ID middleware
+	_ = app.Handlers.InsertFilter("/*", web.BeforeRouter, func(ctx *beecontext.Context) {
+		requestID := ctx.Request.Header.Get("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
+		ctx.ResponseWriter.Header().Set("X-Request-ID", requestID)
+	})
+
+	// 2. Logging middleware
+	_ = app.Handlers.InsertFilter("/*", web.BeforeRouter, func(ctx *beecontext.Context) {
+		start := time.Now()
+		ctx.Input.SetData("start_time", start)
+	})
+	_ = app.Handlers.InsertFilter("/*", web.AfterExec, func(ctx *beecontext.Context) {
+		start := ctx.Input.GetData("start_time").(time.Time)
+		log.Printf("%s %s %d %v", ctx.Request.Method, ctx.Request.URL.Path, ctx.ResponseWriter.Status, time.Since(start))
+	})
+
+	// 3. CORS middleware
+	_ = app.Handlers.InsertFilter("/*", web.BeforeRouter, cors.Allow(&cors.Options{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
+	// 4. Timeout middleware
+	_ = app.Handlers.InsertFilter("/*", web.BeforeRouter, func(ctx *beecontext.Context) {
+		timeoutCtx, cancel := context.WithTimeout(ctx.Request.Context(), 30*time.Second)
+		ctx.Request = ctx.Request.WithContext(timeoutCtx)
+		defer cancel()
+	})
+
+	// 5. Custom middleware from generated scaffold
+	_ = app.Handlers.InsertFilter("/*", web.BeforeRouter, handler.ExampleMiddleware())
+
+	// Create your service implementation
+	svc := handler.NewService()
+
+	// Register routes on the app's handler registry
+	handler.RegisterRoutes(app.Handlers, svc)
+
+	// Start server in goroutine
+	go func() {
+		log.Printf("Starting Beego server on :%d", 8080)
+		app.Run("")
+	}()
+
+	// Wait for interrupt signal for graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+}

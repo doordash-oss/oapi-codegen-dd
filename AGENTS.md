@@ -167,7 +167,7 @@ In `configuration-schema.json`:
 ### 2. Create framework-specific templates
 Create directory `pkg/codegen/templates/handler/<framework>/` with:
 - `handler.tmpl` - **Required**. Main handler template that includes shared templates via `{{template "..."}}`. See existing frameworks for pattern.
-- `server.tmpl` - Optional. Override if framework needs custom server setup (e.g., Echo, Fiber, Gin have custom ones)
+- `server.tmpl` - **Required**. Custom server setup using the framework's native server/middleware. Must wire up all 5 middleware types (recovery, request-id, logging, CORS, timeout) plus custom middleware from scaffold.
 - `middleware.tmpl` - Optional. Override if framework needs custom middleware pattern (e.g., Echo has custom one)
 
 Templates use `{{define "handler-<framework>"}}` blocks. The shared templates in `pkg/codegen/templates/handler/` provide common functionality:
@@ -178,6 +178,17 @@ Templates use `{{define "handler-<framework>"}}` blocks. The shared templates in
 - `response-data.tmpl` - Response data types
 - `middleware.tmpl` - Default middleware scaffold
 - `server.tmpl` - Default server main.go
+
+### Server template middleware requirements
+Each framework's `server.tmpl` must demonstrate proper middleware setup:
+1. **Recovery** - Panic recovery middleware
+2. **Request ID** - Add unique request ID to each request
+3. **Logging** - Log request method, path, status
+4. **CORS** - Cross-origin resource sharing
+5. **Timeout** - Request timeout handling
+6. **Custom middleware** - Wire up `handler.ExampleMiddleware()` when `$config.Generate.Handler.Middleware` is set
+
+Use the framework's native middleware where available. See `echo/server.tmpl` for reference.
 
 ### 3. Add standalone example
 Create `examples/server/<framework>/` with:
@@ -204,8 +215,12 @@ In `examples/server/test/server_test.go`:
 
 ### 6. Regenerate and test
 ```bash
-make generate                    # Regenerate all examples
+# Only regenerate the specific examples you're working on, NOT all examples
+cd examples/server/<framework> && go generate ./...
+cd examples/server/test/<framework> && go generate ./...
 cd examples && go build ./...    # Verify builds
-cd examples && go test ./...     # Run tests including new framework
+cd examples && go test ./server/test/...     # Run tests including new framework
 make lint                        # Check for lint issues
 ```
+
+**Important**: Do NOT run `make generate` when adding a new framework - only regenerate the specific examples you're working on.
