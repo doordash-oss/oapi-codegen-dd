@@ -194,9 +194,22 @@ Use the framework's native middleware where available. See `echo/server.tmpl` fo
 Create `examples/server/<framework>/` with:
 - `cfg.yml` - Config with `generate.handler.kind: <framework>` and `generate.handler.output.overwrite: true`
 - `generate.go` - `//go:generate` directive
+- `README.md` - Documentation for the example (see below)
 - Generated files will be created in `api/` and `server/` subdirectories
 
 **Important**: Standalone examples must have `generate.handler.output.overwrite: true` so scaffold files (service.go, middleware.go) are regenerated when the API spec changes.
+
+#### README.md requirements
+Each server example must have a README.md with:
+- Framework name and link to the framework's GitHub repository
+- Description section with framework-specific notes (middleware pattern, path params, context type, etc.)
+- Shell block showing how to start the server
+- Separate curl examples for each of the 5 API endpoints:
+  - `GET /health` - Health check
+  - `GET /users` - List users
+  - `POST /users` - Create user
+  - `GET /users/{id}` - Get user by ID
+  - `DELETE /users/{id}` - Delete user
 
 ### 4. Add test case
 Create `examples/server/test/<framework>/testcase/` with:
