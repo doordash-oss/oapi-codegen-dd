@@ -27,6 +27,12 @@ on the real value-add for your organization.
 - **Custom client types** - Wrap generated clients with your own types for additional functionality
 - **Error mapping** - Map response types to implement the `error` interface automatically
 
+### Server Generation
+- **Complete server scaffolding** - Generate service interfaces, HTTP adapters, routers, and server main.go
+- **12 framework support** - Chi, Echo, Gin, Fiber, std-http, Beego, go-zero, Kratos, GoFrame, Hertz, gorilla-mux, fasthttp
+- **Clean architecture** - Service interface pattern separates business logic from HTTP handling
+- **Request/response validation** - Optional validation in generated handlers
+
 ### Configuration & Filtering
 - **YAML-based configuration** with JSON schema validation
 - **Flexible filtering** - Include/exclude by paths, tags, operation IDs, schema properties, or extensions
@@ -50,10 +56,10 @@ The [examples directory](examples) contains cases with useful examples how to us
 
 
 ## Migrate from v2
-This project is a fork of [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) v2.  
-Due to the lack of OpenAPI 3.1 support in the original repository, we introduced a fully reworked implementation.  
-While this includes some breaking changes, it also brings more flexible generator and parser APIs for finer control over code generation.  
-If you're migrating from v2, please refer to the [migration guide](docs/migrate-from-v2.md) for important differences.
+This project is a fork of [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) v2.
+Due to the lack of OpenAPI 3.1 support in the original repository, we introduced a fully reworked implementation.
+While this includes some breaking changes, it also brings more flexible generator and parser APIs for finer control over code generation.
+If you're migrating from v2, please refer to the [migration guide](https://doordash-oss.github.io/oapi-codegen-dd/migrate-from-v2/) for important differences.
 
 ## License
 This project is licensed under the Apache License 2.0.  

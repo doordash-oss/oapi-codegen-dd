@@ -3,6 +3,7 @@
 .vscode/
 bin/
 .data/
+.site/
 *.iml
 .go-version
 gosec-report*.json
