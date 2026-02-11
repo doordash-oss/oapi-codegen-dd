@@ -1,0 +1,11 @@
+overlay: 1.0.0
+info:
+  title: Add Go Extensions
+  version: 1.0.0
+actions:
+  - target: $.components.schemas.User
+    update:
+      x-go-name: UserModel
+  - target: $.components.schemas.User.properties.id
+    update:
+      x-go-name: UserID

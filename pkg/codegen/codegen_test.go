@@ -364,3 +364,90 @@ func TestOperationResponseAliasReusesSameType(t *testing.T) {
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
 }
+
+func TestOverlayAppliesExtensions(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Overlay: &OverlayOptions{
+			Sources: []string{"testdata/overlay-add-extensions.yml"},
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "overlay-base.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// The overlay adds x-go-name: UserModel to the User schema
+	assert.Contains(t, code, "type UserModel struct")
+	assert.NotContains(t, code, "type User struct")
+
+	// The overlay adds x-go-name: UserID to the id property
+	assert.Contains(t, code, "UserID")
+}
+
+func TestOverlayRemovesPath(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Overlay: &OverlayOptions{
+			Sources: []string{"testdata/overlay-remove-internal.yml"},
+		},
+		Generate: &GenerateOptions{
+			Client: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "overlay-base.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// The overlay removes /internal/health path
+	assert.NotContains(t, code, "HealthCheck")
+	assert.NotContains(t, code, "healthCheck")
+
+	// But /users should still be there
+	assert.Contains(t, code, "GetUsers")
+}
+
+func TestOverlayMultipleSources(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Overlay: &OverlayOptions{
+			Sources: []string{
+				"testdata/overlay-add-extensions.yml",
+				"testdata/overlay-remove-internal.yml",
+			},
+		},
+		Generate: &GenerateOptions{
+			Client: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "overlay-base.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// First overlay: x-go-name applied
+	assert.Contains(t, code, "type UserModel struct")
+
+	// Second overlay: internal path removed
+	assert.NotContains(t, code, "HealthCheck")
+
+	// GetUsers should still exist
+	assert.Contains(t, code, "GetUsers")
+}
+
+func TestOverlayInvalidSource(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Overlay: &OverlayOptions{
+			Sources: []string{"testdata/nonexistent-overlay.yml"},
+		},
+	}
+
+	_, err := Generate([]byte(readTestdata(t, "overlay-base.yml")), cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error applying overlays")
+}

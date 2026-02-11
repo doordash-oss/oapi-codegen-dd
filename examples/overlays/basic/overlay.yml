@@ -1,0 +1,40 @@
+# This overlay demonstrates common use cases:
+# 1. Adding x-go-name extensions for Go-friendly type names
+# 2. Removing internal endpoints from generated code
+
+overlay: 1.0.0
+info:
+  title: Go Extensions and Cleanup
+  version: 1.0.0
+actions:
+  # Rename schemas to Go-friendly names
+  - target: $.components.schemas.user
+    update:
+      x-go-name: User
+  - target: $.components.schemas.create_user_request
+    update:
+      x-go-name: CreateUserRequest
+
+  # Rename properties to Go-friendly names
+  - target: $.components.schemas.user.properties.user_id
+    update:
+      x-go-name: ID
+  - target: $.components.schemas.user.properties.email_address
+    update:
+      x-go-name: Email
+  - target: $.components.schemas.user.properties.full_name
+    update:
+      x-go-name: Name
+  - target: $.components.schemas.user.properties.created_at
+    update:
+      x-go-name: CreatedAt
+  - target: $.components.schemas.create_user_request.properties.email_address
+    update:
+      x-go-name: Email
+  - target: $.components.schemas.create_user_request.properties.full_name
+    update:
+      x-go-name: Name
+
+  # Remove internal endpoint - not needed in client code
+  - target: $.paths['/internal/health']
+    remove: true

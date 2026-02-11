@@ -37,6 +37,7 @@ on the real value-add for your organization.
 - **YAML-based configuration** with JSON schema validation
 - **Flexible filtering** - Include/exclude by paths, tags, operation IDs, schema properties, or extensions
 - **Transitive pruning** - Automatically remove schemas that are only referenced by filtered-out properties
+- **[OpenAPI Overlays](https://doordash-oss.github.io/oapi-codegen-dd/overlays/)** - Modify specs without editing originals (add extensions, remove paths)
 
 ### Programmatic Access
 - **Runtime package** - Public API for working with generated types

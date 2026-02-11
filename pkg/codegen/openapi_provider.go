@@ -26,6 +26,14 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 		return nil, err
 	}
 
+	// Apply overlays before filtering and pruning
+	if cfg.Overlay != nil && len(cfg.Overlay.Sources) > 0 {
+		doc, err = applyOverlays(doc, cfg.Overlay.Sources)
+		if err != nil {
+			return nil, fmt.Errorf("error applying overlays: %w", err)
+		}
+	}
+
 	if _, err = doc.BuildV3Model(); err != nil {
 		return nil, fmt.Errorf("error building model: %w", err)
 	}

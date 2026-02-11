@@ -29,6 +29,10 @@
       "$ref": "#/definitions/FilterConfig",
       "description": "Filter is the configuration for filtering the paths and operations to be parsed."
     },
+    "overlay": {
+      "$ref": "#/definitions/OverlayOptions",
+      "description": "Overlay specifies OpenAPI Overlay files to apply to the spec before generation."
+    },
     "additional-imports": {
       "type": "array",
       "description": "AdditionalImports defines any additional Go imports to add to the generated code.",
@@ -170,6 +174,21 @@
         "extensions": {
           "type": "array",
           "description": "List of extension names to include or exclude",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": []
+    },
+    "OverlayOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Specifies OpenAPI Overlay files to apply to the spec before generation. See https://spec.openapis.org/overlay/v1.0.0.html",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "description": "List of overlay files to apply to the OpenAPI spec. Each source can be a file path or URL. Overlays are applied in order.",
           "items": {
             "type": "string"
           }

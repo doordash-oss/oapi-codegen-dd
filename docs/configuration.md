@@ -47,6 +47,22 @@ When `true`, keeps all types from the spec even if they're not referenced by any
 skip-prune: true
 ```
 
+### Overlay Settings
+
+#### `overlay.sources`
+**Type:** `string[]` | **Default:** `[]`
+
+List of overlay files to apply to the OpenAPI spec before code generation. Each source can be a file path or URL. Overlays are applied in order.
+
+```yaml
+overlay:
+  sources:
+    - ./overlays/add-go-names.yaml
+    - https://example.com/shared-overlay.yaml
+```
+
+See [Overlays](overlays.md) for detailed documentation and examples.
+
 ### Output Settings
 
 #### `output.use-single-file`

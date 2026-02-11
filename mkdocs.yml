@@ -67,6 +67,7 @@ nav:
       - 'Welcome': 'index.md'
       - 'Migrate from v2': 'migrate-from-v2.md'
   - 'Configuration': 'configuration.md'
+  - 'Overlays': 'overlays.md'
   - 'Server Generation': 'server-generation.md'
   - 'Validation': 'validation.md'
   - 'Union Types': 'union-types.md'

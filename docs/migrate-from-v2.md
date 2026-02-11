@@ -130,8 +130,16 @@ See [Server Generation](server-generation.md) for complete documentation.
 
 ## Overlay support
 
-!!! info "Coming soon"
-    Overlay support is planned for a future release. Currently, you can use spec merge functionality as an alternative.
+v3 supports [OpenAPI Overlays](overlays.md), allowing you to modify specs without editing the original files:
+
+```yaml
+overlay:
+  sources:
+    - ./overlays/add-go-names.yaml
+    - https://example.com/shared-overlay.yaml
+```
+
+See [Overlays documentation](overlays.md) for details.
 
 ## Configuration changes
 
@@ -182,7 +190,7 @@ output-options: ➡️renamed to output
     nullable-type: ❌
     disable-type-aliases-for-type: ❌
     name-normalizer: ❌
-    overlay: ❌ coming soon
+    overlay: ➡️ moved to config root as overlay.sources
     yaml-tags: ❌
     client-response-bytes-function: ❌
     prefer-skip-optional-pointer: ❌

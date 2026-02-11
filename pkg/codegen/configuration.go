@@ -39,6 +39,7 @@ type Configuration struct {
 
 	Generate *GenerateOptions `yaml:"generate"`
 	Filter   FilterConfig     `yaml:"filter,omitempty"`
+	Overlay  *OverlayOptions  `yaml:"overlay,omitempty"`
 
 	AdditionalImports []AdditionalImport `yaml:"additional-imports,omitempty"`
 	ErrorMapping      map[string]string  `yaml:"error-mapping,omitempty"`
@@ -312,6 +313,14 @@ type Output struct {
 	UseSingleFile bool   `yaml:"use-single-file"`
 	Directory     string `yaml:"directory"`
 	Filename      string `yaml:"filename"`
+}
+
+// OverlayOptions specifies OpenAPI Overlay files to apply to the spec before generation.
+// See https://spec.openapis.org/overlay/v1.0.0.html for the Overlay specification.
+type OverlayOptions struct {
+	// Sources is a list of overlay files to apply to the OpenAPI spec.
+	// Each source can be a file path or URL. Overlays are applied in order.
+	Sources []string `yaml:"sources"`
 }
 
 type Client struct {

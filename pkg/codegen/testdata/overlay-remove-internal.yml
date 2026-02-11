@@ -1,0 +1,7 @@
+overlay: 1.0.0
+info:
+  title: Remove Internal Endpoints
+  version: 1.0.0
+actions:
+  - target: $.paths['/internal/health']
+    remove: true

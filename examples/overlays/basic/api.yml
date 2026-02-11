@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: User API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      summary: Get all users
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/user'
+    post:
+      operationId: createUser
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/create_user_request'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/user'
+  /internal/health:
+    get:
+      operationId: healthCheck
+      summary: Internal health check endpoint
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    user:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email_address:
+          type: string
+          format: email
+        full_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    create_user_request:
+      type: object
+      required:
+        - email_address
+        - full_name
+      properties:
+        email_address:
+          type: string
+          format: email
+        full_name:
+          type: string
