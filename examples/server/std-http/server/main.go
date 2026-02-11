@@ -20,8 +20,14 @@ func main() {
 	svc := handler.NewService()
 
 	// Create router
-	// Add your middleware here
-	router := handler.NewRouter(svc)
+	// With middleware from handler package
+	router := handler.NewRouter(svc,
+		handler.WithMiddleware(handler.RecoveryMiddleware),
+		handler.WithMiddleware(handler.RequestIDMiddleware),
+		handler.WithMiddleware(handler.LoggingMiddleware(log.Printf)),
+		handler.WithMiddleware(handler.CORSMiddleware(handler.DefaultCORSConfig())),
+		handler.WithMiddleware(handler.TimeoutMiddleware(30*time.Second)),
+	)
 
 	// Configure server
 	port := 8080

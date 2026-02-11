@@ -114,7 +114,7 @@ Server code generation is now supported with a completely redesigned architectur
 | [Fiber](https://github.com/gofiber/fiber) | ✅ `fiber-server` | ✅ `fiber` |
 | [gorilla/mux](https://github.com/gorilla/mux) | ✅ `gorilla-server` | ✅ `gorilla-mux` |
 | [std-http](https://pkg.go.dev/net/http) | ✅ `std-http-server` | ✅ `std-http` |
-| [Iris](https://github.com/kataras/iris) | ✅ `iris-server` | ❌ |
+| [Iris](https://github.com/kataras/iris) | ✅ `iris-server` | ✅ `iris` |
 | strict-server | ✅ `strict-server` | ❌ (service pattern is similar) |
 | [Beego](https://github.com/beego/beego) | ❌ | ✅ `beego` |
 | [go-zero](https://github.com/zeromicro/go-zero) | ❌ | ✅ `go-zero` |
@@ -157,7 +157,7 @@ generate: ✅
     omit-description: bool
     default-int-type: "int64"
     handler:
-      kind: string (chi, echo, gin, fiber, std-http, beego, go-zero, kratos, gorilla-mux, goframe, hertz, fasthttp)
+      kind: string (chi, echo, gin, fiber, std-http, beego, go-zero, kratos, gorilla-mux, goframe, hertz, iris, fasthttp)
       name: string
       middleware: {}
       server:

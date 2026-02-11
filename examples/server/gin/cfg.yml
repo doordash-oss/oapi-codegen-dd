@@ -10,7 +10,7 @@ generate:
     kind: gin
     output:
       overwrite: true
+    middleware: {}
     server:
       directory: server
       handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/gin/api
-

@@ -156,7 +156,7 @@ func main() {
 			}
 		}
 
-		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(filePath), 0750); err != nil {
 			errExit("Error creating directory: %v", err)
 		}
 		if err = os.WriteFile(filePath, []byte(contents), generatedFilePerm); err != nil {

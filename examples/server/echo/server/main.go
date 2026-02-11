@@ -36,6 +36,9 @@ func main() {
 		Timeout: 30 * time.Second,
 	}))
 
+	// Add custom middleware from generated scaffold
+	e.Use(handler.ExampleMiddleware())
+
 	// Create your service implementation
 	svc := handler.NewService()
 

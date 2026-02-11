@@ -51,10 +51,9 @@ var _ {{ $modelsPrefix }}{{ $serviceName }}Interface = (*{{ $serviceName }})(nil
 
 {{- range $operations }}{{ $op := . }}
 
-{{- if and (not $config.Generate.OmitDescription) $op.Summary }}
-{{ toGoComment $op.Summary $op.ID }}
-{{- else }}
 // {{ $op.ID }} handles {{ $op.Method }} {{ $op.Path }}
+{{- if and (not $config.Generate.OmitDescription) $op.Summary }}
+{{ toGoComment $op.Summary "" }}
 {{- end }}
 {{- if $op.HasRequestOptions }}
 func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {

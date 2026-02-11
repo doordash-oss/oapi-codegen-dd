@@ -1,0 +1,82 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{define "server-main"}}
+{{- $config := .Config -}}
+{{- $server := .ServerOptions -}}
+{{- /* Types prefix: when models-package-alias is set, types are in a separate package */ -}}
+{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
+{{- $typesPrefix := "handler." -}}
+{{- if $modelsAlias -}}
+{{- $typesPrefix = printf "%s." $modelsAlias -}}
+{{- end -}}
+// Package main - This file is generated ONCE as a starting point and will NOT be overwritten.
+// Modify it freely to customize your server setup.
+// To regenerate, delete this file or set generate.handler.output.overwrite: true in config.
+package main
+
+import (
+    "log"
+    "os"
+    "os/signal"
+    "syscall"
+
+    "github.com/kataras/iris/v12"
+    "github.com/kataras/iris/v12/middleware/logger"
+    "github.com/kataras/iris/v12/middleware/recover"
+    "github.com/kataras/iris/v12/middleware/requestid"
+    handler "{{ $server.HandlerPackage }}"
+)
+
+func main() {
+    // Create Iris application
+    app := iris.New()
+
+    // Add Iris built-in middleware
+    app.Use(recover.New())
+    app.Use(requestid.New())
+    app.Use(logger.New())
+
+    // Add middleware from generated scaffold
+    app.Use(handler.CORSMiddleware())
+    {{- if $config.Generate.Handler.Middleware }}
+    app.Use(handler.ExampleMiddleware())
+    {{- end }}
+
+    // Create your service implementation
+    svc := handler.New{{ $config.Generate.Handler.Name }}()
+
+    // Register routes
+    {{ $typesPrefix }}NewRouter(app, svc)
+
+    // Start server
+    port := "{{ $server.Port }}"
+    go func() {
+        log.Printf("Starting server on :%s", port)
+        if err := app.Listen(":" + port); err != nil {
+            log.Printf("Server stopped: %v", err)
+        }
+    }()
+
+    // Wait for interrupt signal for graceful shutdown
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+    <-quit
+
+    log.Println("Shutting down server...")
+}
+{{end}}
+{{template "server-main" .}}
+

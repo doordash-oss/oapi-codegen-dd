@@ -62,6 +62,7 @@ server/
 | [Gorilla Mux](https://github.com/gorilla/mux) | `gorilla-mux` | `mux.Vars(r)["id"]` | Classic router |
 | [GoFrame](https://github.com/gogf/gf) | `goframe` | `r.Get("id")` | Full-stack framework |
 | [Hertz](https://github.com/cloudwego/hertz) | `hertz` | `c.Param("id")` | High-performance from ByteDance |
+| [Iris](https://github.com/kataras/iris) | `iris` | `ctx.Params().Get("id")` | Feature-rich, MVC support |
 | [fasthttp](https://github.com/valyala/fasthttp) | `fasthttp` | `ctx.UserValue("id")` | Zero-allocation HTTP |
 
 ## Architecture
@@ -384,6 +385,7 @@ Complete examples for each framework are available in the repository:
 - [gorilla-mux](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/server/gorilla-mux)
 - [goframe](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/server/goframe)
 - [hertz](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/server/hertz)
+- [iris](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/server/iris)
 - [fasthttp](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/server/fasthttp)
 
 Each example includes:

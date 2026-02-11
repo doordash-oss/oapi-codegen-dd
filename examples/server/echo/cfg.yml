@@ -10,6 +10,7 @@ generate:
     kind: echo
     output:
       overwrite: true
+    middleware: {}
     server:
       directory: server
       handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/echo/api

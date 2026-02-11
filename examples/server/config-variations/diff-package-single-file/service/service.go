@@ -22,31 +22,36 @@ func NewService() *Service {
 // Ensure Service implements models.ServiceInterface.
 var _ models.ServiceInterface = (*Service)(nil)
 
-// HealthCheck handles GET /health - Health check endpoint
+// HealthCheck handles GET /health
+// Health check endpoint
 func (s *Service) HealthCheck(ctx context.Context) (*models.HealthCheckResponseData, error) {
 	// TODO: Implement your business logic here
 	return models.NewHealthCheckResponseData(new(models.HealthCheckResponse)), nil
 }
 
-// ListUsers handles GET /users - List all users
+// ListUsers handles GET /users
+// List all users
 func (s *Service) ListUsers(ctx context.Context, opts *models.ListUsersServiceRequestOptions) (*models.ListUsersResponseData, error) {
 	// TODO: Implement your business logic here
 	return models.NewListUsersResponseData(new(models.ListUsersResponse)), nil
 }
 
-// CreateUser handles POST /users - Create a new user
+// CreateUser handles POST /users
+// Create a new user
 func (s *Service) CreateUser(ctx context.Context, opts *models.CreateUserServiceRequestOptions) (*models.CreateUserResponseData, error) {
 	// TODO: Implement your business logic here
 	return models.NewCreateUserResponseData(new(models.CreateUserResponse)), nil
 }
 
-// GetUser handles GET /users/{id} - Get a user by ID
+// GetUser handles GET /users/{id}
+// Get a user by ID
 func (s *Service) GetUser(ctx context.Context, opts *models.GetUserServiceRequestOptions) (*models.GetUserResponseData, error) {
 	// TODO: Implement your business logic here
 	return models.NewGetUserResponseData(new(models.GetUserResponse)), nil
 }
 
-// DeleteUser handles DELETE /users/{id} - Delete a user
+// DeleteUser handles DELETE /users/{id}
+// Delete a user
 func (s *Service) DeleteUser(ctx context.Context, opts *models.DeleteUserServiceRequestOptions) (*models.DeleteUserResponseData, error) {
 	// TODO: Implement your business logic here
 	return models.NewDeleteUserResponseData(nil), nil

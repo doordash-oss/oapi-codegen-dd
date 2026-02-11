@@ -31,6 +31,9 @@ func main() {
 	app.Use(requestid.New())
 	app.Use(logger.New())
 
+	// Add custom middleware from generated scaffold
+	app.Use(handler.ExampleMiddleware())
+
 	// Create your service implementation
 	svc := handler.NewService()
 

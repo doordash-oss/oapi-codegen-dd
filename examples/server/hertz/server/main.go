@@ -35,16 +35,12 @@ func main() {
 	// Hertz Default() includes recovery middleware
 	// Add request ID middleware
 	h.Use(requestIDMiddleware())
-
 	// Add logging middleware
 	h.Use(loggingMiddleware())
-
 	// Add CORS middleware
 	h.Use(corsMiddleware())
-
 	// Add timeout middleware
 	h.Use(timeoutMiddleware(timeout))
-
 	// Add custom middleware
 	h.Use(handler.ExampleMiddleware())
 

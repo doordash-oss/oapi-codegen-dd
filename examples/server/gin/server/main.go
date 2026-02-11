@@ -20,6 +20,9 @@ func main() {
 	// Create Gin engine with default middleware (Logger, Recovery)
 	r := gin.Default()
 
+	// Add custom middleware from generated scaffold
+	r.Use(handler.ExampleMiddleware())
+
 	// Create your service implementation
 	svc := handler.NewService()
 

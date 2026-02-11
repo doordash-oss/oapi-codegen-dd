@@ -4,13 +4,13 @@ output:
   directory: api
   use-single-file: true
 error-mapping:
-  CreateUserErrorResponse: message
+  CreateOrderErrorResponse: message
 generate:
   handler:
-    kind: std-http
+    kind: iris
     output:
       overwrite: true
     middleware: {}
     server:
       directory: server
-      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/std-http/api
+      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/iris/api
