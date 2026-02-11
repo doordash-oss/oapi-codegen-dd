@@ -14,6 +14,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -164,6 +165,22 @@ func MaskSensitiveString(value string, config SensitiveDataConfig) string {
 		return ""
 	}
 	return fmt.Sprintf("%v", result)
+}
+
+// SlogAttr creates a slog.Attr with a masked value for sensitive data.
+// This is used by generated LogValue() methods to mask sensitive fields in structured logging.
+func SlogAttr[T any](key string, value T, config SensitiveDataConfig) slog.Attr {
+	masked := MaskSensitiveString(fmt.Sprintf("%v", value), config)
+	return slog.String(key, masked)
+}
+
+// SlogAttrPtr creates a slog.Attr with a masked value for sensitive pointer data.
+// Returns an empty string attribute if the pointer is nil.
+func SlogAttrPtr[T any](key string, value *T, config SensitiveDataConfig) slog.Attr {
+	if value == nil {
+		return slog.String(key, "")
+	}
+	return SlogAttr(key, *value, config)
 }
 
 // maskFull replaces the entire value with a fixed mask to hide the length

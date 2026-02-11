@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
@@ -206,60 +207,33 @@ func (c CreditCardPayment) Validate() error {
 	return errors
 }
 
-func (c CreditCardPayment) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_CreditCardPayment CreditCardPayment
-	masked := _Alias_CreditCardPayment(c)
-	// Mask sensitive field: CardNumber
-	{
-		maskedVal := runtime.MaskSensitiveValue(masked.CardNumber, runtime.SensitiveDataConfig{
-			Type:       runtime.MaskTypePartial,
-			Pattern:    "",
-			Algorithm:  "",
-			KeepPrefix: 0,
-			KeepSuffix: 4,
-		})
-		masked.CardNumber = maskedVal.(string)
-	}
-	// Mask sensitive field: Cvv
+// Masked returns a copy of the struct with sensitive fields masked.
+func (c CreditCardPayment) Masked() CreditCardPayment {
+	masked := c
+	masked.CardNumber = runtime.MaskSensitiveString(c.CardNumber, runtime.SensitiveDataConfig{
+		Type:       runtime.MaskTypePartial,
+		Pattern:    "",
+		Algorithm:  "",
+		KeepPrefix: 0,
+		KeepSuffix: 4,
+	})
 	if masked.Cvv != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Cvv, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Cvv, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeFull,
 			Pattern:    "",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.Cvv = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Cvv = &val
-		}
+		masked.Cvv = &v
 	}
-
-	return json.Marshal(masked)
+	return masked
 }
 
-func (c *CreditCardPayment) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_CreditCardPayment CreditCardPayment
-		var tmp _Alias_CreditCardPayment
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*c = CreditCardPayment(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (c CreditCardPayment) LogValue() slog.Value {
+	type plain CreditCardPayment
+	return slog.AnyValue(plain(c.Masked()))
 }
 
 type BankTransferPayment struct {
@@ -371,55 +345,30 @@ func (d DomesticAccount) Validate() error {
 	return errors
 }
 
-func (d DomesticAccount) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_DomesticAccount DomesticAccount
-	masked := _Alias_DomesticAccount(d)
-	// Mask sensitive field: RoutingNumber
-	{
-		maskedVal := runtime.MaskSensitiveValue(masked.RoutingNumber, runtime.SensitiveDataConfig{
-			Type:       runtime.MaskTypePartial,
-			Pattern:    "",
-			Algorithm:  "",
-			KeepPrefix: 2,
-			KeepSuffix: 2,
-		})
-		masked.RoutingNumber = maskedVal.(string)
-	}
-	// Mask sensitive field: AccountNumber
-	{
-		maskedVal := runtime.MaskSensitiveValue(masked.AccountNumber, runtime.SensitiveDataConfig{
-			Type:       runtime.MaskTypePartial,
-			Pattern:    "",
-			Algorithm:  "",
-			KeepPrefix: 0,
-			KeepSuffix: 4,
-		})
-		masked.AccountNumber = maskedVal.(string)
-	}
-
-	return json.Marshal(masked)
+// Masked returns a copy of the struct with sensitive fields masked.
+func (d DomesticAccount) Masked() DomesticAccount {
+	masked := d
+	masked.RoutingNumber = runtime.MaskSensitiveString(d.RoutingNumber, runtime.SensitiveDataConfig{
+		Type:       runtime.MaskTypePartial,
+		Pattern:    "",
+		Algorithm:  "",
+		KeepPrefix: 2,
+		KeepSuffix: 2,
+	})
+	masked.AccountNumber = runtime.MaskSensitiveString(d.AccountNumber, runtime.SensitiveDataConfig{
+		Type:       runtime.MaskTypePartial,
+		Pattern:    "",
+		Algorithm:  "",
+		KeepPrefix: 0,
+		KeepSuffix: 4,
+	})
+	return masked
 }
 
-func (d *DomesticAccount) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_DomesticAccount DomesticAccount
-		var tmp _Alias_DomesticAccount
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*d = DomesticAccount(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (d DomesticAccount) LogValue() slog.Value {
+	type plain DomesticAccount
+	return slog.AnyValue(plain(d.Masked()))
 }
 
 type InternationalAccount struct {
@@ -463,55 +412,30 @@ func (i InternationalAccount) Validate() error {
 	return errors
 }
 
-func (i InternationalAccount) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_InternationalAccount InternationalAccount
-	masked := _Alias_InternationalAccount(i)
-	// Mask sensitive field: Iban
-	{
-		maskedVal := runtime.MaskSensitiveValue(masked.Iban, runtime.SensitiveDataConfig{
-			Type:       runtime.MaskTypePartial,
-			Pattern:    "",
-			Algorithm:  "",
-			KeepPrefix: 4,
-			KeepSuffix: 4,
-		})
-		masked.Iban = maskedVal.(string)
-	}
-	// Mask sensitive field: SwiftCode
-	{
-		maskedVal := runtime.MaskSensitiveValue(masked.SwiftCode, runtime.SensitiveDataConfig{
-			Type:       runtime.MaskTypeFull,
-			Pattern:    "",
-			Algorithm:  "",
-			KeepPrefix: 0,
-			KeepSuffix: 0,
-		})
-		masked.SwiftCode = maskedVal.(string)
-	}
-
-	return json.Marshal(masked)
+// Masked returns a copy of the struct with sensitive fields masked.
+func (i InternationalAccount) Masked() InternationalAccount {
+	masked := i
+	masked.Iban = runtime.MaskSensitiveString(i.Iban, runtime.SensitiveDataConfig{
+		Type:       runtime.MaskTypePartial,
+		Pattern:    "",
+		Algorithm:  "",
+		KeepPrefix: 4,
+		KeepSuffix: 4,
+	})
+	masked.SwiftCode = runtime.MaskSensitiveString(i.SwiftCode, runtime.SensitiveDataConfig{
+		Type:       runtime.MaskTypeFull,
+		Pattern:    "",
+		Algorithm:  "",
+		KeepPrefix: 0,
+		KeepSuffix: 0,
+	})
+	return masked
 }
 
-func (i *InternationalAccount) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_InternationalAccount InternationalAccount
-		var tmp _Alias_InternationalAccount
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*i = InternationalAccount(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (i InternationalAccount) LogValue() slog.Value {
+	type plain InternationalAccount
+	return slog.AnyValue(plain(i.Masked()))
 }
 
 type InternationalAccount_BeneficiaryDetails struct {
@@ -599,81 +523,46 @@ func (p PersonalBeneficiary) Validate() error {
 	return errors
 }
 
-func (p PersonalBeneficiary) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_PersonalBeneficiary PersonalBeneficiary
-	masked := _Alias_PersonalBeneficiary(p)
-	// Mask sensitive field: Ssn
+// Masked returns a copy of the struct with sensitive fields masked.
+func (p PersonalBeneficiary) Masked() PersonalBeneficiary {
+	masked := p
 	if masked.Ssn != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Ssn, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Ssn, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeRegex,
 			Pattern:    "\\d",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.Ssn = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Ssn = &val
-		}
+		masked.Ssn = &v
 	}
-	// Mask sensitive field: Email
 	if masked.Email != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Email, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Email, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeFull,
 			Pattern:    "",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.Email = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Email = &val
-		}
+		masked.Email = &v
 	}
-	// Mask sensitive field: Phone
 	if masked.Phone != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Phone, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Phone, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypePartial,
 			Pattern:    "",
 			Algorithm:  "",
 			KeepPrefix: 3,
 			KeepSuffix: 4,
 		})
-		if maskedVal == nil {
-			masked.Phone = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Phone = &val
-		}
+		masked.Phone = &v
 	}
-
-	return json.Marshal(masked)
+	return masked
 }
 
-func (p *PersonalBeneficiary) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_PersonalBeneficiary PersonalBeneficiary
-		var tmp _Alias_PersonalBeneficiary
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*p = PersonalBeneficiary(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (p PersonalBeneficiary) LogValue() slog.Value {
+	type plain PersonalBeneficiary
+	return slog.AnyValue(plain(p.Masked()))
 }
 
 type BusinessBeneficiary struct {
@@ -698,49 +587,26 @@ func (b BusinessBeneficiary) Validate() error {
 	return errors
 }
 
-func (b BusinessBeneficiary) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_BusinessBeneficiary BusinessBeneficiary
-	masked := _Alias_BusinessBeneficiary(b)
-	// Mask sensitive field: TaxID
+// Masked returns a copy of the struct with sensitive fields masked.
+func (b BusinessBeneficiary) Masked() BusinessBeneficiary {
+	masked := b
 	if masked.TaxID != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.TaxID, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.TaxID, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeHash,
 			Pattern:    "",
 			Algorithm:  "sha256",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.TaxID = nil
-		} else {
-			val := maskedVal.(string)
-			masked.TaxID = &val
-		}
+		masked.TaxID = &v
 	}
-
-	return json.Marshal(masked)
+	return masked
 }
 
-func (b *BusinessBeneficiary) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_BusinessBeneficiary BusinessBeneficiary
-		var tmp _Alias_BusinessBeneficiary
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*b = BusinessBeneficiary(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (b BusinessBeneficiary) LogValue() slog.Value {
+	type plain BusinessBeneficiary
+	return slog.AnyValue(plain(b.Masked()))
 }
 
 type DigitalWalletPayment struct {
@@ -764,44 +630,23 @@ func (d DigitalWalletPayment) Validate() error {
 	return errors
 }
 
-func (d DigitalWalletPayment) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_DigitalWalletPayment DigitalWalletPayment
-	masked := _Alias_DigitalWalletPayment(d)
-	// Mask sensitive field: WalletID
-	{
-		maskedVal := runtime.MaskSensitiveValue(masked.WalletID, runtime.SensitiveDataConfig{
-			Type:       runtime.MaskTypeHash,
-			Pattern:    "",
-			Algorithm:  "sha256",
-			KeepPrefix: 0,
-			KeepSuffix: 0,
-		})
-		masked.WalletID = maskedVal.(string)
-	}
-
-	return json.Marshal(masked)
+// Masked returns a copy of the struct with sensitive fields masked.
+func (d DigitalWalletPayment) Masked() DigitalWalletPayment {
+	masked := d
+	masked.WalletID = runtime.MaskSensitiveString(d.WalletID, runtime.SensitiveDataConfig{
+		Type:       runtime.MaskTypeHash,
+		Pattern:    "",
+		Algorithm:  "sha256",
+		KeepPrefix: 0,
+		KeepSuffix: 0,
+	})
+	return masked
 }
 
-func (d *DigitalWalletPayment) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_DigitalWalletPayment DigitalWalletPayment
-		var tmp _Alias_DigitalWalletPayment
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*d = DigitalWalletPayment(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (d DigitalWalletPayment) LogValue() slog.Value {
+	type plain DigitalWalletPayment
+	return slog.AnyValue(plain(d.Masked()))
 }
 
 type Address struct {
@@ -815,49 +660,26 @@ type AccountHolder struct {
 	Email *string `json:"email,omitempty" sensitive:""`
 }
 
-func (a AccountHolder) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_AccountHolder AccountHolder
-	masked := _Alias_AccountHolder(a)
-	// Mask sensitive field: Email
+// Masked returns a copy of the struct with sensitive fields masked.
+func (a AccountHolder) Masked() AccountHolder {
+	masked := a
 	if masked.Email != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Email, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Email, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeFull,
 			Pattern:    "",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.Email = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Email = &val
-		}
+		masked.Email = &v
 	}
-
-	return json.Marshal(masked)
+	return masked
 }
 
-func (a *AccountHolder) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_AccountHolder AccountHolder
-		var tmp _Alias_AccountHolder
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*a = AccountHolder(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (a AccountHolder) LogValue() slog.Value {
+	type plain AccountHolder
+	return slog.AnyValue(plain(a.Masked()))
 }
 
 type PaymentMethod_AnyOf struct {

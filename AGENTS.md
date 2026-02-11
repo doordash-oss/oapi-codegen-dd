@@ -107,6 +107,7 @@ When debugging complex issues, create a minimal reproducible example:
 ### File organization
 - `testdata/specs` - Specs being tested (if missing: run `make fetch-specs` to download)
 - Never put generated files in project root - use `/tmp` for testing
+- Never build binaries in project root - use `go run ./cmd/oapi-codegen` instead of `go build`
 
 ## Code Generation Architecture
 

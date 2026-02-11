@@ -3,9 +3,7 @@
 package xsensitivedata
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
+	"log/slog"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
@@ -26,97 +24,56 @@ func (u User) Validate() error {
 	return runtime.ConvertValidatorError(typesValidator.Struct(u))
 }
 
-func (u User) MarshalJSON() ([]byte, error) {
-	// Create a copy for masking sensitive fields
-	type _Alias_User User
-	masked := _Alias_User(u)
-	// Mask sensitive field: Email
+// Masked returns a copy of the struct with sensitive fields masked.
+func (u User) Masked() User {
+	masked := u
 	if masked.Email != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Email, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Email, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeFull,
 			Pattern:    "",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.Email = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Email = &val
-		}
+		masked.Email = &v
 	}
-	// Mask sensitive field: Ssn
 	if masked.Ssn != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.Ssn, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.Ssn, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeRegex,
 			Pattern:    "\\d{3}-\\d{2}-\\d{4}",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.Ssn = nil
-		} else {
-			val := maskedVal.(string)
-			masked.Ssn = &val
-		}
+		masked.Ssn = &v
 	}
-	// Mask sensitive field: CreditCard
 	if masked.CreditCard != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.CreditCard, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.CreditCard, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypePartial,
 			Pattern:    "",
 			Algorithm:  "",
 			KeepPrefix: 0,
 			KeepSuffix: 4,
 		})
-		if maskedVal == nil {
-			masked.CreditCard = nil
-		} else {
-			val := maskedVal.(string)
-			masked.CreditCard = &val
-		}
+		masked.CreditCard = &v
 	}
-	// Mask sensitive field: APIKey
 	if masked.APIKey != nil {
-		maskedVal := runtime.MaskSensitivePointer(masked.APIKey, runtime.SensitiveDataConfig{
+		v := runtime.MaskSensitiveString(*masked.APIKey, runtime.SensitiveDataConfig{
 			Type:       runtime.MaskTypeHash,
 			Pattern:    "",
 			Algorithm:  "sha256",
 			KeepPrefix: 0,
 			KeepSuffix: 0,
 		})
-		if maskedVal == nil {
-			masked.APIKey = nil
-		} else {
-			val := maskedVal.(string)
-			masked.APIKey = &val
-		}
+		masked.APIKey = &v
 	}
-
-	return json.Marshal(masked)
+	return masked
 }
 
-func (u *User) UnmarshalJSON(data []byte) error {
-	trim := bytes.TrimSpace(data)
-	if bytes.Equal(trim, []byte("null")) {
-		return nil
-	}
-	if len(trim) == 0 {
-		return fmt.Errorf("empty JSON input")
-	}
-
-	if len(trim) > 0 {
-		type _Alias_User User
-		var tmp _Alias_User
-		if err := json.Unmarshal(data, &tmp); err != nil {
-			return err
-		}
-		*u = User(tmp)
-	}
-
-	return nil
+// LogValue implements slog.LogValuer interface for structured logging.
+func (u User) LogValue() slog.Value {
+	type plain User
+	return slog.AnyValue(plain(u.Masked()))
 }
 
 var typesValidator *validator.Validate

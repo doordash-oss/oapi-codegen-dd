@@ -857,11 +857,8 @@ func enhanceSchema(src, other GoSchema, options ParseOptions) GoSchema {
 }
 
 func needsMarshaler(schema GoSchema) bool {
-	// Check if any property has sensitive data
-	if hasSensitiveData(schema) {
-		return true
-	}
-
+	// Check if any property is an embedded field (no JSON field name)
+	// These require custom marshaling to merge JSON objects
 	res := false
 	for _, p := range schema.Properties {
 		if p.JsonFieldName == "" {

@@ -1,10 +1,21 @@
 # `x-sensitive-data`
 
-Automatically mask sensitive data in JSON output.
+Automatically mask sensitive data in structured logs.
 
 ## Overview
 
-The `x-sensitive-data` extension allows you to mark fields as containing sensitive information that should be automatically masked when marshaling to JSON. This is useful for preventing accidental logging or exposure of sensitive data like passwords, API keys, credit card numbers, etc.
+The `x-sensitive-data` extension allows you to mark fields as containing sensitive information that should be automatically masked when logging. This is useful for preventing accidental exposure of sensitive data like passwords, API keys, credit card numbers, etc. in logs.
+
+The extension generates two methods:
+
+- **`Masked()`** - Returns a copy of the struct with sensitive fields masked
+- **`LogValue()`** - Implements Go's [`slog.LogValuer`](https://pkg.go.dev/log/slog#LogValuer) interface (calls `Masked()` internally)
+
+This means:
+
+- **JSON serialization stays raw** - `json.Marshal(user)` returns the actual values (needed for API calls)
+- **Masked JSON** - `json.Marshal(user.Masked())` returns masked values
+- **Structured logging is masked** - `slog.Info("user", "user", user)` automatically masks sensitive fields
 
 ## Masking Strategies
 
@@ -23,20 +34,44 @@ The extension supports several masking strategies:
 
 ## Generated Code
 
-This generates:
+This generates a struct with `Masked()` and `LogValue()` methods:
 
 ```go
---8<-- "extensions/xsensitivedata/basic/gen.go:16:23"
+--8<-- "extensions/xsensitivedata/basic/gen.go:14:77"
 ```
 
 ## Behavior
 
-When marshaling to JSON:
+When logging with slog:
 
-- `email: "user@example.com"` becomes `email: "********"` (fixed length, hides original length)
-- `ssn: "123-45-6789"` becomes `ssn: "***-**-****"` (digits masked, structure visible)
-- `creditCard: "1234-5678-9012-3456"` becomes `creditCard: "********3456"` (last 4 visible)
-- `apiKey: "my-secret-key"` becomes `apiKey: "325ededd6c3b9988f623c7f964abb9b016b76b0f8b3474df0f7d7c23b941381f"` (SHA256 hash)
+```go
+user := User{
+    ID:         1,
+    Username:   "johndoe",
+    Email:      Ptr("user@example.com"),
+    Ssn:        Ptr("123-45-6789"),
+    CreditCard: Ptr("1234-5678-9012-3456"),
+    APIKey:     Ptr("my-secret-key"),
+}
+
+// Masked in logs
+slog.Info("user created", "user", user)
+// Output: user={id=1 username=johndoe email=******** ssn=***-**-**** creditCard=********3456 apiKey=325ededd...}
+
+// Raw in JSON (for API calls)
+json.Marshal(user)
+// Output: {"id":1,"username":"johndoe","email":"user@example.com","ssn":"123-45-6789",...}
+```
+
+## Masked JSON Output
+
+If you need masked JSON (e.g., for API responses that should hide sensitive data), use the `Masked()` method:
+
+```go
+// Get masked JSON
+maskedJSON, _ := json.Marshal(user.Masked())
+// Output: {"id":1,"username":"johndoe","email":"********","ssn":"***-**-****",...}
+```
 
 ## Partial Masking Options
 
