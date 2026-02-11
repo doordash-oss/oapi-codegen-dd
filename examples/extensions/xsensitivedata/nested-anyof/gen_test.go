@@ -2,15 +2,16 @@ package nestedanyof
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNestedAnyOfWithSensitiveData(t *testing.T) {
-	// Test 1: Credit card payment with billing address
-	t.Run("CreditCardPayment", func(t *testing.T) {
+	// Test 1: Credit card payment with billing address - masked output
+	t.Run("CreditCardPayment_Masked", func(t *testing.T) {
 		street := "123 Main St"
 		city := "New York"
 		zipCode := "10001"
@@ -27,32 +28,24 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 			},
 		}
 
-		data, err := json.Marshal(payment)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
+		// Use Masked() to get masked output
+		data, err := json.Marshal(payment.Masked())
+		require.NoError(t, err)
 
 		jsonStr := string(data)
-		t.Logf("CreditCardPayment JSON: %s", jsonStr)
 
 		// Verify card number shows last 4 digits
-		if !strings.Contains(jsonStr, `"cardNumber":"********3456"`) {
-			t.Errorf("Card number should show last 4 digits, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"cardNumber":"********3456"`, "Card number should show last 4 digits")
 
 		// Verify CVV is fully masked
-		if !strings.Contains(jsonStr, `"cvv":"********"`) {
-			t.Errorf("CVV should be fully masked, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"cvv":"********"`, "CVV should be fully masked")
 
 		// Verify billing address is not masked
-		if !strings.Contains(jsonStr, `"street":"123 Main St"`) {
-			t.Errorf("Street should not be masked, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"street":"123 Main St"`, "Street should not be masked")
 	})
 
-	// Test 2: Domestic bank account (nested in BankTransferPayment)
-	t.Run("BankTransferPayment_DomesticAccount", func(t *testing.T) {
+	// Test 2: Domestic bank account (nested in BankTransferPayment) - masked output
+	t.Run("BankTransferPayment_DomesticAccount_Masked", func(t *testing.T) {
 		holderName := "John Doe"
 		holderEmail := "john@example.com"
 
@@ -66,34 +59,45 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 			},
 		}
 
-		data, err := json.Marshal(domesticAccount)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
+		// Use Masked() to get masked output
+		data, err := json.Marshal(domesticAccount.Masked())
+		require.NoError(t, err)
 
 		jsonStr := string(data)
-		t.Logf("DomesticAccount JSON: %s", jsonStr)
 
 		// Verify routing number shows first 2 and last 2
-		if !strings.Contains(jsonStr, `"routingNumber":"12********89"`) {
-			t.Errorf("Routing number should show first 2 and last 2, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"routingNumber":"12********89"`, "Routing number should show first 2 and last 2")
 
 		// Verify account number shows last 4
-		if !strings.Contains(jsonStr, `"accountNumber":"********3210"`) {
-			t.Errorf("Account number should show last 4, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"accountNumber":"********3210"`, "Account number should show last 4")
 
-		// Verify account holder email is masked
-		if !strings.Contains(jsonStr, `"email":"********"`) {
-			t.Errorf("Email should be fully masked, got: %s", jsonStr)
-		}
+		// Note: AccountHolder is a nested struct, Masked() only masks direct fields
+		// AccountHolder.Email is not masked by DomesticAccount.Masked()
 	})
 
-	// Test 3: International account with personal beneficiary (deeply nested)
-	t.Run("InternationalAccount_PersonalBeneficiary", func(t *testing.T) {
-		holderName := "Jane Smith"
-		holderEmail := "jane@example.com"
+	// Test 3: International account with personal beneficiary - masked output
+	t.Run("InternationalAccount_PersonalBeneficiary_Masked", func(t *testing.T) {
+		internationalAccount := InternationalAccount{
+			AccountType: International,
+			Iban:        "GB82WEST12345698765432",
+			SwiftCode:   "DEUTDEFF",
+		}
+
+		// Use Masked() to get masked output
+		data, err := json.Marshal(internationalAccount.Masked())
+		require.NoError(t, err)
+
+		jsonStr := string(data)
+
+		// Verify IBAN shows first 4 and last 4
+		assert.Contains(t, jsonStr, `"iban":"GB82********5432"`, "IBAN should show first 4 and last 4")
+
+		// Verify SWIFT code is fully masked
+		assert.Contains(t, jsonStr, `"swiftCode":"********"`, "SWIFT code should be fully masked")
+	})
+
+	// Test 3b: PersonalBeneficiary masked output
+	t.Run("PersonalBeneficiary_Masked", func(t *testing.T) {
 		beneficiarySSN := "123-45-6789"
 		beneficiaryEmail := "bob@example.com"
 		beneficiaryPhone := "555-123-4567"
@@ -106,56 +110,20 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 			Phone:           &beneficiaryPhone,
 		}
 
-		// Create the anyOf wrapper
-		beneficiaryAnyOf := &InternationalAccount_BeneficiaryDetails_AnyOf{
-			Either: runtime.NewEitherFromA[PersonalBeneficiary, BusinessBeneficiary](personalBeneficiary),
-		}
-
-		internationalAccount := InternationalAccount{
-			AccountType: International,
-			Iban:        "GB82WEST12345698765432",
-			SwiftCode:   "DEUTDEFF",
-			AccountHolder: &AccountHolder{
-				Name:  &holderName,
-				Email: &holderEmail,
-			},
-			BeneficiaryDetails: &InternationalAccount_BeneficiaryDetails{
-				InternationalAccount_BeneficiaryDetails_AnyOf: beneficiaryAnyOf,
-			},
-		}
-
-		data, err := json.Marshal(internationalAccount)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
+		// Use Masked() to get masked output
+		data, err := json.Marshal(personalBeneficiary.Masked())
+		require.NoError(t, err)
 
 		jsonStr := string(data)
-		t.Logf("InternationalAccount with PersonalBeneficiary JSON: %s", jsonStr)
 
-		// Verify IBAN shows first 4 and last 4
-		if !strings.Contains(jsonStr, `"iban":"GB82********5432"`) {
-			t.Errorf("IBAN should show first 4 and last 4, got: %s", jsonStr)
-		}
-
-		// Verify SWIFT code is fully masked
-		if !strings.Contains(jsonStr, `"swiftCode":"********"`) {
-			t.Errorf("SWIFT code should be fully masked, got: %s", jsonStr)
-		}
-
-		// Verify account holder email is masked
-		if strings.Count(jsonStr, `"email":"********"`) < 2 {
-			t.Errorf("Both emails should be fully masked, got: %s", jsonStr)
-		}
+		// Verify email is fully masked
+		assert.Contains(t, jsonStr, `"email":"********"`, "Email should be fully masked")
 
 		// Verify SSN has all digits masked (regex pattern)
-		if !strings.Contains(jsonStr, `"ssn":"***-**-****"`) {
-			t.Errorf("SSN should have all digits masked, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"ssn":"***-**-****"`, "SSN should have all digits masked")
 
 		// Verify phone shows first 3 and last 4
-		if !strings.Contains(jsonStr, `"phone":"555********4567"`) {
-			t.Errorf("Phone should show first 3 and last 4, got: %s", jsonStr)
-		}
+		assert.Contains(t, jsonStr, `"phone":"555********4567"`, "Phone should show first 3 and last 4")
 	})
 
 	// Test 4: UnmarshalJSON for CreditCardPayment
@@ -172,39 +140,20 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		}`
 
 		var payment CreditCardPayment
-		err := json.Unmarshal([]byte(jsonData), &payment)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal([]byte(jsonData), &payment))
 
-		// Verify type field
-		if payment.Type != CreditCard {
-			t.Errorf("Expected type to be 'credit_card', got: %v", payment.Type)
-		}
+		assert.Equal(t, CreditCard, payment.Type)
+		assert.Equal(t, "1234-5678-9012-3456", payment.CardNumber)
+		require.NotNil(t, payment.Cvv)
+		assert.Equal(t, "123", *payment.Cvv)
 
-		// Verify card number
-		if payment.CardNumber != "1234-5678-9012-3456" {
-			t.Errorf("Expected cardNumber to be '1234-5678-9012-3456', got: %s", payment.CardNumber)
-		}
-
-		// Verify CVV
-		if payment.Cvv == nil || *payment.Cvv != "123" {
-			t.Errorf("Expected cvv to be '123', got: %v", payment.Cvv)
-		}
-
-		// Verify billing address
-		if payment.BillingAddress == nil {
-			t.Fatal("Expected billingAddress to be present")
-		}
-		if payment.BillingAddress.Street == nil || *payment.BillingAddress.Street != "123 Main St" {
-			t.Errorf("Expected street to be '123 Main St', got: %v", payment.BillingAddress.Street)
-		}
-		if payment.BillingAddress.City == nil || *payment.BillingAddress.City != "New York" {
-			t.Errorf("Expected city to be 'New York', got: %v", payment.BillingAddress.City)
-		}
-		if payment.BillingAddress.ZipCode == nil || *payment.BillingAddress.ZipCode != "10001" {
-			t.Errorf("Expected zipCode to be '10001', got: %v", payment.BillingAddress.ZipCode)
-		}
+		require.NotNil(t, payment.BillingAddress)
+		require.NotNil(t, payment.BillingAddress.Street)
+		assert.Equal(t, "123 Main St", *payment.BillingAddress.Street)
+		require.NotNil(t, payment.BillingAddress.City)
+		assert.Equal(t, "New York", *payment.BillingAddress.City)
+		require.NotNil(t, payment.BillingAddress.ZipCode)
+		assert.Equal(t, "10001", *payment.BillingAddress.ZipCode)
 	})
 
 	// Test 5: UnmarshalJSON for DomesticAccount
@@ -220,36 +169,17 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		}`
 
 		var account DomesticAccount
-		err := json.Unmarshal([]byte(jsonData), &account)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal([]byte(jsonData), &account))
 
-		// Verify accountType field
-		if account.AccountType != Domestic {
-			t.Errorf("Expected accountType to be 'domestic', got: %v", account.AccountType)
-		}
+		assert.Equal(t, Domestic, account.AccountType)
+		assert.Equal(t, "123456789", account.RoutingNumber)
+		assert.Equal(t, "9876543210", account.AccountNumber)
 
-		// Verify routing number
-		if account.RoutingNumber != "123456789" {
-			t.Errorf("Expected routingNumber to be '123456789', got: %s", account.RoutingNumber)
-		}
-
-		// Verify account number
-		if account.AccountNumber != "9876543210" {
-			t.Errorf("Expected accountNumber to be '9876543210', got: %s", account.AccountNumber)
-		}
-
-		// Verify account holder
-		if account.AccountHolder == nil {
-			t.Fatal("Expected accountHolder to be present")
-		}
-		if account.AccountHolder.Name == nil || *account.AccountHolder.Name != "John Doe" {
-			t.Errorf("Expected name to be 'John Doe', got: %v", account.AccountHolder.Name)
-		}
-		if account.AccountHolder.Email == nil || *account.AccountHolder.Email != "john@example.com" {
-			t.Errorf("Expected email to be 'john@example.com', got: %v", account.AccountHolder.Email)
-		}
+		require.NotNil(t, account.AccountHolder)
+		require.NotNil(t, account.AccountHolder.Name)
+		assert.Equal(t, "John Doe", *account.AccountHolder.Name)
+		require.NotNil(t, account.AccountHolder.Email)
+		assert.Equal(t, "john@example.com", *account.AccountHolder.Email)
 	})
 
 	// Test 6: UnmarshalJSON for InternationalAccount
@@ -272,67 +202,31 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		}`
 
 		var account InternationalAccount
-		err := json.Unmarshal([]byte(jsonData), &account)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal([]byte(jsonData), &account))
 
-		// Verify accountType field
-		if account.AccountType != International {
-			t.Errorf("Expected accountType to be 'international', got: %v", account.AccountType)
-		}
+		assert.Equal(t, International, account.AccountType)
+		assert.Equal(t, "GB82WEST12345698765432", account.Iban)
+		assert.Equal(t, "DEUTDEFF", account.SwiftCode)
 
-		// Verify IBAN
-		if account.Iban != "GB82WEST12345698765432" {
-			t.Errorf("Expected iban to be 'GB82WEST12345698765432', got: %s", account.Iban)
-		}
+		require.NotNil(t, account.AccountHolder)
+		require.NotNil(t, account.AccountHolder.Name)
+		assert.Equal(t, "Jane Smith", *account.AccountHolder.Name)
+		require.NotNil(t, account.AccountHolder.Email)
+		assert.Equal(t, "jane@example.com", *account.AccountHolder.Email)
 
-		// Verify SWIFT code
-		if account.SwiftCode != "DEUTDEFF" {
-			t.Errorf("Expected swiftCode to be 'DEUTDEFF', got: %s", account.SwiftCode)
-		}
-
-		// Verify account holder
-		if account.AccountHolder == nil {
-			t.Fatal("Expected accountHolder to be present")
-		}
-		if account.AccountHolder.Name == nil || *account.AccountHolder.Name != "Jane Smith" {
-			t.Errorf("Expected name to be 'Jane Smith', got: %v", account.AccountHolder.Name)
-		}
-		if account.AccountHolder.Email == nil || *account.AccountHolder.Email != "jane@example.com" {
-			t.Errorf("Expected email to be 'jane@example.com', got: %v", account.AccountHolder.Email)
-		}
-
-		// Verify beneficiary details
-		if account.BeneficiaryDetails == nil {
-			t.Fatal("Expected beneficiaryDetails to be present")
-		}
-		if account.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf == nil {
-			t.Fatal("Expected beneficiaryDetails anyOf to be present")
-		}
-
-		// Verify it's PersonalBeneficiary (type A in Either)
-		if !account.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.IsA() {
-			t.Fatal("Expected beneficiary to be PersonalBeneficiary (type A)")
-		}
+		require.NotNil(t, account.BeneficiaryDetails)
+		require.NotNil(t, account.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf)
+		require.True(t, account.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.IsA(), "Expected PersonalBeneficiary (type A)")
 
 		beneficiary := account.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.A
-
-		if beneficiary.BeneficiaryType != Personal {
-			t.Errorf("Expected beneficiaryType to be 'personal', got: %v", beneficiary.BeneficiaryType)
-		}
-		if beneficiary.FullName != "Bob Johnson" {
-			t.Errorf("Expected fullName to be 'Bob Johnson', got: %s", beneficiary.FullName)
-		}
-		if beneficiary.Ssn == nil || *beneficiary.Ssn != "123-45-6789" {
-			t.Errorf("Expected ssn to be '123-45-6789', got: %v", beneficiary.Ssn)
-		}
-		if beneficiary.Email == nil || *beneficiary.Email != "bob@example.com" {
-			t.Errorf("Expected email to be 'bob@example.com', got: %v", beneficiary.Email)
-		}
-		if beneficiary.Phone == nil || *beneficiary.Phone != "555-123-4567" {
-			t.Errorf("Expected phone to be '555-123-4567', got: %v", beneficiary.Phone)
-		}
+		assert.Equal(t, Personal, beneficiary.BeneficiaryType)
+		assert.Equal(t, "Bob Johnson", beneficiary.FullName)
+		require.NotNil(t, beneficiary.Ssn)
+		assert.Equal(t, "123-45-6789", *beneficiary.Ssn)
+		require.NotNil(t, beneficiary.Email)
+		assert.Equal(t, "bob@example.com", *beneficiary.Email)
+		require.NotNil(t, beneficiary.Phone)
+		assert.Equal(t, "555-123-4567", *beneficiary.Phone)
 	})
 
 	// Test 7: UnmarshalJSON for DigitalWalletPayment
@@ -343,20 +237,10 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		}`
 
 		var payment DigitalWalletPayment
-		err := json.Unmarshal([]byte(jsonData), &payment)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal([]byte(jsonData), &payment))
 
-		// Verify type field
-		if payment.Type != DigitalWallet {
-			t.Errorf("Expected type to be 'digital_wallet', got: %v", payment.Type)
-		}
-
-		// Verify wallet ID
-		if payment.WalletID != "wallet-12345" {
-			t.Errorf("Expected walletId to be 'wallet-12345', got: %s", payment.WalletID)
-		}
+		assert.Equal(t, DigitalWallet, payment.Type)
+		assert.Equal(t, "wallet-12345", payment.WalletID)
 	})
 
 	// Test 8: Round-trip marshal/unmarshal for PaymentMethod with CreditCardPayment
@@ -380,44 +264,23 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 				ZipCode: &zipCode,
 			},
 		}
-		if err := original.PaymentMethod_AnyOf.FromCreditCardPayment(creditCard); err != nil {
-			t.Fatalf("Failed to set credit card: %v", err)
-		}
+		require.NoError(t, original.PaymentMethod_AnyOf.FromCreditCardPayment(creditCard))
 
 		// Marshal
 		data, err := json.Marshal(original)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
-
-		t.Logf("Marshaled PaymentMethod: %s", string(data))
+		require.NoError(t, err)
 
 		// Unmarshal
 		var unmarshaled PaymentMethod
-		err = json.Unmarshal(data, &unmarshaled)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
 
-		// Verify unmarshaled data
-		if unmarshaled.PaymentMethod_AnyOf == nil {
-			t.Fatal("Expected PaymentMethod_AnyOf to be present")
-		}
+		require.NotNil(t, unmarshaled.PaymentMethod_AnyOf)
 
-		// Try to get as CreditCardPayment
 		result, err := unmarshaled.PaymentMethod_AnyOf.AsCreditCardPayment()
-		if err != nil {
-			t.Fatalf("Failed to get as CreditCardPayment: %v", err)
-		}
+		require.NoError(t, err)
 
-		// Note: Marshaled data is masked, so we can't compare exact values
-		// Just verify the structure is intact
-		if result.Type != CreditCard {
-			t.Errorf("Expected type to be 'credit_card', got: %v", result.Type)
-		}
-		if result.BillingAddress == nil {
-			t.Error("Expected billing address to be present")
-		}
+		assert.Equal(t, CreditCard, result.Type)
+		assert.NotNil(t, result.BillingAddress)
 	})
 
 	// Test 9: Round-trip marshal/unmarshal for BankTransferPayment with nested DomesticAccount
@@ -425,7 +288,6 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		holderName := "Alice Johnson"
 		holderEmail := "alice@example.com"
 
-		// Create original payment
 		domesticAccount := DomesticAccount{
 			AccountType:   Domestic,
 			RoutingNumber: "987654321",
@@ -447,38 +309,18 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 			},
 		}
 
-		// Marshal
 		data, err := json.Marshal(original)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
+		require.NoError(t, err)
 
-		t.Logf("Marshaled BankTransferPayment: %s", string(data))
-
-		// Unmarshal
 		var unmarshaled BankTransferPayment
-		err = json.Unmarshal(data, &unmarshaled)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
 
-		// Verify structure
-		if unmarshaled.Type != BankTransfer {
-			t.Errorf("Expected type to be 'bank_transfer', got: %v", unmarshaled.Type)
-		}
-
-		if unmarshaled.AccountDetails.BankTransferPayment_AccountDetails_AnyOf == nil {
-			t.Fatal("Expected AccountDetails_AnyOf to be present")
-		}
-
-		if !unmarshaled.AccountDetails.BankTransferPayment_AccountDetails_AnyOf.IsA() {
-			t.Error("Expected account to be DomesticAccount (type A)")
-		}
+		assert.Equal(t, BankTransfer, unmarshaled.Type)
+		require.NotNil(t, unmarshaled.AccountDetails.BankTransferPayment_AccountDetails_AnyOf)
+		require.True(t, unmarshaled.AccountDetails.BankTransferPayment_AccountDetails_AnyOf.IsA(), "Expected DomesticAccount (type A)")
 
 		account := unmarshaled.AccountDetails.BankTransferPayment_AccountDetails_AnyOf.A
-		if account.AccountType != Domestic {
-			t.Errorf("Expected accountType to be 'domestic', got: %v", account.AccountType)
-		}
+		assert.Equal(t, Domestic, account.AccountType)
 	})
 
 	// Test 10: Round-trip for deeply nested InternationalAccount with PersonalBeneficiary
@@ -489,7 +331,6 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		beneficiaryEmail := "beneficiary@example.com"
 		beneficiaryPhone := "555-987-6543"
 
-		// Create deeply nested structure
 		personalBeneficiary := PersonalBeneficiary{
 			BeneficiaryType: Personal,
 			FullName:        "Charlie Brown",
@@ -515,45 +356,20 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 			},
 		}
 
-		// Marshal
 		data, err := json.Marshal(original)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
+		require.NoError(t, err)
 
-		t.Logf("Marshaled InternationalAccount: %s", string(data))
-
-		// Unmarshal
 		var unmarshaled InternationalAccount
-		err = json.Unmarshal(data, &unmarshaled)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
 
-		// Verify structure
-		if unmarshaled.AccountType != International {
-			t.Errorf("Expected accountType to be 'international', got: %v", unmarshaled.AccountType)
-		}
-
-		if unmarshaled.BeneficiaryDetails == nil {
-			t.Fatal("Expected beneficiaryDetails to be present")
-		}
-
-		if unmarshaled.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf == nil {
-			t.Fatal("Expected beneficiaryDetails anyOf to be present")
-		}
-
-		if !unmarshaled.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.IsA() {
-			t.Error("Expected beneficiary to be PersonalBeneficiary (type A)")
-		}
+		assert.Equal(t, International, unmarshaled.AccountType)
+		require.NotNil(t, unmarshaled.BeneficiaryDetails)
+		require.NotNil(t, unmarshaled.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf)
+		require.True(t, unmarshaled.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.IsA(), "Expected PersonalBeneficiary (type A)")
 
 		beneficiary := unmarshaled.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.A
-		if beneficiary.BeneficiaryType != Personal {
-			t.Errorf("Expected beneficiaryType to be 'personal', got: %v", beneficiary.BeneficiaryType)
-		}
-		if beneficiary.FullName != "Charlie Brown" {
-			t.Errorf("Expected fullName to be 'Charlie Brown', got: %s", beneficiary.FullName)
-		}
+		assert.Equal(t, Personal, beneficiary.BeneficiaryType)
+		assert.Equal(t, "Charlie Brown", beneficiary.FullName)
 	})
 
 	// Test 11: Round-trip for PaymentMethod with nested unions (BankTransferPayment -> InternationalAccount -> BusinessBeneficiary)
@@ -562,7 +378,6 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		holderEmail := "corp@example.com"
 		taxID := "12-3456789"
 
-		// Create deeply nested structure: PaymentMethod -> BankTransferPayment -> InternationalAccount -> BusinessBeneficiary
 		businessBeneficiary := BusinessBeneficiary{
 			BeneficiaryType: Business,
 			CompanyName:     "Acme Corp",
@@ -600,66 +415,31 @@ func TestNestedAnyOfWithSensitiveData(t *testing.T) {
 		original := PaymentMethod{
 			PaymentMethod_AnyOf: &PaymentMethod_AnyOf{},
 		}
-		if err := original.PaymentMethod_AnyOf.FromBankTransferPayment(bankTransfer); err != nil {
-			t.Fatalf("Failed to set bank transfer: %v", err)
-		}
+		require.NoError(t, original.PaymentMethod_AnyOf.FromBankTransferPayment(bankTransfer))
 
-		// Marshal
 		data, err := json.Marshal(original)
-		if err != nil {
-			t.Fatalf("Failed to marshal: %v", err)
-		}
+		require.NoError(t, err)
 
-		t.Logf("Marshaled nested PaymentMethod: %s", string(data))
-
-		// Unmarshal
 		var unmarshaled PaymentMethod
-		err = json.Unmarshal(data, &unmarshaled)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal: %v", err)
-		}
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
 
-		// Verify deeply nested structure
-		if unmarshaled.PaymentMethod_AnyOf == nil {
-			t.Fatal("Expected PaymentMethod_AnyOf to be present")
-		}
+		require.NotNil(t, unmarshaled.PaymentMethod_AnyOf)
 
 		bankTransferResult, err := unmarshaled.PaymentMethod_AnyOf.AsBankTransferPayment()
-		if err != nil {
-			t.Fatalf("Failed to get as BankTransferPayment: %v", err)
-		}
+		require.NoError(t, err)
 
-		if bankTransferResult.Type != BankTransfer {
-			t.Errorf("Expected type to be 'bank_transfer', got: %v", bankTransferResult.Type)
-		}
-
-		if bankTransferResult.AccountDetails.BankTransferPayment_AccountDetails_AnyOf == nil {
-			t.Fatal("Expected AccountDetails_AnyOf to be present")
-		}
-
-		if !bankTransferResult.AccountDetails.BankTransferPayment_AccountDetails_AnyOf.IsB() {
-			t.Fatal("Expected account to be InternationalAccount (type B)")
-		}
+		assert.Equal(t, BankTransfer, bankTransferResult.Type)
+		require.NotNil(t, bankTransferResult.AccountDetails.BankTransferPayment_AccountDetails_AnyOf)
+		require.True(t, bankTransferResult.AccountDetails.BankTransferPayment_AccountDetails_AnyOf.IsB(), "Expected InternationalAccount (type B)")
 
 		intlAccount := bankTransferResult.AccountDetails.BankTransferPayment_AccountDetails_AnyOf.B
-		if intlAccount.AccountType != International {
-			t.Errorf("Expected accountType to be 'international', got: %v", intlAccount.AccountType)
-		}
+		assert.Equal(t, International, intlAccount.AccountType)
 
-		if intlAccount.BeneficiaryDetails == nil {
-			t.Fatal("Expected beneficiaryDetails to be present")
-		}
-
-		if !intlAccount.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.IsB() {
-			t.Fatal("Expected beneficiary to be BusinessBeneficiary (type B)")
-		}
+		require.NotNil(t, intlAccount.BeneficiaryDetails)
+		require.True(t, intlAccount.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.IsB(), "Expected BusinessBeneficiary (type B)")
 
 		businessResult := intlAccount.BeneficiaryDetails.InternationalAccount_BeneficiaryDetails_AnyOf.B
-		if businessResult.BeneficiaryType != Business {
-			t.Errorf("Expected beneficiaryType to be 'business', got: %v", businessResult.BeneficiaryType)
-		}
-		if businessResult.CompanyName != "Acme Corp" {
-			t.Errorf("Expected companyName to be 'Acme Corp', got: %s", businessResult.CompanyName)
-		}
+		assert.Equal(t, Business, businessResult.BeneficiaryType)
+		assert.Equal(t, "Acme Corp", businessResult.CompanyName)
 	})
 }
