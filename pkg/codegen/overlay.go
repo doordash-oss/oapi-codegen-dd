@@ -45,12 +45,14 @@ func loadOverlaySource(source string) ([]byte, error) {
 	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
 		return loadOverlayFromURL(source)
 	}
+	// #nosec G304 -- Overlay paths are user-specified in config, same as OpenAPI spec paths
 	return os.ReadFile(source)
 }
 
 // loadOverlayFromURL fetches overlay content from a URL.
 func loadOverlayFromURL(url string) ([]byte, error) {
-	resp, err := http.Get(url) //nolint:gosec // URL is user-provided config
+	// #nosec G107 -- Overlay URLs are user-specified in config, same as OpenAPI spec URLs
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching URL: %w", err)
 	}
