@@ -102,6 +102,10 @@
           "$ref": "#/definitions/HandlerOptions",
           "description": "Handler specifies options for handler/server code generation. If not specified, no handler code is generated."
         },
+        "mcp-server": {
+          "$ref": "#/definitions/MCPServerOptions",
+          "description": "MCPServer specifies options for MCP (Model Context Protocol) server generation. If set, generates MCP tools that wrap the generated client for AI assistant integration. Requires client generation to be enabled."
+        },
         "omit-description": {
           "type": "boolean",
           "description": "OmitDescription specifies whether to omit schema description from the spec in the generated code. Defaults to false."
@@ -308,6 +312,18 @@
       "additionalProperties": false,
       "description": "Options for generating middleware.go. Currently empty but allows for future extensibility.",
       "properties": {},
+      "required": []
+    },
+    "MCPServerOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Options for MCP (Model Context Protocol) server generation. MCP servers expose API operations as tools that AI assistants (Claude, Cursor, etc.) can invoke.",
+      "properties": {
+        "default-skip": {
+          "type": "boolean",
+          "description": "If true, skip all operations by default unless x-mcp.skip is explicitly false. If false (default), include all operations unless x-mcp.skip is true."
+        }
+      },
       "required": []
     },
     "ServerOptions": {

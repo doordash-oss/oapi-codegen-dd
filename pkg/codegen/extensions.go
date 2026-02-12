@@ -50,7 +50,66 @@ const (
 
 	// extSensitiveData marks a field as containing sensitive data that should be masked
 	extSensitiveData = "x-sensitive-data"
+
+	// extMCP configures MCP tool generation for an operation
+	extMCP = "x-mcp"
 )
+
+// MCPExtension configures MCP tool generation for an operation.
+type MCPExtension struct {
+	// Skip excludes this operation from MCP tool generation.
+	// nil means not set (use default behavior), true means skip, false means include.
+	Skip *bool `json:"skip,omitempty" yaml:"skip,omitempty"`
+
+	// Name overrides the MCP tool name (default: operationId)
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+
+	// Description overrides the MCP tool description (default: operation summary)
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// ShouldSkip returns whether this operation should be skipped based on the extension
+// and the default-skip configuration.
+func (e *MCPExtension) ShouldSkip(defaultSkip bool) bool {
+	if e == nil {
+		// No extension - use default behavior
+		return defaultSkip
+	}
+	if e.Skip == nil {
+		// Extension exists but skip not set - use default behavior
+		return defaultSkip
+	}
+	// Skip is explicitly set
+	return *e.Skip
+}
+
+// extParseMCP parses the x-mcp extension value into MCPExtension
+func extParseMCP(extPropValue any) (*MCPExtension, error) {
+	if extPropValue == nil {
+		return nil, nil
+	}
+
+	m, ok := extPropValue.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("x-mcp must be an object, got %T", extPropValue)
+	}
+
+	ext := &MCPExtension{}
+	if skip, ok := m["skip"]; ok {
+		b, err := parseBooleanValue(skip)
+		if err != nil {
+			return nil, fmt.Errorf("x-mcp.skip: %w", err)
+		}
+		ext.Skip = &b
+	}
+	if name, ok := m["name"].(string); ok {
+		ext.Name = name
+	}
+	if desc, ok := m["description"].(string); ok {
+		ext.Description = desc
+	}
+	return ext, nil
+}
 
 func extExtraTags(extPropValue any) (map[string]string, error) {
 	tagsI, ok := extPropValue.(map[string]any)

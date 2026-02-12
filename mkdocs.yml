@@ -69,6 +69,7 @@ nav:
   - 'Configuration': 'configuration.md'
   - 'Overlays': 'overlays.md'
   - 'Server Generation': 'server-generation.md'
+  - 'MCP Server': 'mcp-server.md'
   - 'Validation': 'validation.md'
   - 'Union Types': 'union-types.md'
   - 'Additional Properties': 'additional-properties.md'
@@ -86,3 +87,4 @@ nav:
       - 'x-sensitive-data': 'extensions/x-sensitive-data.md'
       - 'x-enum-names': 'extensions/x-enum-names.md'
       - 'x-deprecated-reason': 'extensions/x-deprecated-reason.md'
+      - 'x-mcp': 'extensions/x-mcp.md'

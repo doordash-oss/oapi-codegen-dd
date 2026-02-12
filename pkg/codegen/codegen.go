@@ -305,6 +305,18 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 				}
 			}
 
+			// Parse x-mcp extension if present
+			var mcpExt *MCPExtension
+			if operation.Extensions != nil {
+				extensions := extractExtensions(operation.Extensions)
+				if mcpValue, ok := extensions[extMCP]; ok {
+					mcpExt, err = extParseMCP(mcpValue)
+					if err != nil {
+						return nil, fmt.Errorf("error parsing x-mcp extension for %s: %w", operationID, err)
+					}
+				}
+			}
+
 			operations = append(operations, OperationDefinition{
 				ID:          operationID,
 				Summary:     operation.Summary,
@@ -317,6 +329,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 				Query:      queryParamsDef,
 				Response:   response,
 				Body:       bodyDefinition,
+				MCP:        mcpExt,
 			})
 		}
 	}

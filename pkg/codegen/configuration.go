@@ -283,6 +283,11 @@ type GenerateOptions struct {
 	// If nil, no handler code is generated.
 	Handler *HandlerOptions `yaml:"handler,omitempty"`
 
+	// MCPServer specifies options for MCP (Model Context Protocol) server generation.
+	// If set, generates MCP tools that wrap the generated client for AI assistant integration.
+	// Requires client generation to be enabled.
+	MCPServer *MCPServerOptions `yaml:"mcp-server,omitempty"`
+
 	// OmitDescription specifies whether to omit schema description from the spec in the generated code. Defaults to false.
 	OmitDescription bool `yaml:"omit-description"`
 
@@ -437,6 +442,16 @@ type HandlerValidation struct {
 // MiddlewareOptions specifies options for generating middleware.go.
 // Currently empty but allows for future extensibility.
 type MiddlewareOptions struct {
+}
+
+// MCPServerOptions specifies options for MCP (Model Context Protocol) server generation.
+// MCP servers expose API operations as tools that AI assistants (Claude, Cursor, etc.) can invoke.
+// The generated code wraps the generated client to make real API calls.
+type MCPServerOptions struct {
+	// DefaultSkip specifies whether operations are skipped by default.
+	// If true, operations are excluded unless x-mcp.skip is explicitly false.
+	// If false (default), operations are included unless x-mcp.skip is true.
+	DefaultSkip bool `yaml:"default-skip"`
 }
 
 // ScaffoldOutput specifies output options for scaffolded files.

@@ -1,0 +1,285 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- template "header" $ }}
+
+{{ define "mcp-tools" }}
+{{ $args := . }}
+{{ $config := $args.Config }}
+{{ $operations := $args.Operations }}
+{{ $clientName := $config.Client.Name }}
+{{ $defaultSkip := $config.Generate.MCPServer.DefaultSkip }}
+
+// MCPToolsOption configures the MCPTools.
+type MCPToolsOption func(*MCPTools)
+
+// MCPTools registers API operations as MCP tools.
+// It uses an HTTP client to make API calls.
+//
+// TODO: Add MCPAdapter support for direct service calls (similar to HTTPAdapter)
+// that would allow calling ServiceInterface directly without HTTP overhead,
+// including proper request validation.
+type MCPTools struct {
+    server *server.MCPServer
+    client {{ $clientName }}Interface
+}
+
+// NewMCPTools creates a new MCPTools and registers all tools with the MCP server.
+func NewMCPTools(s *server.MCPServer, opts ...MCPToolsOption) *MCPTools {
+    t := &MCPTools{server: s}
+    for _, opt := range opts {
+        opt(t)
+    }
+    t.registerAll()
+    return t
+}
+
+// WithClient configures MCPTools to use an HTTP client for API calls.
+func WithClient(client {{ $clientName }}Interface) MCPToolsOption {
+    return func(t *MCPTools) {
+        t.client = client
+    }
+}
+
+func (t *MCPTools) registerAll() {
+{{- range $operations }}
+{{- if not (.MCP.ShouldSkip $defaultSkip) }}
+    t.register{{ .ID | ucFirst }}()
+{{- end }}
+{{- end }}
+}
+
+{{- range $operations }}{{ $op := . }}
+{{- if not ($op.MCP.ShouldSkip $defaultSkip) }}
+{{- $toolName := $op.ID }}{{ if and $op.MCP $op.MCP.Name }}{{ $toolName = $op.MCP.Name }}{{ end }}
+{{- $toolDesc := $op.Summary }}{{ if and $op.MCP $op.MCP.Description }}{{ $toolDesc = $op.MCP.Description }}{{ end }}
+
+func (t *MCPTools) register{{ $op.ID | ucFirst }}() {
+    tool := mcp.NewTool("{{ escapeGoString $toolName }}",
+        mcp.WithDescription("{{ if $toolDesc }}{{ escapeGoString $toolDesc }}{{ else }}{{ escapeGoString $toolName }}{{ end }}"),
+        {{- template "mcp-tool-options" $op }}
+    )
+    t.server.AddTool(tool, t.handle{{ $op.ID | ucFirst }})
+}
+
+func (t *MCPTools) handle{{ $op.ID | ucFirst }}(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+{{- template "mcp-tool-handler" dict "op" $op "clientName" $clientName }}
+}
+{{- end }}
+{{- end }}
+{{ end }}
+
+{{- define "mcp-tool-options" -}}
+{{- $op := . -}}
+{{- if $op.PathParams }}
+{{- range $op.PathParams.Schema.Properties }}
+        {{ template "mcp-property-option" dict "name" .JsonFieldName "schema" .Schema "description" .Description "required" true }},
+{{- end }}
+{{- end }}
+{{- if $op.Query }}
+{{- range $op.Query.Params }}
+        {{ template "mcp-property-option" dict "name" .ParamName "schema" .Schema "description" .Schema.Description "required" false }},
+{{- end }}
+{{- end }}
+{{- if $op.Body }}
+        mcp.WithObject("body", mcp.Description("Request body"){{ if $op.BodyRequired }}, mcp.Required(){{ end }}),
+{{- end }}
+{{- end }}
+
+{{- define "mcp-property-option" -}}
+{{- $name := .name -}}
+{{- $schema := .schema -}}
+{{- $description := .description -}}
+{{- $required := .required -}}
+{{- $goType := $schema.TypeDecl -}}
+{{- if or (eq $goType "string") (hasPrefix $goType "string") -}}
+mcp.WithString("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+{{- else if or (eq $goType "int") (eq $goType "int32") (eq $goType "int64") (eq $goType "float32") (eq $goType "float64") -}}
+mcp.WithNumber("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+{{- else if eq $goType "bool" -}}
+mcp.WithBoolean("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+{{- else if hasPrefix $goType "[]" -}}
+mcp.WithArray("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+{{- else -}}
+mcp.WithObject("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+{{- end -}}
+{{- end }}
+
+{{- define "mcp-tool-handler" -}}
+{{- $op := .op -}}
+{{- $clientName := .clientName }}
+{{- if $op.HasRequestOptions }}
+    opts := &{{ $op.ID | ucFirst }}RequestOptions{}
+{{- template "mcp-extract-params" $op }}
+{{- end }}
+{{- if eq $op.Response.SuccessStatusCode 204 }}
+    _, err := t.client.{{ $op.ID }}(ctx{{ if $op.HasRequestOptions }}, opts{{ end }})
+    if err != nil {
+        return mcp.NewToolResultError(err.Error()), nil
+    }
+    return mcp.NewToolResultText("success"), nil
+{{- else }}
+    result, err := t.client.{{ $op.ID }}(ctx{{ if $op.HasRequestOptions }}, opts{{ end }})
+    if err != nil {
+        return mcp.NewToolResultError(err.Error()), nil
+    }
+    return mcp.NewToolResultJSON(result)
+{{- end }}
+{{- end }}
+
+{{- define "mcp-extract-params" -}}
+{{- $op := . -}}
+{{- if $op.PathParams }}
+    opts.PathParams = &{{ $op.ID | ucFirst }}Path{}
+{{ range $op.PathParams.Schema.Properties -}}
+{{ template "mcp-get-param" dict "prop" . "target" "opts.PathParams" "fieldName" .GoName }}
+{{ end -}}
+{{- end -}}
+{{- if $op.Query }}
+    opts.Query = &{{ $op.ID | ucFirst }}Query{}
+{{ range $op.Query.Params -}}
+{{ template "mcp-get-query-param" dict "prop" . "target" "opts.Query" "fieldName" (.ParamName | toCamelCase | ucFirst) }}
+{{ end -}}
+{{- end -}}
+{{- if $op.Body }}
+    if args := req.GetArguments(); args != nil {
+        if bodyData, ok := args["body"]; ok {
+            bodyBytes, _ := json.Marshal(bodyData)
+            var body {{ $op.Body.Schema.TypeDecl }}
+            if err := json.Unmarshal(bodyBytes, &body); err == nil {
+                opts.Body = &body
+            }
+        }
+    }
+{{- end }}
+{{- end }}
+
+{{- define "mcp-get-param" -}}
+{{- $prop := .prop -}}
+{{- $target := .target -}}
+{{- $fieldName := .fieldName -}}
+{{- $goType := $prop.Schema.TypeDecl -}}
+{{- $paramName := $prop.JsonFieldName -}}
+{{- if eq $goType "string" -}}
+    {{ $target }}.{{ $fieldName }} = req.GetString("{{ $paramName }}", "")
+{{- else if eq $goType "int" -}}
+    {{ $target }}.{{ $fieldName }} = req.GetInt("{{ $paramName }}", 0)
+{{- else if eq $goType "int32" -}}
+    {{ $target }}.{{ $fieldName }} = int32(req.GetInt("{{ $paramName }}", 0))
+{{- else if eq $goType "int64" -}}
+    {{ $target }}.{{ $fieldName }} = int64(req.GetInt("{{ $paramName }}", 0))
+{{- else if or (eq $goType "float32") (eq $goType "float64") -}}
+    {{ $target }}.{{ $fieldName }} = {{ $goType }}(req.GetFloat("{{ $paramName }}", 0))
+{{- else if eq $goType "bool" -}}
+    {{ $target }}.{{ $fieldName }} = req.GetBool("{{ $paramName }}", false)
+{{- else -}}
+    // Complex type - attempt JSON conversion
+    if args := req.GetArguments(); args != nil {
+        if v, ok := args["{{ $paramName }}"]; ok {
+            if data, err := json.Marshal(v); err == nil {
+                var val {{ $goType }}
+                if err := json.Unmarshal(data, &val); err == nil {
+                    {{ $target }}.{{ $fieldName }} = val
+                }
+            }
+        }
+    }
+{{- end -}}
+{{- end }}
+
+{{- define "mcp-get-query-param" -}}
+{{- $prop := .prop -}}
+{{- $target := .target -}}
+{{- $fieldName := .fieldName -}}
+{{- $goType := $prop.Schema.TypeDecl -}}
+{{- $paramName := $prop.ParamName -}}
+{{- $isPointer := $prop.IsPointerType -}}
+{{- /* Query params are often pointers, so we need to handle that */ -}}
+{{- if $isPointer -}}
+{{- if eq $goType "string" -}}
+    if v := req.GetString("{{ $paramName }}", ""); v != "" {
+        {{ $target }}.{{ $fieldName }} = &v
+    }
+{{- else if eq $goType "int" -}}
+    if v := req.GetInt("{{ $paramName }}", 0); v != 0 {
+        {{ $target }}.{{ $fieldName }} = &v
+    }
+{{- else if eq $goType "int32" -}}
+    if v := req.GetInt("{{ $paramName }}", 0); v != 0 {
+        v32 := int32(v)
+        {{ $target }}.{{ $fieldName }} = &v32
+    }
+{{- else if eq $goType "int64" -}}
+    if v := req.GetInt("{{ $paramName }}", 0); v != 0 {
+        v64 := int64(v)
+        {{ $target }}.{{ $fieldName }} = &v64
+    }
+{{- else if or (eq $goType "float32") (eq $goType "float64") -}}
+    if v := req.GetFloat("{{ $paramName }}", 0); v != 0 {
+        vf := {{ $goType }}(v)
+        {{ $target }}.{{ $fieldName }} = &vf
+    }
+{{- else if eq $goType "bool" -}}
+    if args := req.GetArguments(); args != nil {
+        if _, ok := args["{{ $paramName }}"]; ok {
+            v := req.GetBool("{{ $paramName }}", false)
+            {{ $target }}.{{ $fieldName }} = &v
+        }
+    }
+{{- else -}}
+    // Complex pointer type - attempt JSON conversion
+    if args := req.GetArguments(); args != nil {
+        if v, ok := args["{{ $paramName }}"]; ok {
+            if data, err := json.Marshal(v); err == nil {
+                var val {{ $goType }}
+                if err := json.Unmarshal(data, &val); err == nil {
+                    {{ $target }}.{{ $fieldName }} = &val
+                }
+            }
+        }
+    }
+{{- end -}}
+{{- else -}}
+{{- /* Non-pointer query param */ -}}
+{{- if eq $goType "string" -}}
+    {{ $target }}.{{ $fieldName }} = req.GetString("{{ $paramName }}", "")
+{{- else if eq $goType "int" -}}
+    {{ $target }}.{{ $fieldName }} = req.GetInt("{{ $paramName }}", 0)
+{{- else if eq $goType "int32" -}}
+    {{ $target }}.{{ $fieldName }} = int32(req.GetInt("{{ $paramName }}", 0))
+{{- else if eq $goType "int64" -}}
+    {{ $target }}.{{ $fieldName }} = int64(req.GetInt("{{ $paramName }}", 0))
+{{- else if or (eq $goType "float32") (eq $goType "float64") -}}
+    {{ $target }}.{{ $fieldName }} = {{ $goType }}(req.GetFloat("{{ $paramName }}", 0))
+{{- else if eq $goType "bool" -}}
+    {{ $target }}.{{ $fieldName }} = req.GetBool("{{ $paramName }}", false)
+{{- else -}}
+    // Complex type - attempt JSON conversion
+    if args := req.GetArguments(); args != nil {
+        if v, ok := args["{{ $paramName }}"]; ok {
+            if data, err := json.Marshal(v); err == nil {
+                var val {{ $goType }}
+                if err := json.Unmarshal(data, &val); err == nil {
+                    {{ $target }}.{{ $fieldName }} = val
+                }
+            }
+        }
+    }
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{ template "mcp-tools" dict "Config" .Config "Operations" .Operations }}

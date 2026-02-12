@@ -42,6 +42,9 @@ type OperationDefinition struct {
 
 	Body     *RequestBodyDefinition
 	Response ResponseDefinition
+
+	// MCP contains x-mcp extension configuration for MCP tool generation
+	MCP *MCPExtension
 }
 
 // RequiresParamObject indicates If we have parameters other than path parameters, they're bundled into an

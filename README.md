@@ -28,9 +28,15 @@ on the real value-add for your organization.
 
 ### Server Generation
 - **Complete server scaffolding** - Generate service interfaces, HTTP adapters, routers, and server main.go
-- **12 framework support** - Chi, Echo, Gin, Fiber, std-http, Beego, go-zero, Kratos, GoFrame, Hertz, gorilla-mux, fasthttp
+- **13 framework support** - Chi, Echo, Gin, Fiber, std-http, Beego, go-zero, Kratos, GoFrame, Hertz, gorilla-mux, fasthttp, Iris
 - **Clean architecture** - Service interface pattern separates business logic from HTTP handling
 - **Request/response validation** - Optional validation in generated handlers
+
+### MCP Server Generation
+- **[MCP (Model Context Protocol)](https://modelcontextprotocol.io/)** - Generate MCP servers for AI assistant integration
+- **Tool generation** - Each API operation becomes an MCP tool that AI assistants can call
+- **x-mcp extension** - Control tool names, descriptions, and skip operations
+- **Works with Claude Desktop, Cursor, and other MCP clients**
 
 ### Configuration & Filtering
 - **YAML-based configuration** with JSON schema validation
@@ -84,6 +90,7 @@ Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/cubahno/s
 | **Templates** | Monolithic | Composable with `{{define}}` blocks |
 | **Programmatic API** | Limited | Full (`ParseContext`, `TypeTracker`) |
 | **Server Frameworks** | 7 (Chi, Echo, Fiber, Gin, Gorilla, Iris, std-http) | 13 (+ Beego, go-zero, Kratos, GoFrame, Hertz, fasthttp) |
+| **MCP Server** | None | Full (AI assistant integration) |
 
 ### Migration
 

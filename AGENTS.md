@@ -238,3 +238,23 @@ make lint                        # Check for lint issues
 ```
 
 **Important**: Do NOT run `make generate` when adding a new framework - only regenerate the specific examples you're working on.
+
+## Documentation
+
+Documentation is in `docs/` using MkDocs. Key files:
+
+- `docs/mcp-server.md` - MCP server generation guide
+- `docs/server-generation.md` - HTTP server generation guide
+- `docs/extensions/x-*.md` - Extension documentation
+- `mkdocs.yml` - Navigation and config
+
+### Adding documentation
+1. Create markdown file in `docs/`
+2. Add to `nav:` section in `mkdocs.yml`
+3. For extensions, create in `docs/extensions/` and add under Extensions nav
+
+### Local preview
+```bash
+pip install mkdocs-material
+mkdocs serve
+```

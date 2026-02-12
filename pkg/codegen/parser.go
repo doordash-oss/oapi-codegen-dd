@@ -376,6 +376,31 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 	}
 
+	// Generate MCP server tools if MCP server generation is enabled
+	if len(p.ctx.Operations) > 0 && p.cfg.Generate.MCPServer != nil {
+		if !p.cfg.Generate.Client {
+			return nil, fmt.Errorf("MCP server generation requires client generation to be enabled (set generate.client: true)")
+		}
+		opsCtx := &TplOperationsContext{
+			Operations: p.ctx.Operations,
+			Imports:    p.ctx.Imports,
+			Config:     p.cfg,
+			WithHeader: withHeader,
+		}
+		out, err := p.ParseTemplates([]string{"mcp/tools.tmpl"}, opsCtx)
+		if err != nil {
+			return nil, fmt.Errorf("error generating code for MCP tools: %w", err)
+		}
+		formatted := out
+		if !useSingleFile {
+			formatted, err = FormatCode(out)
+			if err != nil {
+				return nil, fmt.Errorf("error formatting MCP tools: %w", err)
+			}
+		}
+		typesOut["mcp_tools"] = formatted
+	}
+
 	// Generate validator file if validation is not skipped, not using single file, and generating models
 	if shouldGenerateModels && !useSingleFile && !p.cfg.Generate.Validation.Skip {
 		out, err := p.ParseTemplates([]string{"common.tmpl"}, EnumContext{
@@ -557,6 +582,11 @@ func loadTemplates(cfg Configuration) (*template.Template, error) {
 	// Add framework-specific directory if handler is configured
 	if cfg.Generate != nil && cfg.Generate.Handler != nil && cfg.Generate.Handler.Kind != "" {
 		dirs = append(dirs, "templates/handler/"+string(cfg.Generate.Handler.Kind))
+	}
+
+	// Add MCP templates directory if MCP server is configured
+	if cfg.Generate != nil && cfg.Generate.MCPServer != nil {
+		dirs = append(dirs, "templates/mcp")
 	}
 
 	for _, dir := range dirs {

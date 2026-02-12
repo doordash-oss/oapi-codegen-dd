@@ -18,6 +18,7 @@ help:
 	@echo "    test:        run all tests"
 	@echo "    tidy         tidy go mod"
 	@echo "    lint         lint the project"
+	@echo "    notice       regenerate NOTICE.txt with third-party licenses"
 
 $(GOBIN)/golangci-lint:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) v2.4.0
@@ -106,3 +107,21 @@ docs-install:
 @PHONY: docs-serve
 docs-serve:
 	@mkdocs serve
+
+$(GOBIN)/go-licenses:
+	GOBIN=$(GOBIN) go install github.com/google/go-licenses@latest
+
+.PHONY: notice
+notice: $(GOBIN)/go-licenses
+	@echo "This product includes software developed by DoorDash, Inc." > NOTICE.txt
+	@echo "Copyright 2025 DoorDash, Inc." >> NOTICE.txt
+	@echo "" >> NOTICE.txt
+	@echo "Bundled third-party components and their licenses:" >> NOTICE.txt
+	@echo "--------------------------------------------------" >> NOTICE.txt
+	@echo "" >> NOTICE.txt
+	@$(GOBIN)/go-licenses report ./... 2>/dev/null | sort | awk -F',' 'BEGIN{n=1} {printf "%d) %s\n   Source: %s\n   License: %s\n\n", n++, $$1, $$2, $$3}'  >> NOTICE.txt
+	@echo "--------------------------------------------------" >> NOTICE.txt
+	@echo "This NOTICE file must be updated whenever this project adds," >> NOTICE.txt
+	@echo "vendors, or bundles additional third-party components." >> NOTICE.txt
+	@echo "" >> NOTICE.txt
+	@echo "Generated NOTICE.txt"
