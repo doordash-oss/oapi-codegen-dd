@@ -9,7 +9,9 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// modelcontextprotocol
+// To run it this example:
+// cd examples
+// npx @modelcontextprotocol/inspector go run ./mcp/server/
 func main() {
 	// Create mock client with sample data
 	client := &mockClient{
