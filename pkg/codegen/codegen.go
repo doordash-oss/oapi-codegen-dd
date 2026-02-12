@@ -349,8 +349,18 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 // resolveRequestOptionsCollisions checks if any operation's RequestOptions type name
 // would collide with existing component schemas, and renames the operation ID if needed.
+// It also checks for ServiceRequestOptions collisions (used by handler generation).
 func resolveRequestOptionsCollisions(operations []OperationDefinition, tracker *TypeTracker) []OperationDefinition {
 	result := make([]OperationDefinition, len(operations))
+
+	// First pass: register all client RequestOptions names so handler can detect collisions
+	clientRequestOptions := make(map[string]bool)
+	for _, op := range operations {
+		if op.HasRequestOptions() {
+			name := UppercaseFirstCharacter(op.ID) + "RequestOptions"
+			clientRequestOptions[name] = true
+		}
+	}
 
 	for i, op := range operations {
 		if !op.HasRequestOptions() {
@@ -359,8 +369,19 @@ func resolveRequestOptionsCollisions(operations []OperationDefinition, tracker *
 		}
 
 		// Check if the RequestOptions type name would collide and get a unique base name
-		op.ID = tracker.generateUniqueBaseName(UppercaseFirstCharacter(op.ID), "RequestOptions")
+		baseName := UppercaseFirstCharacter(op.ID)
+		baseName = tracker.generateUniqueBaseName(baseName, "RequestOptions")
 
+		// Also check if ServiceRequestOptions would collide with any client RequestOptions
+		// e.g., createPayment -> CreatePaymentServiceRequestOptions collides with
+		//       createPaymentService -> CreatePaymentServiceRequestOptions
+		serviceOptsName := baseName + "ServiceRequestOptions"
+		if clientRequestOptions[serviceOptsName] {
+			// Collision detected - append suffix to make it unique
+			baseName = baseName + "Handler"
+		}
+
+		op.ID = baseName
 		result[i] = op
 	}
 

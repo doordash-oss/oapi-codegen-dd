@@ -60,6 +60,10 @@ import (
     {{- if and .Config.Generate .Config.Generate.Handler }}
     {{template "router-import" .}}
     {{- end }}
+    {{- if and .Config.Generate .Config.Generate.MCPServer }}
+    "github.com/mark3labs/mcp-go/mcp"
+    "github.com/mark3labs/mcp-go/server"
+    {{- end }}
     {{- range .Config.AdditionalImports}}
     {{.Alias -}} "{{.Package}}"
     {{- end}}

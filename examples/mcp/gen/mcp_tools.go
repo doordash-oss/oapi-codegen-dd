@@ -122,6 +122,7 @@ func (t *MCPTools) registerGetUser() {
 func (t *MCPTools) handleGetUser(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	opts := &GetUserRequestOptions{}
 	opts.PathParams = &GetUserPath{}
+
 	opts.PathParams.ID = req.GetString("id", "")
 
 	result, err := t.client.GetUser(ctx, opts)

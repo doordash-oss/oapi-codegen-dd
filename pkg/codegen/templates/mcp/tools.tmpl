@@ -106,15 +106,15 @@ func (t *MCPTools) handle{{ $op.ID | ucFirst }}(ctx context.Context, req mcp.Cal
 {{- $required := .required -}}
 {{- $goType := $schema.TypeDecl -}}
 {{- if or (eq $goType "string") (hasPrefix $goType "string") -}}
-mcp.WithString("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+mcp.WithString("{{ escapeGoString $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
 {{- else if or (eq $goType "int") (eq $goType "int32") (eq $goType "int64") (eq $goType "float32") (eq $goType "float64") -}}
-mcp.WithNumber("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+mcp.WithNumber("{{ escapeGoString $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
 {{- else if eq $goType "bool" -}}
-mcp.WithBoolean("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+mcp.WithBoolean("{{ escapeGoString $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
 {{- else if hasPrefix $goType "[]" -}}
-mcp.WithArray("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+mcp.WithArray("{{ escapeGoString $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
 {{- else -}}
-mcp.WithObject("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
+mcp.WithObject("{{ escapeGoString $name }}"{{ if $description }}, mcp.Description("{{ escapeGoString $description }}"){{ end }}{{ if $required }}, mcp.Required(){{ end }})
 {{- end -}}
 {{- end }}
 
@@ -143,15 +143,15 @@ mcp.WithObject("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoS
 {{- define "mcp-extract-params" -}}
 {{- $op := . -}}
 {{- if $op.PathParams }}
-    opts.PathParams = &{{ $op.ID | ucFirst }}Path{}
+    opts.PathParams = &{{ $op.PathParams.Name }}{}
 {{ range $op.PathParams.Schema.Properties -}}
 {{ template "mcp-get-param" dict "prop" . "target" "opts.PathParams" "fieldName" .GoName }}
 {{ end -}}
 {{- end -}}
 {{- if $op.Query }}
-    opts.Query = &{{ $op.ID | ucFirst }}Query{}
+    opts.Query = &{{ $op.Query.Name }}{}
 {{ range $op.Query.Params -}}
-{{ template "mcp-get-query-param" dict "prop" . "target" "opts.Query" "fieldName" (.ParamName | toCamelCase | ucFirst) }}
+{{ template "mcp-get-query-param" dict "prop" . "target" "opts.Query" "fieldName" .GoName }}
 {{ end -}}
 {{- end -}}
 {{- if $op.Body }}
@@ -173,18 +173,61 @@ mcp.WithObject("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoS
 {{- $fieldName := .fieldName -}}
 {{- $goType := $prop.Schema.TypeDecl -}}
 {{- $paramName := $prop.JsonFieldName -}}
+{{- $isPointer := $prop.IsPointerType -}}
 {{- if eq $goType "string" -}}
+    {{- if $isPointer }}
+    if v := req.GetString("{{ $paramName }}", ""); v != "" {
+        {{ $target }}.{{ $fieldName }} = &v
+    }
+    {{- else }}
     {{ $target }}.{{ $fieldName }} = req.GetString("{{ $paramName }}", "")
+    {{- end }}
 {{- else if eq $goType "int" -}}
+    {{- if $isPointer }}
+    if v := req.GetInt("{{ $paramName }}", 0); v != 0 {
+        {{ $target }}.{{ $fieldName }} = &v
+    }
+    {{- else }}
     {{ $target }}.{{ $fieldName }} = req.GetInt("{{ $paramName }}", 0)
+    {{- end }}
 {{- else if eq $goType "int32" -}}
+    {{- if $isPointer }}
+    if v := req.GetInt("{{ $paramName }}", 0); v != 0 {
+        v32 := int32(v)
+        {{ $target }}.{{ $fieldName }} = &v32
+    }
+    {{- else }}
     {{ $target }}.{{ $fieldName }} = int32(req.GetInt("{{ $paramName }}", 0))
+    {{- end }}
 {{- else if eq $goType "int64" -}}
+    {{- if $isPointer }}
+    if v := req.GetInt("{{ $paramName }}", 0); v != 0 {
+        v64 := int64(v)
+        {{ $target }}.{{ $fieldName }} = &v64
+    }
+    {{- else }}
     {{ $target }}.{{ $fieldName }} = int64(req.GetInt("{{ $paramName }}", 0))
+    {{- end }}
 {{- else if or (eq $goType "float32") (eq $goType "float64") -}}
+    {{- if $isPointer }}
+    if v := req.GetFloat("{{ $paramName }}", 0); v != 0 {
+        vf := {{ $goType }}(v)
+        {{ $target }}.{{ $fieldName }} = &vf
+    }
+    {{- else }}
     {{ $target }}.{{ $fieldName }} = {{ $goType }}(req.GetFloat("{{ $paramName }}", 0))
+    {{- end }}
 {{- else if eq $goType "bool" -}}
+    {{- if $isPointer }}
+    if args := req.GetArguments(); args != nil {
+        if _, ok := args["{{ $paramName }}"]; ok {
+            v := req.GetBool("{{ $paramName }}", false)
+            {{ $target }}.{{ $fieldName }} = &v
+        }
+    }
+    {{- else }}
     {{ $target }}.{{ $fieldName }} = req.GetBool("{{ $paramName }}", false)
+    {{- end }}
 {{- else -}}
     // Complex type - attempt JSON conversion
     if args := req.GetArguments(); args != nil {
@@ -192,7 +235,11 @@ mcp.WithObject("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoS
             if data, err := json.Marshal(v); err == nil {
                 var val {{ $goType }}
                 if err := json.Unmarshal(data, &val); err == nil {
+                    {{- if $isPointer }}
+                    {{ $target }}.{{ $fieldName }} = &val
+                    {{- else }}
                     {{ $target }}.{{ $fieldName }} = val
+                    {{- end }}
                 }
             }
         }
@@ -205,7 +252,7 @@ mcp.WithObject("{{ $name }}"{{ if $description }}, mcp.Description("{{ escapeGoS
 {{- $target := .target -}}
 {{- $fieldName := .fieldName -}}
 {{- $goType := $prop.Schema.TypeDecl -}}
-{{- $paramName := $prop.ParamName -}}
+{{- $paramName := escapeGoString $prop.ParamName -}}
 {{- $isPointer := $prop.IsPointerType -}}
 {{- /* Query params are often pointers, so we need to handle that */ -}}
 {{- if $isPointer -}}

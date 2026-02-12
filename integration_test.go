@@ -30,6 +30,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/codegen"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -329,22 +332,38 @@ func TestIntegration(t *testing.T) {
 			}
 
 			// Create config file
-			configContent := `package: integration
-generate:
-  validation:
-    response: true
-  handler:
-    kind: std-http
-    name: IntegrationHandler
-    validation:
-      request: true
-      response: true
-output:
-  use-single-file: true
-  filename: generated.go
-`
+			cfg := codegen.Configuration{
+				PackageName: "integration",
+				Generate: &codegen.GenerateOptions{
+					Client: true,
+					Validation: codegen.ValidationOptions{
+						Response: true,
+					},
+					Handler: &codegen.HandlerOptions{
+						Kind: codegen.HandlerKindStdHTTP,
+						Name: "IntegrationHandler",
+						Validation: codegen.HandlerValidation{
+							Request:  true,
+							Response: true,
+						},
+					},
+					MCPServer: &codegen.MCPServerOptions{},
+				},
+				Client: &codegen.Client{
+					Name: "IntegrationClient",
+				},
+				Output: &codegen.Output{
+					UseSingleFile: true,
+					Filename:      "generated.go",
+				},
+			}
+			configContent, err := yaml.Marshal(cfg)
+			if err != nil {
+				recordFailure("setup", "failed to marshal config: %s", err)
+				return
+			}
 
-			if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+			if err := os.WriteFile(configFile, configContent, 0644); err != nil {
 				recordFailure("setup", "failed to write config file: %s", err)
 				return
 			}
