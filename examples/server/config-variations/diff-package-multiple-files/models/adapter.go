@@ -152,7 +152,6 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
 			Err:         err,
-			ContentType: "application/json",
 			StatusCode:  http.StatusBadRequest,
 		})
 		return

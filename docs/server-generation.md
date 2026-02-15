@@ -416,7 +416,6 @@ type OapiErrorContext struct {
     Err           error          // The underlying error
     ParamName     string         // Parameter name (for parse errors)
     ParamLocation string         // Parameter location: "path", "query", "header" (for parse errors)
-    ContentType   string         // Content type being decoded (for decode errors)
     StatusCode    int            // Suggested HTTP status code
 }
 ```
@@ -437,7 +436,6 @@ func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request
         "status", ctx.StatusCode,
         "param", ctx.ParamName,
         "param_location", ctx.ParamLocation,
-        "content_type", ctx.ContentType,
     )
 
     // Write response

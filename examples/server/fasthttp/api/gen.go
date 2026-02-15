@@ -50,9 +50,6 @@ type OapiErrorContext struct {
 	// ParamLocation is where the parameter came from: "path", "query", "header" (only set for OapiErrorKindParse).
 	ParamLocation string
 
-	// ContentType is the content type being decoded (only set for OapiErrorKindDecode).
-	ContentType string
-
 	// StatusCode is the suggested HTTP status code for the error.
 	// For service errors, this may be determined by the error type (e.g., typed error responses).
 	StatusCode int
@@ -60,7 +57,10 @@ type OapiErrorContext struct {
 
 // OapiErrorResponse is the default error response structure for parse, decode, and validation errors.
 type OapiErrorResponse struct {
-	Error string `json:"error"`
+	Error         string `json:"error"`
+	OperationID   string `json:"operation_id,omitempty"`
+	ParamName     string `json:"param_name,omitempty"`
+	ParamLocation string `json:"param_location,omitempty"`
 }
 
 // OapiErrorHandler handles errors that occur during request processing.
@@ -90,8 +90,12 @@ func (h *OapiDefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Req
 		w.WriteHeader(ctx.StatusCode)
 		switch ctx.Kind {
 		case OapiErrorKindParse:
-			fmt.Fprintf(w, "invalid parameter %q: %v", ctx.ParamName, ctx.Err)
-		case OapiErrorKindDecode, OapiErrorKindValidation, OapiErrorKindService:
+			fmt.Fprintf(w, "%s: invalid %s parameter %q: %v", ctx.OperationID, ctx.ParamLocation, ctx.ParamName, ctx.Err)
+		case OapiErrorKindDecode:
+			fmt.Fprintf(w, "%s: failed to decode request body: %v", ctx.OperationID, ctx.Err)
+		case OapiErrorKindValidation:
+			fmt.Fprintf(w, "%s: validation failed: %v", ctx.OperationID, ctx.Err)
+		case OapiErrorKindService:
 			fmt.Fprint(w, ctx.Err.Error())
 		}
 		return
@@ -103,11 +107,20 @@ func (h *OapiDefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Req
 	switch ctx.Kind {
 	case OapiErrorKindParse:
 		_ = json.NewEncoder(w).Encode(OapiErrorResponse{
-			Error: fmt.Sprintf("invalid parameter %q: %v", ctx.ParamName, ctx.Err),
+			Error:         fmt.Sprintf("invalid %s parameter %q: %v", ctx.ParamLocation, ctx.ParamName, ctx.Err),
+			OperationID:   ctx.OperationID,
+			ParamName:     ctx.ParamName,
+			ParamLocation: ctx.ParamLocation,
 		})
-	case OapiErrorKindDecode, OapiErrorKindValidation:
+	case OapiErrorKindDecode:
 		_ = json.NewEncoder(w).Encode(OapiErrorResponse{
-			Error: ctx.Err.Error(),
+			Error:       fmt.Sprintf("failed to decode request body: %v", ctx.Err),
+			OperationID: ctx.OperationID,
+		})
+	case OapiErrorKindValidation:
+		_ = json.NewEncoder(w).Encode(OapiErrorResponse{
+			Error:       fmt.Sprintf("validation failed: %v", ctx.Err),
+			OperationID: ctx.OperationID,
 		})
 	case OapiErrorKindService:
 		// Service errors are encoded directly - they may have custom structure
@@ -257,7 +270,6 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
 			Err:         err,
-			ContentType: "application/json",
 			StatusCode:  http.StatusBadRequest,
 		})
 		return

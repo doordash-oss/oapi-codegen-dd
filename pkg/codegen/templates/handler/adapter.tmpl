@@ -152,7 +152,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         Kind:        OapiErrorKindDecode,
                         OperationID: "{{ $op.ID }}",
                         Err:         fmt.Errorf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %w", err),
-                        ContentType: "application/json",
                         StatusCode:  http.StatusBadRequest,
                     })
                     return
@@ -294,7 +293,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Err:         err,
-            ContentType: "{{ $op.Body.ContentType }}",
             StatusCode:  http.StatusBadRequest,
         })
         return
@@ -308,7 +306,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Err:         err,
-            ContentType: "{{ $op.Body.ContentType }}",
             StatusCode:  http.StatusBadRequest,
         })
         return
@@ -319,7 +316,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Err:         err,
-            ContentType: "{{ $op.Body.ContentType }}",
             StatusCode:  http.StatusBadRequest,
         })
         return
@@ -329,7 +325,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Err:         err,
-            ContentType: "{{ $op.Body.ContentType }}",
             StatusCode:  http.StatusBadRequest,
         })
         return
@@ -343,7 +338,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     Kind:        OapiErrorKindDecode,
                     OperationID: "{{ $op.ID }}",
                     Err:         err,
-                    ContentType: "{{ $op.Body.ContentType }}",
                     StatusCode:  http.StatusBadRequest,
                 })
                 return
@@ -359,7 +353,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 Kind:        OapiErrorKindDecode,
                 OperationID: "{{ $op.ID }}",
                 Err:         err,
-                ContentType: "{{ $op.Body.ContentType }}",
                 StatusCode:  http.StatusBadRequest,
             })
             return
@@ -395,7 +388,6 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                             Kind:        OapiErrorKindDecode,
                             OperationID: "{{ $op.ID }}",
                             Err:         err,
-                            ContentType: "{{ $op.Body.ContentType }}",
                             StatusCode:  http.StatusBadRequest,
                         })
                         return
