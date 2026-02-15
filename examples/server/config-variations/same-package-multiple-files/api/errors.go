@@ -49,10 +49,9 @@ type OapiErrorResponse struct {
 // OapiErrorHandler handles errors that occur during request processing.
 // Implement this interface to customize error responses, logging, and metrics.
 type OapiErrorHandler interface {
-	// HandleError writes an error response body to w.
-	// The statusCode has already been written to w before this method is called.
-	// The err is either an OapiHandlerError (generic handler error) or a typed error
-	// matching the OpenAPI spec's error response schema.
+	// HandleError writes an error response to w with the given status code.
+	// The err is either an OapiHandlerError (for parse/decode/validation errors)
+	// or a typed error matching the OpenAPI spec's error response schema.
 	HandleError(w http.ResponseWriter, r *http.Request, statusCode int, err error)
 }
 
