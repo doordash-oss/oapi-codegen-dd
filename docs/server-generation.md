@@ -407,16 +407,22 @@ Implement the `OapiErrorHandler` interface to customize error responses, add log
 
 ```go
 type OapiErrorHandler interface {
-    HandleError(w http.ResponseWriter, r *http.Request, ctx OapiErrorContext)
+    HandleError(w http.ResponseWriter, r *http.Request, statusCode int, err error)
 }
+```
 
-type OapiErrorContext struct {
+The `err` parameter is either:
+
+- **`OapiHandlerError`** - A generic handler error (parse, decode, validation) with context fields
+- **Typed error** - An error type from your OpenAPI spec (when `error-mapping` is configured)
+
+```go
+type OapiHandlerError struct {
     Kind          OapiErrorKind  // Type of error (Parse, Decode, Validation, Service)
     OperationID   string         // OpenAPI operation ID (e.g., "GetUser", "CreateOrder")
-    Err           error          // The underlying error
+    Message       string         // Error message
     ParamName     string         // Parameter name (for parse errors)
     ParamLocation string         // Parameter location: "path", "query", "header" (for parse errors)
-    StatusCode    int            // Suggested HTTP status code
 }
 ```
 
@@ -427,23 +433,37 @@ type LoggingErrorHandler struct {
     logger *slog.Logger
 }
 
-func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx api.OapiErrorContext) {
-    // Log the error with full context
-    h.logger.Error("request error",
-        "operation", ctx.OperationID,
-        "kind", ctx.Kind,
-        "error", ctx.Err,
-        "status", ctx.StatusCode,
-        "param", ctx.ParamName,
-        "param_location", ctx.ParamLocation,
-    )
+func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, statusCode int, err error) {
+    // Check if it's a generic handler error
+    if handlerErr, ok := err.(api.OapiHandlerError); ok {
+        h.logger.Error("request error",
+            "operation", handlerErr.OperationID,
+            "kind", handlerErr.Kind,
+            "error", handlerErr.Message,
+            "status", statusCode,
+            "param", handlerErr.ParamName,
+            "param_location", handlerErr.ParamLocation,
+        )
+    } else {
+        // Typed error from OpenAPI spec or service error
+        h.logger.Error("service error",
+            "error", err.Error(),
+            "status", statusCode,
+        )
+    }
 
     // Write response
     w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(ctx.StatusCode)
-    json.NewEncoder(w).Encode(map[string]string{
-        "error": ctx.Err.Error(),
-    })
+    w.WriteHeader(statusCode)
+
+    if handlerErr, ok := err.(api.OapiHandlerError); ok {
+        json.NewEncoder(w).Encode(map[string]string{
+            "error": handlerErr.Message,
+        })
+    } else {
+        // Typed error - encode directly to match API contract
+        json.NewEncoder(w).Encode(err)
+    }
 }
 ```
 

@@ -48,12 +48,7 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.errHandler.HandleError(w, r, OapiErrorContext{
-			Kind:        OapiErrorKindService,
-			OperationID: "HealthCheck",
-			Err:         err,
-			StatusCode:  code,
-		})
+		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
 
@@ -90,13 +85,12 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	if queryParamLimitStr := query.Get("limit"); queryParamLimitStr != "" {
 		queryParamLimit, err := runtime.ParseString[int](queryParamLimitStr)
 		if err != nil {
-			a.errHandler.HandleError(w, r, OapiErrorContext{
+			a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 				Kind:          OapiErrorKindParse,
 				OperationID:   "ListUsers",
-				Err:           err,
+				Message:       err.Error(),
 				ParamName:     "limit",
 				ParamLocation: "query",
-				StatusCode:    http.StatusBadRequest,
 			})
 			return
 		}
@@ -108,12 +102,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.errHandler.HandleError(w, r, OapiErrorContext{
-			Kind:        OapiErrorKindService,
-			OperationID: "ListUsers",
-			Err:         err,
-			StatusCode:  code,
-		})
+		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
 
@@ -148,11 +137,10 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var body CreateUserBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		a.errHandler.HandleError(w, r, OapiErrorContext{
+		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
-			Err:         err,
-			StatusCode:  http.StatusBadRequest,
+			Message:     err.Error(),
 		})
 		return
 	}
@@ -162,12 +150,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.errHandler.HandleError(w, r, OapiErrorContext{
-			Kind:        OapiErrorKindService,
-			OperationID: "CreateUser",
-			Err:         err,
-			StatusCode:  code,
-		})
+		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
 
@@ -208,12 +191,7 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.errHandler.HandleError(w, r, OapiErrorContext{
-			Kind:        OapiErrorKindService,
-			OperationID: "GetUser",
-			Err:         err,
-			StatusCode:  code,
-		})
+		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
 
@@ -254,12 +232,7 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.errHandler.HandleError(w, r, OapiErrorContext{
-			Kind:        OapiErrorKindService,
-			OperationID: "DeleteUser",
-			Err:         err,
-			StatusCode:  code,
-		})
+		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
 

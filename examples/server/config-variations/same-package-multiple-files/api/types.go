@@ -39,5 +39,14 @@ type Error struct {
 }
 
 func (s Error) Error() string {
-	return "unmapped client error"
+	res0 := s.Message
+	if res0 == nil {
+		return "unknown error"
+	}
+	res1 := *res0
+	return res1
+}
+
+func NewError(message string) Error {
+	return Error{Message: runtime.Ptr(message)}
 }

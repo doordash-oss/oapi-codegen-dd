@@ -7,3 +7,5 @@ generate:
     kind: chi
     output:
       overwrite: true
+error-mapping:
+  Error: message
