@@ -370,6 +370,119 @@ func TestGetUser(t *testing.T) {
 }
 ```
 
+## Error Handling
+
+The generated code includes a flexible error handling system that separates error classification from error response formatting.
+
+### Error Types
+
+The `HTTPAdapter` handles four types of errors:
+
+| Error Kind | Description | Default Status |
+|------------|-------------|----------------|
+| `ErrorKindParse` | Parameter parsing errors (invalid path/query/header) | 400 |
+| `ErrorKindDecode` | Request body decoding errors (invalid JSON, form data) | 400 |
+| `ErrorKindValidation` | Request validation errors (failed schema validation) | 400 |
+| `ErrorKindService` | Service/business logic errors from your implementation | 500 (or typed) |
+
+### Default Behavior
+
+The `DefaultErrorHandler` respects the `Accept` header:
+
+- **JSON** (`application/json`, `*/*`, or empty): Returns JSON response
+- **Other**: Returns plain text
+
+```go
+// JSON error response for parse/decode/validation errors
+{
+    "error": "invalid parameter \"id\": strconv.Atoi: parsing \"abc\": invalid syntax"
+}
+```
+
+Service errors are JSON-encoded directly, so the response structure matches your error type's JSON tags.
+
+### Custom Error Handler
+
+Implement the `ErrorHandler` interface to customize error responses, add logging, or collect metrics:
+
+```go
+type ErrorHandler interface {
+    HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext)
+}
+
+type ErrorContext struct {
+    Kind       ErrorKind  // Type of error
+    Err        error      // The underlying error
+    ParamName  string     // Parameter name (for parse errors)
+    StatusCode int        // Suggested HTTP status code
+}
+```
+
+Example custom handler with logging:
+
+```go
+type LoggingErrorHandler struct {
+    logger *slog.Logger
+}
+
+func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext) {
+    // Log the error
+    h.logger.Error("request error",
+        "kind", ctx.Kind,
+        "error", ctx.Err,
+        "status", ctx.StatusCode,
+        "path", r.URL.Path,
+    )
+
+    // Write response
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(ctx.StatusCode)
+    json.NewEncoder(w).Encode(map[string]string{
+        "error": ctx.Err.Error(),
+    })
+}
+```
+
+Use your custom handler with `WithErrorHandler`:
+
+```go
+svc := api.NewService()
+handler := api.NewRouter(r, svc,
+    api.WithErrorHandler(&LoggingErrorHandler{logger: slog.Default()}),
+)
+```
+
+### Typed Error Responses
+
+When your OpenAPI spec defines error response types and you configure `error-mapping`, the generator creates typed errors with constructors:
+
+```yaml
+# cfg.yaml
+error-mapping:
+  InvalidRequestError: error.message
+```
+
+This generates:
+
+```go
+func NewInvalidRequestError(message string) InvalidRequestError {
+    return InvalidRequestError{ErrorData: &ErrorData{Message: message}}
+}
+```
+
+Use in your service implementation:
+
+```go
+func (s *Service) CreateUser(ctx context.Context, opts *CreateUserOpts) (*CreateUserResponse, error) {
+    if opts.Body.Email == "" {
+        return nil, NewInvalidRequestError("email is required")
+    }
+    // ...
+}
+```
+
+The `HTTPAdapter` automatically detects typed errors and uses the appropriate status code from your OpenAPI spec.
+
 ## Examples
 
 Complete examples for each framework are available in the repository:

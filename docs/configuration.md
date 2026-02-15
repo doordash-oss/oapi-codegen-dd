@@ -463,7 +463,50 @@ error-mapping:
   UpdateClientErrorResponseJSON: arrayField[].code
 ```
 
-When configured, the response type will have an `Error() string` method that returns the value from the specified field.
+When configured, the response type will have:
+
+1. **`Error() string` method** - Returns the value from the specified field path
+2. **Constructor function** - `NewTypeName(message string)` for easy error creation
+
+### Generated Code Example
+
+Given this configuration:
+
+```yaml
+error-mapping:
+  InvalidRequestError: error.message
+```
+
+The generator produces:
+
+```go
+type InvalidRequestError struct {
+    ErrorData *ErrorData `json:"error,omitempty"`
+}
+
+func (i InvalidRequestError) Error() string {
+    res0 := i.ErrorData
+    if res0 == nil {
+        return "unknown error"
+    }
+    return res0.Message
+}
+
+func NewInvalidRequestError(message string) InvalidRequestError {
+    return InvalidRequestError{ErrorData: &ErrorData{Message: message}}
+}
+```
+
+The constructor is useful in server implementations for returning typed errors:
+
+```go
+func (s *Service) CreateUser(ctx context.Context, opts *CreateUserOpts) (*CreateUserResponse, error) {
+    if opts.Body.Email == "" {
+        return nil, NewInvalidRequestError("email is required")
+    }
+    // ...
+}
+```
 
 See [examples/client/example1/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/client/example1/cfg.yaml){:target="_blank"} for a complete example.
 
