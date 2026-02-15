@@ -2,6 +2,10 @@
 
 package example1
 
+import (
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
+)
+
 type GetClientResponse = ClientType
 
 type GetClientErrorResponse struct {
@@ -18,6 +22,10 @@ func (r GetClientErrorResponse) Error() string {
 	return res1
 }
 
+func NewGetClientErrorResponse(message string) GetClientErrorResponse {
+	return GetClientErrorResponse{Message: runtime.Ptr(message)}
+}
+
 type UpdateClientErrorResponseJSON struct {
 	Code    *ErrorCode `json:"code,omitempty"`
 	Message *string    `json:"message,omitempty"`
@@ -30,4 +38,8 @@ func (r UpdateClientErrorResponseJSON) Error() string {
 	}
 	res1 := *res0
 	return res1
+}
+
+func NewUpdateClientErrorResponseJSON(message string) UpdateClientErrorResponseJSON {
+	return UpdateClientErrorResponseJSON{Code: runtime.Ptr(message)}
 }

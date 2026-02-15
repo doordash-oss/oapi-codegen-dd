@@ -4,7 +4,6 @@ package models
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
@@ -28,22 +27,59 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc ServiceInterface
+	svc        ServiceInterface
+	errHandler ErrorHandler
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
-func NewHTTPAdapter(svc ServiceInterface) *HTTPAdapter {
-	return &HTTPAdapter{svc: svc}
+// If errHandler is nil, DefaultErrorHandler is used.
+func NewHTTPAdapter(svc ServiceInterface, errHandler ErrorHandler) *HTTPAdapter {
+	if errHandler == nil {
+		errHandler = &DefaultErrorHandler{}
+	}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
 
-// returnParseError writes a 400 Bad Request response if err is not nil.
-// Returns true if an error was written (caller should return), false otherwise.
-func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
+// handleParseError handles parameter parsing errors using the error handler.
+// Returns true if an error was handled (caller should return), false otherwise.
+func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
+		a.errHandler.HandleError(w, r, ErrorContext{
+			Kind:       ErrorKindParse,
+			Err:        err,
+			ParamName:  paramName,
+			StatusCode: http.StatusBadRequest,
+		})
 		return true
 	}
 	return false
+}
+
+// handleDecodeError handles request body decoding errors using the error handler.
+func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
+	a.errHandler.HandleError(w, r, ErrorContext{
+		Kind:       ErrorKindDecode,
+		Err:        err,
+		StatusCode: http.StatusBadRequest,
+	})
+}
+
+// handleServiceError handles service/business logic errors using the error handler.
+func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
+	a.errHandler.HandleError(w, r, ErrorContext{
+		Kind:       ErrorKindService,
+		Err:        err,
+		StatusCode: code,
+	})
+}
+
+// handleValidationError handles request validation errors using the error handler.
+func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
+	a.errHandler.HandleError(w, r, ErrorContext{
+		Kind:       ErrorKindValidation,
+		Err:        err,
+		StatusCode: http.StatusBadRequest,
+	})
 }
 
 // HTTP handler adapters - parse request, call interface, write response
@@ -56,9 +92,7 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -94,7 +128,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if queryParamLimitStr := query.Get("limit"); queryParamLimitStr != "" {
 		queryParamLimit, err := runtime.ParseString[int](queryParamLimitStr)
-		if returnParseError(w, "limit", err) {
+		if a.handleParseError(w, r, "limit", err) {
 			return
 		}
 		queryParams.Limit = &queryParamLimit
@@ -105,9 +139,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -142,7 +174,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var body CreateUserBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		a.handleDecodeError(w, r, err)
 		return
 	}
 	opts.Body = &body
@@ -151,9 +183,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -194,9 +224,7 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -237,9 +265,7 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 

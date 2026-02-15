@@ -23,12 +23,21 @@ limitations under the License.
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []iris.Handler
+    errHandler  ErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
 func WithMiddleware(mw iris.Handler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+
+// WithErrorHandler sets a custom error handler for the router.
+// If not set, DefaultErrorHandler is used.
+func WithErrorHandler(h ErrorHandler) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.errHandler = h
     }
 }
 {{end}}
@@ -44,7 +53,7 @@ func NewRouter(app *iris.Application, svc {{ $serviceName }}Interface, opts ...R
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc)
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
 
     // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
@@ -66,8 +75,13 @@ func NewRouter(app *iris.Application, svc {{ $serviceName }}Interface, opts ...R
 
 // Handler returns an http.Handler for use with net/http or testing.
 // This provides a standard http.Handler interface without requiring an Iris application.
-func Handler(svc {{ $serviceName }}Interface) http.Handler {
-    adapter := NewHTTPAdapter(svc)
+func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handler {
+    cfg := &routerConfig{}
+    for _, opt := range opts {
+        opt(cfg)
+    }
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     mux := http.NewServeMux()
     {{- range $operations }}{{ $op := . }}
     mux.HandleFunc("{{ $op.Method | caps }} {{ escapeGoString $op.Path }}", adapter.{{ $op.ID | ucFirst }})
@@ -76,6 +90,6 @@ func Handler(svc {{ $serviceName }}Interface) http.Handler {
 }
 {{end}}
 
+{{template "handler/errors.tmpl" .}}
 {{template "handler/adapter.tmpl" .}}
 {{template "handler/router.tmpl" .}}
-

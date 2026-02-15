@@ -37,19 +37,29 @@ type {{ $serviceName }}Interface interface {
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
     svc {{ $serviceName }}Interface
+    errHandler ErrorHandler
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
-func NewHTTPAdapter(svc {{ $serviceName }}Interface) *HTTPAdapter {
-    return &HTTPAdapter{svc: svc}
+// If errHandler is nil, DefaultErrorHandler is used.
+func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler ErrorHandler) *HTTPAdapter {
+    if errHandler == nil {
+        errHandler = &DefaultErrorHandler{}
+    }
+    return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
 
 {{define "handle-parse-error"}}
-// returnParseError writes a 400 Bad Request response if err is not nil.
-// Returns true if an error was written (caller should return), false otherwise.
-func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
+// handleParseError handles parameter parsing errors using the error handler.
+// Returns true if an error was handled (caller should return), false otherwise.
+func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
     if err != nil {
-        http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
+        a.errHandler.HandleError(w, r, ErrorContext{
+            Kind:       ErrorKindParse,
+            Err:        err,
+            ParamName:  paramName,
+            StatusCode: http.StatusBadRequest,
+        })
         return true
     }
     return false
@@ -57,10 +67,46 @@ func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
 {{end}}
 {{template "handle-parse-error" .}}
 
+{{define "handle-decode-error"}}
+// handleDecodeError handles request body decoding errors using the error handler.
+func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
+    a.errHandler.HandleError(w, r, ErrorContext{
+        Kind:       ErrorKindDecode,
+        Err:        err,
+        StatusCode: http.StatusBadRequest,
+    })
+}
+{{end}}
+{{template "handle-decode-error" .}}
+
+{{define "handle-service-error-method"}}
+// handleServiceError handles service/business logic errors using the error handler.
+func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
+    a.errHandler.HandleError(w, r, ErrorContext{
+        Kind:       ErrorKindService,
+        Err:        err,
+        StatusCode: code,
+    })
+}
+{{end}}
+{{template "handle-service-error-method" .}}
+
+{{define "handle-validation-error-method"}}
+// handleValidationError handles request validation errors using the error handler.
+func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
+    a.errHandler.HandleError(w, r, ErrorContext{
+        Kind:       ErrorKindValidation,
+        Err:        err,
+        StatusCode: http.StatusBadRequest,
+    })
+}
+{{end}}
+{{template "handle-validation-error-method" .}}
+
 {{define "handle-validation-error"}}
     // Validate request
     if err := opts.Validate(); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+        a.handleValidationError(w, r, err)
         return
     }
 {{end}}
@@ -76,9 +122,7 @@ if err != nil {
             }
         {{- end }}
     {{- end }}
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(code)
-    _ = json.NewEncoder(w).Encode(err)
+    a.handleServiceError(w, r, err, code)
     return
 }
 {{end}}
@@ -116,7 +160,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- else }}
             {{/* Other types (int, uuid.UUID, etc.) - use ParseString with format hint */}}
             {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-            if returnParseError(w, "{{ .JsonFieldName }}", err) {
+            if a.handleParseError(w, r, "{{ .JsonFieldName }}", err) {
                 return
             }
             {{- if .IsPointerType }}
@@ -139,7 +183,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             if {{ $paramVar }}Str := query.Get("{{ escapeGoString .ParamName }}"); {{ $paramVar }}Str != "" {
                 var {{ $paramVar }} {{ .Schema.TypeDecl }}
                 if err := json.Unmarshal([]byte({{ $paramVar }}Str), &{{ $paramVar }}); err != nil {
-                    http.Error(w, fmt.Sprintf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %v", err), http.StatusBadRequest)
+                    a.handleDecodeError(w, r, fmt.Errorf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %w", err))
                     return
                 }
             {{- if .IsPointerType }}
@@ -160,7 +204,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     }
                     {{- else }}
                     parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
-                    if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
+                    if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
                         return
                     }
                     result := make({{ .Schema.GoType }}, len(parsed))
@@ -180,7 +224,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     queryParams.{{ .GoName }} = result
                 {{- else }}
                     parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
-                    if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
+                    if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
                         return
                     }
                     queryParams.{{ .GoName }} = parsed
@@ -195,7 +239,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 {{ $paramVar }} := {{ .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- else }}
                 {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-                if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
+                if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
                     return
                 }
             {{- end }}
@@ -224,7 +268,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{ $paramVar }} := {{ .Schema.TypeDecl }}(headerValues[0])
         {{- else }}
             {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-            if returnParseError(w, "{{ escapeGoString .ParamName }}", err) {
+            if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
                 return
             }
         {{- end }}
@@ -243,7 +287,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     {{- if or (eq $op.Body.ContentType "application/json") (hasSuffix $op.Body.ContentType "+json") }}
     var body {{ $op.Body.Name }}
     if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+        a.handleDecodeError(w, r, err)
         return
     }
     opts.Body = &body
@@ -251,16 +295,16 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     var body {{ $op.Body.Name }}
     formBytes, err := io.ReadAll(r.Body)
     if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+        a.handleDecodeError(w, r, err)
         return
     }
     jsonBytes, err := runtime.ConvertFormFields(formBytes)
     if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+        a.handleDecodeError(w, r, err)
         return
     }
     if err := json.Unmarshal(jsonBytes, &body); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+        a.handleDecodeError(w, r, err)
         return
     }
     opts.Body = &body
@@ -268,7 +312,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- if or (eq $op.Body.Schema.GoType "string") (eq $op.Body.Schema.TypeDecl "string") }}
             bodyBytes, err := io.ReadAll(r.Body)
             if err != nil {
-                http.Error(w, err.Error(), http.StatusBadRequest)
+                a.handleDecodeError(w, r, err)
                 return
             }
             body := {{ $op.Body.Name }}(string(bodyBytes))
@@ -278,7 +322,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- end }}
     {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
         if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
-            http.Error(w, err.Error(), http.StatusBadRequest)
+            a.handleDecodeError(w, r, err)
             return
         }
         var body {{ $op.Body.Name }}
@@ -308,7 +352,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     {{- else if or (hasPrefix .Schema.TypeDecl "map[") .Schema.HasAdditionalProperties }}
                     {{/* Complex type (struct, map) - parse as JSON */}}
                     if err := json.Unmarshal([]byte(values[0]), &body.{{ .GoName }}); err != nil {
-                        http.Error(w, err.Error(), http.StatusBadRequest)
+                        a.handleDecodeError(w, r, err)
                         return
                     }
                     {{- else if eq .Schema.TypeDecl "string" }}
@@ -366,7 +410,11 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         if resp != nil && resp.Body != nil {
             if v, ok := any(resp.Body).(runtime.Validator); ok {
                 if err := v.Validate(); err != nil {
-                    http.Error(w, "internal validation error", http.StatusInternalServerError)
+                    a.errHandler.HandleError(w, r, ErrorContext{
+                        Kind:       ErrorKindValidation,
+                        Err:        fmt.Errorf("response validation failed: %w", err),
+                        StatusCode: http.StatusInternalServerError,
+                    })
                     return
                 }
             }

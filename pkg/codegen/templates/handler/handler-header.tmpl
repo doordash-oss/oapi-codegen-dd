@@ -22,7 +22,9 @@ package {{ .Config.PackageName }}
 import (
     "context"
     "encoding/json"
+    "fmt"
     "net/http"
+    "strings"
 
     "github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
     {{template "router-import" .}}
@@ -43,6 +45,20 @@ import (
     {{- range .Config.AdditionalImports}}
     {{.Alias}} "{{.Package}}"
     {{- end}}
+)
+{{- end -}}
+{{- end -}}
+
+{{- define "errors-header" -}}
+{{- if .WithHeader }}
+// {{ .Config.CopyrightHeader }}
+package {{ .Config.PackageName }}
+
+import (
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "strings"
 )
 {{- end -}}
 {{- end -}}

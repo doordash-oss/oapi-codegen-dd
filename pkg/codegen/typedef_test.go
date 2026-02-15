@@ -339,6 +339,178 @@ return res1`
 	})
 }
 
+func TestTypeDefinition_GetErrorConstructor(t *testing.T) {
+	t.Run("no error mapping - returns empty", func(t *testing.T) {
+		typ := TypeDefinition{
+			Name:   "BadRequestError",
+			Schema: GoSchema{},
+		}
+		res := typ.GetErrorConstructor(map[string]string{}, map[string]GoSchema{})
+		assert.Equal(t, "", res)
+	})
+
+	t.Run("single property without pointer", func(t *testing.T) {
+		typ := TypeDefinition{
+			Name: "ResError",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "Details",
+						JsonFieldName: "details",
+						Schema: GoSchema{
+							GoType: "string",
+						},
+					},
+				},
+			},
+		}
+		res := typ.GetErrorConstructor(map[string]string{"ResError": "details"}, map[string]GoSchema{})
+		expected := `func NewResError(message string) ResError {
+	return ResError{Details: message}
+}`
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("nested property with pointer", func(t *testing.T) {
+		// Define the referenced type
+		errorDataType := TypeDefinition{
+			Name: "ErrorData",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "Message",
+						JsonFieldName: "message",
+						Schema: GoSchema{
+							GoType: "string",
+						},
+					},
+				},
+			},
+		}
+
+		// Define the main type that references ErrorData
+		typ := TypeDefinition{
+			Name: "InvalidRequestError",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "ErrorData",
+						JsonFieldName: "error",
+						Schema: GoSchema{
+							GoType: "ErrorData",
+						},
+						Constraints: Constraints{
+							Nullable: boolPtr(true),
+						},
+					},
+				},
+			},
+		}
+
+		typeSchemaMap := map[string]GoSchema{
+			"InvalidRequestError": typ.Schema,
+			"ErrorData":           errorDataType.Schema,
+		}
+		res := typ.GetErrorConstructor(map[string]string{"InvalidRequestError": "error.message"}, typeSchemaMap)
+		expected := `func NewInvalidRequestError(message string) InvalidRequestError {
+	return InvalidRequestError{ErrorData: &ErrorData{Message: message}}
+}`
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("array property with bracket notation", func(t *testing.T) {
+		typ := TypeDefinition{
+			Name: "ServiceError",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "Data",
+						JsonFieldName: "data",
+						Schema: GoSchema{
+							ArrayType: &GoSchema{
+								GoType: "ErrorData",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		errorDataSchema := GoSchema{
+			Properties: []Property{
+				{
+					GoName:        "Message",
+					JsonFieldName: "message",
+					Schema: GoSchema{
+						GoType: "string",
+					},
+				},
+			},
+		}
+
+		typeSchemaMap := map[string]GoSchema{
+			"ServiceError": typ.Schema,
+			"ErrorData":    errorDataSchema,
+		}
+
+		res := typ.GetErrorConstructor(map[string]string{"ServiceError": "data[].message"}, typeSchemaMap)
+		expected := `func NewServiceError(message string) ServiceError {
+	return ServiceError{Data: []ErrorData{{Message: message}}}
+}`
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("nested property with nullable primitive", func(t *testing.T) {
+		// Define the referenced type with nullable string
+		errorDetailsType := TypeDefinition{
+			Name: "ErrorDetails",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "Message",
+						JsonFieldName: "message",
+						Schema: GoSchema{
+							GoType: "string",
+						},
+						Constraints: Constraints{
+							Nullable: boolPtr(true),
+						},
+					},
+				},
+			},
+		}
+
+		// Define the main type that references ErrorDetails
+		typ := TypeDefinition{
+			Name: "ServiceError",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "ErrorData",
+						JsonFieldName: "error",
+						Schema: GoSchema{
+							GoType: "ErrorDetails",
+						},
+						Constraints: Constraints{
+							Nullable: boolPtr(true),
+						},
+					},
+				},
+			},
+		}
+
+		typeSchemaMap := map[string]GoSchema{
+			"ServiceError": typ.Schema,
+			"ErrorDetails": errorDetailsType.Schema,
+		}
+		res := typ.GetErrorConstructor(map[string]string{"ServiceError": "error.message"}, typeSchemaMap)
+		expected := `func NewServiceError(message string) ServiceError {
+	return ServiceError{ErrorData: &ErrorDetails{Message: runtime.Ptr(message)}}
+}`
+		assert.Equal(t, expected, res)
+	})
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }

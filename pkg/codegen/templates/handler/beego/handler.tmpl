@@ -24,12 +24,21 @@ beecontext "github.com/beego/beego/v2/server/web/context"{{end}}
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []beego.MiddleWare
+    errHandler  ErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
 func WithMiddleware(mw beego.MiddleWare) RouterOption {
     return func(cfg *routerConfig) {
         cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+
+// WithErrorHandler sets a custom error handler for the router.
+// If not set, DefaultErrorHandler is used.
+func WithErrorHandler(h ErrorHandler) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.errHandler = h
     }
 }
 
@@ -57,7 +66,7 @@ func RegisterRoutes(router *beego.ControllerRegister, svc {{ $serviceName }}Inte
         opt(cfg)
     }
 
-    httpAdapter := NewHTTPAdapter(svc)
+    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 
     {{- range $operations }}{{ $op := . }}
         router.{{ $op.Method | lower | ucFirst }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", beegoHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ if $op.PathParams }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}{{ end }}))
@@ -73,6 +82,6 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *beego.Con
 }
 {{end}}
 
+{{template "handler/errors.tmpl" .}}
 {{template "handler/adapter.tmpl" .}}
 {{template "handler/router.tmpl" .}}
-

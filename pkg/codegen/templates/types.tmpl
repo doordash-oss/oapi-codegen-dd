@@ -43,7 +43,7 @@ limitations under the License.
     {{ end }}
     {{ end -}}
 
-    {{/* Error() method - TypeTracker handles alias resolution and any-type filtering */}}
+    {{/* Error() method and constructor - TypeTracker handles alias resolution and any-type filtering */}}
     {{ if and $typeTracker ($typeTracker.NeedsErrorMethod $td.Name) }}
     {{ $errAlias := $loc | fst | lower }}
     func ({{$errAlias}} {{$td.Name}}) Error() string {
@@ -53,6 +53,11 @@ limitations under the License.
         return "unmapped client error"
         {{ end -}}
     }
+
+    {{/* Only generate constructor when error-mapping is configured - empty constructors aren't useful */}}
+    {{ if index $config.ErrorMapping $td.Name }}
+    {{ $td.GetErrorConstructor $config.ErrorMapping $typeSchemaMap }}
+    {{ end }}
     {{ end }}
 
     {{ if and $td.Schema.HasAdditionalProperties (not $td.IsAlias) }}

@@ -24,12 +24,21 @@ limitations under the License.
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []rest.Middleware
+    errHandler  ErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
 func WithMiddleware(mw rest.Middleware) RouterOption {
     return func(cfg *routerConfig) {
         cfg.middlewares = append(cfg.middlewares, mw)
+    }
+}
+
+// WithErrorHandler sets a custom error handler for the router.
+// If not set, DefaultErrorHandler is used.
+func WithErrorHandler(h ErrorHandler) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.errHandler = h
     }
 }
 {{end}}
@@ -45,7 +54,7 @@ func RegisterRoutes(server *rest.Server, svc {{ $serviceName }}Interface, opts .
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc)
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
 
     routes := []rest.Route{
     {{- range $operations }}{{ $op := . }}
@@ -73,7 +82,7 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handl
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc)
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     r := router.NewRouter()
 
     {{- range $operations }}{{ $op := . }}
@@ -84,6 +93,6 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handl
 }
 {{end}}
 
+{{template "handler/errors.tmpl" .}}
 {{template "handler/adapter.tmpl" .}}
 {{template "handler/router.tmpl" .}}
-

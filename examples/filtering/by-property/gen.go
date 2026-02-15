@@ -279,6 +279,10 @@ func (r CreateUserErrorResponse) Error() string {
 	return res0
 }
 
+func NewCreateUserErrorResponse(message string) CreateUserErrorResponse {
+	return CreateUserErrorResponse{Message: message}
+}
+
 type GetUserResponse = User
 
 type User struct {

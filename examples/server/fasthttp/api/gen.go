@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/fasthttp/router"
@@ -14,6 +15,96 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
+
+// ErrorKind represents the type of error that occurred during request processing.
+type ErrorKind int
+
+const (
+	// ErrorKindParse indicates a parameter parsing error (invalid path/query/header parameter).
+	ErrorKindParse ErrorKind = iota
+
+	// ErrorKindDecode indicates a request body decoding error (invalid JSON, form data, etc.).
+	ErrorKindDecode
+
+	// ErrorKindValidation indicates a request validation error (failed schema validation).
+	ErrorKindValidation
+
+	// ErrorKindService indicates a service/business logic error returned by the service implementation.
+	ErrorKindService
+)
+
+// ErrorContext provides context about an error that occurred during request processing.
+type ErrorContext struct {
+	// Kind indicates the type of error (parse, decode, validation, service).
+	Kind ErrorKind
+
+	// Err is the underlying error.
+	Err error
+
+	// ParamName is the name of the parameter that failed to parse (only set for ErrorKindParse).
+	ParamName string
+
+	// StatusCode is the suggested HTTP status code for the error.
+	// For service errors, this may be determined by the error type (e.g., typed error responses).
+	StatusCode int
+}
+
+// ErrorResponse is the default error response structure for parse, decode, and validation errors.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// ErrorHandler handles errors that occur during request processing.
+// Implement this interface to customize error responses, logging, and metrics.
+type ErrorHandler interface {
+	// HandleError writes an error response. The ErrorContext provides details about the error.
+	// Implementations should write the response status and body to w.
+	HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext)
+}
+
+// DefaultErrorHandler provides the default error handling behavior.
+// It writes JSON error responses with appropriate status codes.
+// Customize this implementation to add logging, metrics, or change the error format.
+type DefaultErrorHandler struct{}
+
+// HandleError implements ErrorHandler with default JSON error responses.
+// It respects the Accept header: if the client accepts JSON, it returns JSON;
+// otherwise, it returns plain text.
+func (h *DefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext) {
+	// Check if client accepts JSON
+	accept := r.Header.Get("Accept")
+	wantsJSON := accept == "" || strings.Contains(accept, "application/json") || strings.Contains(accept, "*/*")
+
+	if !wantsJSON {
+		// Return plain text
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(ctx.StatusCode)
+		switch ctx.Kind {
+		case ErrorKindParse:
+			fmt.Fprintf(w, "invalid parameter %q: %v", ctx.ParamName, ctx.Err)
+		case ErrorKindDecode, ErrorKindValidation, ErrorKindService:
+			fmt.Fprint(w, ctx.Err.Error())
+		}
+		return
+	}
+
+	// Return JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(ctx.StatusCode)
+	switch ctx.Kind {
+	case ErrorKindParse:
+		_ = json.NewEncoder(w).Encode(ErrorResponse{
+			Error: fmt.Sprintf("invalid parameter %q: %v", ctx.ParamName, ctx.Err),
+		})
+	case ErrorKindDecode, ErrorKindValidation:
+		_ = json.NewEncoder(w).Encode(ErrorResponse{
+			Error: ctx.Err.Error(),
+		})
+	case ErrorKindService:
+		// Service errors are encoded directly - they may have custom structure
+		_ = json.NewEncoder(w).Encode(ctx.Err)
+	}
+}
 
 // ServiceInterface defines the service interface for business logic.
 type ServiceInterface interface {
@@ -32,22 +123,59 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc ServiceInterface
+	svc        ServiceInterface
+	errHandler ErrorHandler
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
-func NewHTTPAdapter(svc ServiceInterface) *HTTPAdapter {
-	return &HTTPAdapter{svc: svc}
+// If errHandler is nil, DefaultErrorHandler is used.
+func NewHTTPAdapter(svc ServiceInterface, errHandler ErrorHandler) *HTTPAdapter {
+	if errHandler == nil {
+		errHandler = &DefaultErrorHandler{}
+	}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
 
-// returnParseError writes a 400 Bad Request response if err is not nil.
-// Returns true if an error was written (caller should return), false otherwise.
-func returnParseError(w http.ResponseWriter, paramName string, err error) bool {
+// handleParseError handles parameter parsing errors using the error handler.
+// Returns true if an error was handled (caller should return), false otherwise.
+func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid parameter %q: %v", paramName, err), http.StatusBadRequest)
+		a.errHandler.HandleError(w, r, ErrorContext{
+			Kind:       ErrorKindParse,
+			Err:        err,
+			ParamName:  paramName,
+			StatusCode: http.StatusBadRequest,
+		})
 		return true
 	}
 	return false
+}
+
+// handleDecodeError handles request body decoding errors using the error handler.
+func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
+	a.errHandler.HandleError(w, r, ErrorContext{
+		Kind:       ErrorKindDecode,
+		Err:        err,
+		StatusCode: http.StatusBadRequest,
+	})
+}
+
+// handleServiceError handles service/business logic errors using the error handler.
+func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
+	a.errHandler.HandleError(w, r, ErrorContext{
+		Kind:       ErrorKindService,
+		Err:        err,
+		StatusCode: code,
+	})
+}
+
+// handleValidationError handles request validation errors using the error handler.
+func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
+	a.errHandler.HandleError(w, r, ErrorContext{
+		Kind:       ErrorKindValidation,
+		Err:        err,
+		StatusCode: http.StatusBadRequest,
+	})
 }
 
 // HTTP handler adapters - parse request, call interface, write response
@@ -60,9 +188,7 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -98,7 +224,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if queryParamLimitStr := query.Get("limit"); queryParamLimitStr != "" {
 		queryParamLimit, err := runtime.ParseString[int](queryParamLimitStr)
-		if returnParseError(w, "limit", err) {
+		if a.handleParseError(w, r, "limit", err) {
 			return
 		}
 		queryParams.Limit = &queryParamLimit
@@ -109,9 +235,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -146,7 +270,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var body CreateUserBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		a.handleDecodeError(w, r, err)
 		return
 	}
 	opts.Body = &body
@@ -158,9 +282,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(*CreateUserErrorResponse); ok {
 			code = 400
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -201,9 +323,7 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -244,9 +364,7 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(err)
+		a.handleServiceError(w, r, err, code)
 		return
 	}
 
@@ -272,12 +390,21 @@ type RouterOption func(*routerConfig)
 
 type routerConfig struct {
 	middlewares []func(fasthttp.RequestHandler) fasthttp.RequestHandler
+	errHandler  ErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
 func WithMiddleware(mw func(fasthttp.RequestHandler) fasthttp.RequestHandler) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.middlewares = append(cfg.middlewares, mw)
+	}
+}
+
+// WithErrorHandler sets a custom error handler for the router.
+// If not set, DefaultErrorHandler is used.
+func WithErrorHandler(h ErrorHandler) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.errHandler = h
 	}
 }
 
@@ -304,7 +431,7 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *router.Router {
 		opt(cfg)
 	}
 
-	httpAdapter := NewHTTPAdapter(svc)
+	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r := router.New()
 	r.GET("/health", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.HealthCheck))
 	r.GET("/users", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.ListUsers))
@@ -335,7 +462,7 @@ func Handler(svc ServiceInterface, opts ...RouterOption) fasthttp.RequestHandler
 		opt(cfg)
 	}
 
-	httpAdapter := NewHTTPAdapter(svc)
+	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r := router.New()
 	r.GET("/health", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.HealthCheck))
 	r.GET("/users", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.ListUsers))
@@ -512,6 +639,10 @@ func (r CreateUserErrorResponse) Error() string {
 	}
 	res1 := *res0
 	return res1
+}
+
+func NewCreateUserErrorResponse(message string) CreateUserErrorResponse {
+	return CreateUserErrorResponse{Message: runtime.Ptr(message)}
 }
 
 type GetUserResponse = User

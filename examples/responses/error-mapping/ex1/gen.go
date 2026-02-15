@@ -93,6 +93,10 @@ func (r InvalidRequestError) Error() string {
 	return res2
 }
 
+func NewInvalidRequestError(message string) InvalidRequestError {
+	return InvalidRequestError{ErrorData: &ErrorData{Message: message}}
+}
+
 type Problem struct {
 	Message *string `json:"message,omitempty"`
 }

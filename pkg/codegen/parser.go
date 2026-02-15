@@ -247,7 +247,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			typesOut["handler"] = out
 		} else {
 			// In multi-file mode, generate separate files from shared templates
-			for _, tmpl := range []string{"adapter", "router"} {
+			for _, tmpl := range []string{"errors", "adapter", "router"} {
 				out, err := p.ParseTemplates([]string{sharedPrefix + tmpl + ".tmpl"}, opsCtx)
 				if err != nil {
 					return nil, fmt.Errorf("error generating code for %s: %w", tmpl, err)

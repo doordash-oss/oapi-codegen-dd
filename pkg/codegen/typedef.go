@@ -106,6 +106,59 @@ func (t TypeDefinition) GetErrorResponse(errTypes map[string]string, alias strin
 	return strings.Join(code, "\n")
 }
 
+// GetErrorConstructor generates a Go constructor function for an error type.
+// It creates nested struct literals based on the error-mapping path.
+// If no error-mapping is configured, it returns a simple constructor.
+func (t TypeDefinition) GetErrorConstructor(errTypes map[string]string, typeSchemaMap map[string]GoSchema) string {
+	fields := resolveErrorPath(t.Name, errTypes, t.Schema, typeSchemaMap)
+
+	// No error-mapping or invalid path - return empty (template only calls this when error-mapping exists)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	// Build nested struct literal from inside out
+	// Start with "message" and wrap with struct literals going outward
+	innerExpr := "message"
+
+	// Process fields in reverse order to build from inside out
+	for i := len(fields) - 1; i >= 0; i-- {
+		f := fields[i]
+
+		// Get the next field's goName (the field we're assigning to in the inner struct)
+		var nextFieldName string
+		if i < len(fields)-1 {
+			nextFieldName = fields[i+1].goName
+		}
+
+		if f.isArrayIndex {
+			// Array field - wrap in slice with single element
+			if f.arrayType != "" {
+				if nextFieldName != "" {
+					innerExpr = fmt.Sprintf("[]%s{{%s: %s}}", f.arrayType, nextFieldName, innerExpr)
+				} else {
+					innerExpr = fmt.Sprintf("[]%s{%s}", f.arrayType, innerExpr)
+				}
+			} else {
+				innerExpr = fmt.Sprintf("[]%s{%s}", f.goType, innerExpr)
+			}
+		} else if f.isNullable && !f.isArray {
+			// Pointer field - need to take address of struct literal or use runtime.Ptr for primitives
+			if nextFieldName != "" {
+				innerExpr = fmt.Sprintf("&%s{%s: %s}", f.goType, nextFieldName, innerExpr)
+			} else {
+				// Last field is a nullable primitive - use runtime.Ptr
+				innerExpr = fmt.Sprintf("runtime.Ptr(%s)", innerExpr)
+			}
+		}
+		// For non-pointer, non-array fields, we don't wrap - the field assignment
+		// happens at the parent level
+	}
+
+	return fmt.Sprintf("func New%s(message string) %s {\n\treturn %s{%s: %s}\n}",
+		t.Name, t.Name, t.Name, fields[0].goName, innerExpr)
+}
+
 // errorPathSegment represents a parsed segment of an error mapping path.
 type errorPathSegment struct {
 	propertyName string

@@ -120,6 +120,10 @@ func (s ServiceError) Error() string {
 	return res3
 }
 
+func NewServiceError(message string) ServiceError {
+	return ServiceError{Errors: []ErrorDetails{{Messages: []string{message}}}}
+}
+
 type ErrorDetails struct {
 	Messages []string `json:"messages,omitempty"`
 }
