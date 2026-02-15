@@ -37,11 +37,20 @@ type OapiErrorContext struct {
 	// Kind indicates the type of error (parse, decode, validation, service).
 	Kind OapiErrorKind
 
+	// OperationID is the OpenAPI operation ID (e.g., "GetUser", "CreateOrder").
+	OperationID string
+
 	// Err is the underlying error.
 	Err error
 
-	// ParamName is the name of the parameter that failed to parse (only set for OapiErrorKindParse).
+	// ParamName is the name of the parameter that failed (only set for OapiErrorKindParse).
 	ParamName string
+
+	// ParamLocation is where the parameter came from: "path", "query", "header" (only set for OapiErrorKindParse).
+	ParamLocation string
+
+	// ContentType is the content type being decoded (only set for OapiErrorKindDecode).
+	ContentType string
 
 	// StatusCode is the suggested HTTP status code for the error.
 	// For service errors, this may be determined by the error type (e.g., typed error responses).

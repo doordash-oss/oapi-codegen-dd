@@ -39,11 +39,20 @@ type OapiErrorContext struct {
 	// Kind indicates the type of error (parse, decode, validation, service).
 	Kind OapiErrorKind
 
+	// OperationID is the OpenAPI operation ID (e.g., "GetUser", "CreateOrder").
+	OperationID string
+
 	// Err is the underlying error.
 	Err error
 
-	// ParamName is the name of the parameter that failed to parse (only set for OapiErrorKindParse).
+	// ParamName is the name of the parameter that failed (only set for OapiErrorKindParse).
 	ParamName string
+
+	// ParamLocation is where the parameter came from: "path", "query", "header" (only set for OapiErrorKindParse).
+	ParamLocation string
+
+	// ContentType is the content type being decoded (only set for OapiErrorKindDecode).
+	ContentType string
 
 	// StatusCode is the suggested HTTP status code for the error.
 	// For service errors, this may be determined by the error type (e.g., typed error responses).
@@ -137,50 +146,6 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
 
-// handleParseError handles parameter parsing errors using the error handler.
-// Returns true if an error was handled (caller should return), false otherwise.
-func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
-	if err != nil {
-		a.errHandler.HandleError(w, r, OapiErrorContext{
-			Kind:       OapiErrorKindParse,
-			Err:        err,
-			ParamName:  paramName,
-			StatusCode: http.StatusBadRequest,
-		})
-		return true
-	}
-	return false
-}
-
-// handleDecodeError handles request body decoding errors using the error handler.
-func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
-	a.errHandler.HandleError(w, r, OapiErrorContext{
-		Kind:       OapiErrorKindDecode,
-		Err:        err,
-		StatusCode: http.StatusBadRequest,
-	})
-}
-
-// handleServiceError handles service/business logic errors using the error handler.
-func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
-	a.errHandler.HandleError(w, r, OapiErrorContext{
-		Kind:       OapiErrorKindService,
-		Err:        err,
-		StatusCode: code,
-	})
-}
-
-// handleValidationError handles request validation errors using the error handler.
-func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
-	a.errHandler.HandleError(w, r, OapiErrorContext{
-		Kind:       OapiErrorKindValidation,
-		Err:        err,
-		StatusCode: http.StatusBadRequest,
-	})
-}
-
-// HTTP handler adapters - parse request, call interface, write response
-
 // HealthCheck handles GET /health
 func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -189,7 +154,12 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.handleServiceError(w, r, err, code)
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:        OapiErrorKindService,
+			OperationID: "HealthCheck",
+			Err:         err,
+			StatusCode:  code,
+		})
 		return
 	}
 
@@ -225,7 +195,15 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if queryParamLimitStr := query.Get("limit"); queryParamLimitStr != "" {
 		queryParamLimit, err := runtime.ParseString[int](queryParamLimitStr)
-		if a.handleParseError(w, r, "limit", err) {
+		if err != nil {
+			a.errHandler.HandleError(w, r, OapiErrorContext{
+				Kind:          OapiErrorKindParse,
+				OperationID:   "ListUsers",
+				Err:           err,
+				ParamName:     "limit",
+				ParamLocation: "query",
+				StatusCode:    http.StatusBadRequest,
+			})
 			return
 		}
 		queryParams.Limit = &queryParamLimit
@@ -236,7 +214,12 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.handleServiceError(w, r, err, code)
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:        OapiErrorKindService,
+			OperationID: "ListUsers",
+			Err:         err,
+			StatusCode:  code,
+		})
 		return
 	}
 
@@ -271,7 +254,13 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var body CreateUserBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		a.handleDecodeError(w, r, err)
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:        OapiErrorKindDecode,
+			OperationID: "CreateUser",
+			Err:         err,
+			ContentType: "application/json",
+			StatusCode:  http.StatusBadRequest,
+		})
 		return
 	}
 	opts.Body = &body
@@ -283,7 +272,12 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(*CreateUserErrorResponse); ok {
 			code = 400
 		}
-		a.handleServiceError(w, r, err, code)
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:        OapiErrorKindService,
+			OperationID: "CreateUser",
+			Err:         err,
+			StatusCode:  code,
+		})
 		return
 	}
 
@@ -324,7 +318,12 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.handleServiceError(w, r, err, code)
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:        OapiErrorKindService,
+			OperationID: "GetUser",
+			Err:         err,
+			StatusCode:  code,
+		})
 		return
 	}
 
@@ -365,7 +364,12 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		a.handleServiceError(w, r, err, code)
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:        OapiErrorKindService,
+			OperationID: "DeleteUser",
+			Err:         err,
+			StatusCode:  code,
+		})
 		return
 	}
 

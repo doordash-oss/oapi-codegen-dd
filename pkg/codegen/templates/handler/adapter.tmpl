@@ -49,64 +49,16 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
     return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
 
-{{define "handle-parse-error"}}
-// handleParseError handles parameter parsing errors using the error handler.
-// Returns true if an error was handled (caller should return), false otherwise.
-func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
-    if err != nil {
-        a.errHandler.HandleError(w, r, OapiErrorContext{
-            Kind:       OapiErrorKindParse,
-            Err:        err,
-            ParamName:  paramName,
-            StatusCode: http.StatusBadRequest,
-        })
-        return true
-    }
-    return false
-}
-{{end}}
-{{template "handle-parse-error" .}}
-
-{{define "handle-decode-error"}}
-// handleDecodeError handles request body decoding errors using the error handler.
-func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
-    a.errHandler.HandleError(w, r, OapiErrorContext{
-        Kind:       OapiErrorKindDecode,
-        Err:        err,
-        StatusCode: http.StatusBadRequest,
-    })
-}
-{{end}}
-{{template "handle-decode-error" .}}
-
-{{define "handle-service-error-method"}}
-// handleServiceError handles service/business logic errors using the error handler.
-func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
-    a.errHandler.HandleError(w, r, OapiErrorContext{
-        Kind:       OapiErrorKindService,
-        Err:        err,
-        StatusCode: code,
-    })
-}
-{{end}}
-{{template "handle-service-error-method" .}}
-
-{{define "handle-validation-error-method"}}
-// handleValidationError handles request validation errors using the error handler.
-func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
-    a.errHandler.HandleError(w, r, OapiErrorContext{
-        Kind:       OapiErrorKindValidation,
-        Err:        err,
-        StatusCode: http.StatusBadRequest,
-    })
-}
-{{end}}
-{{template "handle-validation-error-method" .}}
-
 {{define "handle-validation-error"}}
+{{- $op := .Op -}}
     // Validate request
     if err := opts.Validate(); err != nil {
-        a.handleValidationError(w, r, err)
+        a.errHandler.HandleError(w, r, OapiErrorContext{
+            Kind:        OapiErrorKindValidation,
+            OperationID: "{{ $op.ID }}",
+            Err:         err,
+            StatusCode:  http.StatusBadRequest,
+        })
         return
     }
 {{end}}
@@ -122,12 +74,16 @@ if err != nil {
             }
         {{- end }}
     {{- end }}
-    a.handleServiceError(w, r, err, code)
+    a.errHandler.HandleError(w, r, OapiErrorContext{
+        Kind:        OapiErrorKindService,
+        OperationID: "{{ $op.ID }}",
+        Err:         err,
+        StatusCode:  code,
+    })
     return
 }
 {{end}}
 
-// HTTP handler adapters - parse request, call interface, write response
 {{ range $operations }}{{ $op := . }}
 // {{ $op.ID | ucFirst }} handles {{ $op.Method }} {{ $op.Path }}
 func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +116,15 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- else }}
             {{/* Other types (int, uuid.UUID, etc.) - use ParseString with format hint */}}
             {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-            if a.handleParseError(w, r, "{{ .JsonFieldName }}", err) {
+            if err != nil {
+                a.errHandler.HandleError(w, r, OapiErrorContext{
+                    Kind:          OapiErrorKindParse,
+                    OperationID:   "{{ $op.ID }}",
+                    Err:           err,
+                    ParamName:     "{{ .JsonFieldName }}",
+                    ParamLocation: "path",
+                    StatusCode:    http.StatusBadRequest,
+                })
                 return
             }
             {{- if .IsPointerType }}
@@ -183,7 +147,13 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             if {{ $paramVar }}Str := query.Get("{{ escapeGoString .ParamName }}"); {{ $paramVar }}Str != "" {
                 var {{ $paramVar }} {{ .Schema.TypeDecl }}
                 if err := json.Unmarshal([]byte({{ $paramVar }}Str), &{{ $paramVar }}); err != nil {
-                    a.handleDecodeError(w, r, fmt.Errorf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %w", err))
+                    a.errHandler.HandleError(w, r, OapiErrorContext{
+                        Kind:        OapiErrorKindDecode,
+                        OperationID: "{{ $op.ID }}",
+                        Err:         fmt.Errorf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %w", err),
+                        ContentType: "application/json",
+                        StatusCode:  http.StatusBadRequest,
+                    })
                     return
                 }
             {{- if .IsPointerType }}
@@ -204,7 +174,15 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     }
                     {{- else }}
                     parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
-                    if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
+                    if err != nil {
+                        a.errHandler.HandleError(w, r, OapiErrorContext{
+                            Kind:          OapiErrorKindParse,
+                            OperationID:   "{{ $op.ID }}",
+                            Err:           err,
+                            ParamName:     "{{ escapeGoString .ParamName }}",
+                            ParamLocation: "query",
+                            StatusCode:    http.StatusBadRequest,
+                        })
                         return
                     }
                     result := make({{ .Schema.GoType }}, len(parsed))
@@ -224,7 +202,15 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     queryParams.{{ .GoName }} = result
                 {{- else }}
                     parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
-                    if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
+                    if err != nil {
+                        a.errHandler.HandleError(w, r, OapiErrorContext{
+                            Kind:          OapiErrorKindParse,
+                            OperationID:   "{{ $op.ID }}",
+                            Err:           err,
+                            ParamName:     "{{ escapeGoString .ParamName }}",
+                            ParamLocation: "query",
+                            StatusCode:    http.StatusBadRequest,
+                        })
                         return
                     }
                     queryParams.{{ .GoName }} = parsed
@@ -239,7 +225,15 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 {{ $paramVar }} := {{ .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- else }}
                 {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-                if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
+                if err != nil {
+                    a.errHandler.HandleError(w, r, OapiErrorContext{
+                        Kind:          OapiErrorKindParse,
+                        OperationID:   "{{ $op.ID }}",
+                        Err:           err,
+                        ParamName:     "{{ escapeGoString .ParamName }}",
+                        ParamLocation: "query",
+                        StatusCode:    http.StatusBadRequest,
+                    })
                     return
                 }
             {{- end }}
@@ -268,7 +262,15 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{ $paramVar }} := {{ .Schema.TypeDecl }}(headerValues[0])
         {{- else }}
             {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
-            if a.handleParseError(w, r, "{{ escapeGoString .ParamName }}", err) {
+            if err != nil {
+                a.errHandler.HandleError(w, r, OapiErrorContext{
+                    Kind:          OapiErrorKindParse,
+                    OperationID:   "{{ $op.ID }}",
+                    Err:           err,
+                    ParamName:     "{{ escapeGoString .ParamName }}",
+                    ParamLocation: "header",
+                    StatusCode:    http.StatusBadRequest,
+                })
                 return
             }
         {{- end }}
@@ -287,7 +289,13 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     {{- if or (eq $op.Body.ContentType "application/json") (hasSuffix $op.Body.ContentType "+json") }}
     var body {{ $op.Body.Name }}
     if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-        a.handleDecodeError(w, r, err)
+        a.errHandler.HandleError(w, r, OapiErrorContext{
+            Kind:        OapiErrorKindDecode,
+            OperationID: "{{ $op.ID }}",
+            Err:         err,
+            ContentType: "{{ $op.Body.ContentType }}",
+            StatusCode:  http.StatusBadRequest,
+        })
         return
     }
     opts.Body = &body
@@ -295,16 +303,34 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     var body {{ $op.Body.Name }}
     formBytes, err := io.ReadAll(r.Body)
     if err != nil {
-        a.handleDecodeError(w, r, err)
+        a.errHandler.HandleError(w, r, OapiErrorContext{
+            Kind:        OapiErrorKindDecode,
+            OperationID: "{{ $op.ID }}",
+            Err:         err,
+            ContentType: "{{ $op.Body.ContentType }}",
+            StatusCode:  http.StatusBadRequest,
+        })
         return
     }
     jsonBytes, err := runtime.ConvertFormFields(formBytes)
     if err != nil {
-        a.handleDecodeError(w, r, err)
+        a.errHandler.HandleError(w, r, OapiErrorContext{
+            Kind:        OapiErrorKindDecode,
+            OperationID: "{{ $op.ID }}",
+            Err:         err,
+            ContentType: "{{ $op.Body.ContentType }}",
+            StatusCode:  http.StatusBadRequest,
+        })
         return
     }
     if err := json.Unmarshal(jsonBytes, &body); err != nil {
-        a.handleDecodeError(w, r, err)
+        a.errHandler.HandleError(w, r, OapiErrorContext{
+            Kind:        OapiErrorKindDecode,
+            OperationID: "{{ $op.ID }}",
+            Err:         err,
+            ContentType: "{{ $op.Body.ContentType }}",
+            StatusCode:  http.StatusBadRequest,
+        })
         return
     }
     opts.Body = &body
@@ -312,7 +338,13 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- if or (eq $op.Body.Schema.GoType "string") (eq $op.Body.Schema.TypeDecl "string") }}
             bodyBytes, err := io.ReadAll(r.Body)
             if err != nil {
-                a.handleDecodeError(w, r, err)
+                a.errHandler.HandleError(w, r, OapiErrorContext{
+                    Kind:        OapiErrorKindDecode,
+                    OperationID: "{{ $op.ID }}",
+                    Err:         err,
+                    ContentType: "{{ $op.Body.ContentType }}",
+                    StatusCode:  http.StatusBadRequest,
+                })
                 return
             }
             body := {{ $op.Body.Name }}(string(bodyBytes))
@@ -322,7 +354,13 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- end }}
     {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
         if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
-            a.handleDecodeError(w, r, err)
+            a.errHandler.HandleError(w, r, OapiErrorContext{
+                Kind:        OapiErrorKindDecode,
+                OperationID: "{{ $op.ID }}",
+                Err:         err,
+                ContentType: "{{ $op.Body.ContentType }}",
+                StatusCode:  http.StatusBadRequest,
+            })
             return
         }
         var body {{ $op.Body.Name }}
@@ -352,7 +390,13 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     {{- else if or (hasPrefix .Schema.TypeDecl "map[") .Schema.HasAdditionalProperties }}
                     {{/* Complex type (struct, map) - parse as JSON */}}
                     if err := json.Unmarshal([]byte(values[0]), &body.{{ .GoName }}); err != nil {
-                        a.handleDecodeError(w, r, err)
+                        a.errHandler.HandleError(w, r, OapiErrorContext{
+                            Kind:        OapiErrorKindDecode,
+                            OperationID: "{{ $op.ID }}",
+                            Err:         err,
+                            ContentType: "{{ $op.Body.ContentType }}",
+                            StatusCode:  http.StatusBadRequest,
+                        })
                         return
                     }
                     {{- else if eq .Schema.TypeDecl "string" }}
@@ -384,7 +428,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 
 {{- if $validateRequest }}
 {{- if $op.HasRequestOptions }}
-    {{template "handle-validation-error" .}}
+    {{template "handle-validation-error" (dict "Op" $op)}}
 {{- end }}
 {{- end }}
 
@@ -411,9 +455,10 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             if v, ok := any(resp.Body).(runtime.Validator); ok {
                 if err := v.Validate(); err != nil {
                     a.errHandler.HandleError(w, r, OapiErrorContext{
-                        Kind:       OapiErrorKindValidation,
-                        Err:        fmt.Errorf("response validation failed: %w", err),
-                        StatusCode: http.StatusInternalServerError,
+                        Kind:        OapiErrorKindValidation,
+                        OperationID: "{{ $op.ID }}",
+                        Err:         fmt.Errorf("response validation failed: %w", err),
+                        StatusCode:  http.StatusInternalServerError,
                     })
                     return
                 }

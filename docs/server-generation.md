@@ -411,10 +411,13 @@ type OapiErrorHandler interface {
 }
 
 type OapiErrorContext struct {
-    Kind       OapiErrorKind  // Type of error
-    Err        error          // The underlying error
-    ParamName  string         // Parameter name (for parse errors)
-    StatusCode int            // Suggested HTTP status code
+    Kind          OapiErrorKind  // Type of error (Parse, Decode, Validation, Service)
+    OperationID   string         // OpenAPI operation ID (e.g., "GetUser", "CreateOrder")
+    Err           error          // The underlying error
+    ParamName     string         // Parameter name (for parse errors)
+    ParamLocation string         // Parameter location: "path", "query", "header" (for parse errors)
+    ContentType   string         // Content type being decoded (for decode errors)
+    StatusCode    int            // Suggested HTTP status code
 }
 ```
 
@@ -426,12 +429,15 @@ type LoggingErrorHandler struct {
 }
 
 func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx api.OapiErrorContext) {
-    // Log the error
+    // Log the error with full context
     h.logger.Error("request error",
+        "operation", ctx.OperationID,
         "kind", ctx.Kind,
         "error", ctx.Err,
         "status", ctx.StatusCode,
-        "path", r.URL.Path,
+        "param", ctx.ParamName,
+        "param_location", ctx.ParamLocation,
+        "content_type", ctx.ContentType,
     )
 
     // Write response
