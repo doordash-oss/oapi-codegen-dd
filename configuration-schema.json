@@ -268,6 +268,10 @@
           "type": "string",
           "description": "Package alias to prefix model types with. Used when models are generated separately (generate.models: false). Example: 'types' will generate 'types.User' instead of 'User'."
         },
+        "multipart-max-memory": {
+          "type": "integer",
+          "description": "Maximum memory in MB for multipart form parsing. Defaults to 32MB. Files exceeding this are stored in temp files."
+        },
         "validation": {
           "$ref": "#/definitions/HandlerValidation",
           "description": "Validation options for request/response validation in handlers."

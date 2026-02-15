@@ -18,6 +18,7 @@ limitations under the License.
 {{- $serviceName := $config.Generate.Handler.Name -}}
 {{- $validateRequest := $config.Generate.Handler.Validation.Request -}}
 {{- $validateResponse := $config.Generate.Handler.Validation.Response -}}
+{{- $multipartMaxMemory := $config.Generate.Handler.MultipartMaxMemory -}}
 {{- /* Adapter is always generated in the same package as models, so no prefix needed */ -}}
 {{- template "handler-header" $ }}
 
@@ -353,7 +354,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         // text/plain body with non-string schema - skip body parsing
         {{- end }}
     {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
-        if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
+        if err := r.ParseMultipartForm({{ $multipartMaxMemory }} << 20); err != nil {
             a.errHandler.HandleError(w, r, OapiErrorContext{
                 Kind:        OapiErrorKindDecode,
                 OperationID: "{{ $op.ID }}",

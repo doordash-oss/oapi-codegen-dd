@@ -250,6 +250,18 @@ generate:
 
 This generates `types.User` instead of `User` in the handler code.
 
+#### `generate.handler.multipart-max-memory`
+**Type:** `integer` | **Default:** `32`
+
+Maximum memory in MB for multipart form parsing. Files exceeding this limit are stored in temporary files on disk.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    multipart-max-memory: 64
+```
+
 #### `generate.handler.validation.request`
 **Type:** `boolean` | **Default:** `false`
 

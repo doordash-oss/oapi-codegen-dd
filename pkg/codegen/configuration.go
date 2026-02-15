@@ -96,6 +96,9 @@ func (o Configuration) WithDefaults() Configuration {
 			if o.Generate.Handler.Kind == "" {
 				o.Generate.Handler.Kind = HandlerKindChi
 			}
+			if o.Generate.Handler.MultipartMaxMemory == 0 {
+				o.Generate.Handler.MultipartMaxMemory = 32
+			}
 		}
 	}
 
@@ -378,6 +381,10 @@ type HandlerOptions struct {
 	// Used when models are generated separately (generate.models: false).
 	// Example: "types" will generate "types.User" instead of "User".
 	ModelsPackageAlias string `yaml:"models-package-alias"`
+
+	// MultipartMaxMemory is the maximum memory in MB for multipart form parsing.
+	// Defaults to 32MB (matching Go stdlib). Files exceeding this are stored in temp files.
+	MultipartMaxMemory int `yaml:"multipart-max-memory"`
 
 	// Output specifies output for scaffolded handler files (service.go, middleware.go).
 	// Falls back to root output if nil.
