@@ -253,6 +253,19 @@ Documentation is in `docs/` using MkDocs. Key files:
 2. Add to `nav:` section in `mkdocs.yml`
 3. For extensions, create in `docs/extensions/` and add under Extensions nav
 
+### Code snippets in docs
+Documentation uses MkDocs snippets to include code from example files. The format is:
+```
+--8<-- "path/to/file.go:start_line:end_line"
+```
+For example: `--8<-- "extensions/xgotype/gen.go:11:14"` includes lines 11-14 from that file.
+
+**After regenerating examples**, verify that line number references in docs are still correct:
+```bash
+grep -rn '\-\-8<\-\-' docs/ | grep -E ':[0-9]+:[0-9]+'
+```
+Then check each referenced file to ensure the line ranges still point to the expected code.
+
 ### Local preview
 ```bash
 pip install mkdocs-material
