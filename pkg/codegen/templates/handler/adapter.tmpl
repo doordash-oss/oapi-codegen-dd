@@ -37,14 +37,14 @@ type {{ $serviceName }}Interface interface {
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
     svc {{ $serviceName }}Interface
-    errHandler ErrorHandler
+    errHandler OapiErrorHandler
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
-// If errHandler is nil, DefaultErrorHandler is used.
-func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler ErrorHandler) *HTTPAdapter {
+// If errHandler is nil, OapiDefaultErrorHandler is used.
+func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler) *HTTPAdapter {
     if errHandler == nil {
-        errHandler = &DefaultErrorHandler{}
+        errHandler = &OapiDefaultErrorHandler{}
     }
     return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
@@ -54,8 +54,8 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler ErrorHandler) *H
 // Returns true if an error was handled (caller should return), false otherwise.
 func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
     if err != nil {
-        a.errHandler.HandleError(w, r, ErrorContext{
-            Kind:       ErrorKindParse,
+        a.errHandler.HandleError(w, r, OapiErrorContext{
+            Kind:       OapiErrorKindParse,
             Err:        err,
             ParamName:  paramName,
             StatusCode: http.StatusBadRequest,
@@ -70,8 +70,8 @@ func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, p
 {{define "handle-decode-error"}}
 // handleDecodeError handles request body decoding errors using the error handler.
 func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
-    a.errHandler.HandleError(w, r, ErrorContext{
-        Kind:       ErrorKindDecode,
+    a.errHandler.HandleError(w, r, OapiErrorContext{
+        Kind:       OapiErrorKindDecode,
         Err:        err,
         StatusCode: http.StatusBadRequest,
     })
@@ -82,8 +82,8 @@ func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, 
 {{define "handle-service-error-method"}}
 // handleServiceError handles service/business logic errors using the error handler.
 func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
-    a.errHandler.HandleError(w, r, ErrorContext{
-        Kind:       ErrorKindService,
+    a.errHandler.HandleError(w, r, OapiErrorContext{
+        Kind:       OapiErrorKindService,
         Err:        err,
         StatusCode: code,
     })
@@ -94,8 +94,8 @@ func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request,
 {{define "handle-validation-error-method"}}
 // handleValidationError handles request validation errors using the error handler.
 func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
-    a.errHandler.HandleError(w, r, ErrorContext{
-        Kind:       ErrorKindValidation,
+    a.errHandler.HandleError(w, r, OapiErrorContext{
+        Kind:       OapiErrorKindValidation,
         Err:        err,
         StatusCode: http.StatusBadRequest,
     })
@@ -410,8 +410,8 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         if resp != nil && resp.Body != nil {
             if v, ok := any(resp.Body).(runtime.Validator); ok {
                 if err := v.Validate(); err != nil {
-                    a.errHandler.HandleError(w, r, ErrorContext{
-                        Kind:       ErrorKindValidation,
+                    a.errHandler.HandleError(w, r, OapiErrorContext{
+                        Kind:       OapiErrorKindValidation,
                         Err:        fmt.Errorf("response validation failed: %w", err),
                         StatusCode: http.StatusInternalServerError,
                     })

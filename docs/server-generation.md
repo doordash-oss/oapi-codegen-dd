@@ -380,14 +380,14 @@ The `HTTPAdapter` handles four types of errors:
 
 | Error Kind | Description | Default Status |
 |------------|-------------|----------------|
-| `ErrorKindParse` | Parameter parsing errors (invalid path/query/header) | 400 |
-| `ErrorKindDecode` | Request body decoding errors (invalid JSON, form data) | 400 |
-| `ErrorKindValidation` | Request validation errors (failed schema validation) | 400 |
-| `ErrorKindService` | Service/business logic errors from your implementation | 500 (or typed) |
+| `OapiErrorKindParse` | Parameter parsing errors (invalid path/query/header) | 400 |
+| `OapiErrorKindDecode` | Request body decoding errors (invalid JSON, form data) | 400 |
+| `OapiErrorKindValidation` | Request validation errors (failed schema validation) | 400 |
+| `OapiErrorKindService` | Service/business logic errors from your implementation | 500 (or typed) |
 
 ### Default Behavior
 
-The `DefaultErrorHandler` respects the `Accept` header:
+The `OapiDefaultErrorHandler` respects the `Accept` header:
 
 - **JSON** (`application/json`, `*/*`, or empty): Returns JSON response
 - **Other**: Returns plain text
@@ -403,18 +403,18 @@ Service errors are JSON-encoded directly, so the response structure matches your
 
 ### Custom Error Handler
 
-Implement the `ErrorHandler` interface to customize error responses, add logging, or collect metrics:
+Implement the `OapiErrorHandler` interface to customize error responses, add logging, or collect metrics:
 
 ```go
-type ErrorHandler interface {
-    HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext)
+type OapiErrorHandler interface {
+    HandleError(w http.ResponseWriter, r *http.Request, ctx OapiErrorContext)
 }
 
-type ErrorContext struct {
-    Kind       ErrorKind  // Type of error
-    Err        error      // The underlying error
-    ParamName  string     // Parameter name (for parse errors)
-    StatusCode int        // Suggested HTTP status code
+type OapiErrorContext struct {
+    Kind       OapiErrorKind  // Type of error
+    Err        error          // The underlying error
+    ParamName  string         // Parameter name (for parse errors)
+    StatusCode int            // Suggested HTTP status code
 }
 ```
 
@@ -425,7 +425,7 @@ type LoggingErrorHandler struct {
     logger *slog.Logger
 }
 
-func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext) {
+func (h *LoggingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx api.OapiErrorContext) {
     // Log the error
     h.logger.Error("request error",
         "kind", ctx.Kind,
@@ -447,7 +447,7 @@ Use your custom handler with `WithErrorHandler`:
 
 ```go
 svc := api.NewService()
-handler := api.NewRouter(r, svc,
+handler := api.NewRouter(svc,
     api.WithErrorHandler(&LoggingErrorHandler{logger: slog.Default()}),
 )
 ```

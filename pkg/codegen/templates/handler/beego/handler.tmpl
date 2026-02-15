@@ -24,7 +24,7 @@ beecontext "github.com/beego/beego/v2/server/web/context"{{end}}
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []beego.MiddleWare
-    errHandler  ErrorHandler
+    errHandler  OapiErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
@@ -35,8 +35,8 @@ func WithMiddleware(mw beego.MiddleWare) RouterOption {
 }
 
 // WithErrorHandler sets a custom error handler for the router.
-// If not set, DefaultErrorHandler is used.
-func WithErrorHandler(h ErrorHandler) RouterOption {
+// If not set, OapiDefaultErrorHandler is used.
+func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
     }

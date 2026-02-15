@@ -22,7 +22,7 @@ limitations under the License.
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []mux.MiddlewareFunc
-    errHandler  ErrorHandler
+    errHandler  OapiErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
@@ -33,8 +33,8 @@ func WithMiddleware(mw mux.MiddlewareFunc) RouterOption {
 }
 
 // WithErrorHandler sets a custom error handler for the router.
-// If not set, DefaultErrorHandler is used.
-func WithErrorHandler(h ErrorHandler) RouterOption {
+// If not set, OapiDefaultErrorHandler is used.
+func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
     }

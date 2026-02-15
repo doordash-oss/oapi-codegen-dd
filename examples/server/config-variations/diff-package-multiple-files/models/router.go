@@ -12,7 +12,7 @@ type RouterOption func(*routerConfig)
 
 type routerConfig struct {
 	middlewares []func(http.Handler) http.Handler
-	errHandler  ErrorHandler
+	errHandler  OapiErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
@@ -23,8 +23,8 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 }
 
 // WithErrorHandler sets a custom error handler for the router.
-// If not set, DefaultErrorHandler is used.
-func WithErrorHandler(h ErrorHandler) RouterOption {
+// If not set, OapiOapiDefaultErrorHandler is used.
+func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.errHandler = h
 	}

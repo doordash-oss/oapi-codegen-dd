@@ -13,32 +13,32 @@ import (
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 )
 
-// ErrorKind represents the type of error that occurred during request processing.
-type ErrorKind int
+// OapiErrorKind represents the type of error that occurred during request processing.
+type OapiErrorKind int
 
 const (
-	// ErrorKindParse indicates a parameter parsing error (invalid path/query/header parameter).
-	ErrorKindParse ErrorKind = iota
+	// OapiErrorKindParse indicates a parameter parsing error (invalid path/query/header parameter).
+	OapiErrorKindParse OapiErrorKind = iota
 
-	// ErrorKindDecode indicates a request body decoding error (invalid JSON, form data, etc.).
-	ErrorKindDecode
+	// OapiErrorKindDecode indicates a request body decoding error (invalid JSON, form data, etc.).
+	OapiErrorKindDecode
 
-	// ErrorKindValidation indicates a request validation error (failed schema validation).
-	ErrorKindValidation
+	// OapiErrorKindValidation indicates a request validation error (failed schema validation).
+	OapiErrorKindValidation
 
-	// ErrorKindService indicates a service/business logic error returned by the service implementation.
-	ErrorKindService
+	// OapiErrorKindService indicates a service/business logic error returned by the service implementation.
+	OapiErrorKindService
 )
 
-// ErrorContext provides context about an error that occurred during request processing.
-type ErrorContext struct {
+// OapiErrorContext provides context about an error that occurred during request processing.
+type OapiErrorContext struct {
 	// Kind indicates the type of error (parse, decode, validation, service).
-	Kind ErrorKind
+	Kind OapiErrorKind
 
 	// Err is the underlying error.
 	Err error
 
-	// ParamName is the name of the parameter that failed to parse (only set for ErrorKindParse).
+	// ParamName is the name of the parameter that failed to parse (only set for OapiErrorKindParse).
 	ParamName string
 
 	// StatusCode is the suggested HTTP status code for the error.
@@ -46,28 +46,28 @@ type ErrorContext struct {
 	StatusCode int
 }
 
-// ErrorResponse is the default error response structure for parse, decode, and validation errors.
-type ErrorResponse struct {
+// OapiErrorResponse is the default error response structure for parse, decode, and validation errors.
+type OapiErrorResponse struct {
 	Error string `json:"error"`
 }
 
-// ErrorHandler handles errors that occur during request processing.
+// OapiErrorHandler handles errors that occur during request processing.
 // Implement this interface to customize error responses, logging, and metrics.
-type ErrorHandler interface {
-	// HandleError writes an error response. The ErrorContext provides details about the error.
+type OapiErrorHandler interface {
+	// HandleError writes an error response. The OapiErrorContext provides details about the error.
 	// Implementations should write the response status and body to w.
-	HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext)
+	HandleError(w http.ResponseWriter, r *http.Request, ctx OapiErrorContext)
 }
 
-// DefaultErrorHandler provides the default error handling behavior.
+// OapiDefaultErrorHandler provides the default error handling behavior.
 // It writes JSON error responses with appropriate status codes.
 // Customize this implementation to add logging, metrics, or change the error format.
-type DefaultErrorHandler struct{}
+type OapiDefaultErrorHandler struct{}
 
-// HandleError implements ErrorHandler with default JSON error responses.
+// HandleError implements OapiErrorHandler with default JSON error responses.
 // It respects the Accept header: if the client accepts JSON, it returns JSON;
 // otherwise, it returns plain text.
-func (h *DefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx ErrorContext) {
+func (h *OapiDefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, ctx OapiErrorContext) {
 	// Check if client accepts JSON
 	accept := r.Header.Get("Accept")
 	wantsJSON := accept == "" || strings.Contains(accept, "application/json") || strings.Contains(accept, "*/*")
@@ -77,9 +77,9 @@ func (h *DefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Request
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(ctx.StatusCode)
 		switch ctx.Kind {
-		case ErrorKindParse:
+		case OapiErrorKindParse:
 			fmt.Fprintf(w, "invalid parameter %q: %v", ctx.ParamName, ctx.Err)
-		case ErrorKindDecode, ErrorKindValidation, ErrorKindService:
+		case OapiErrorKindDecode, OapiErrorKindValidation, OapiErrorKindService:
 			fmt.Fprint(w, ctx.Err.Error())
 		}
 		return
@@ -89,15 +89,15 @@ func (h *DefaultErrorHandler) HandleError(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(ctx.StatusCode)
 	switch ctx.Kind {
-	case ErrorKindParse:
-		_ = json.NewEncoder(w).Encode(ErrorResponse{
+	case OapiErrorKindParse:
+		_ = json.NewEncoder(w).Encode(OapiErrorResponse{
 			Error: fmt.Sprintf("invalid parameter %q: %v", ctx.ParamName, ctx.Err),
 		})
-	case ErrorKindDecode, ErrorKindValidation:
-		_ = json.NewEncoder(w).Encode(ErrorResponse{
+	case OapiErrorKindDecode, OapiErrorKindValidation:
+		_ = json.NewEncoder(w).Encode(OapiErrorResponse{
 			Error: ctx.Err.Error(),
 		})
-	case ErrorKindService:
+	case OapiErrorKindService:
 		// Service errors are encoded directly - they may have custom structure
 		_ = json.NewEncoder(w).Encode(ctx.Err)
 	}
@@ -157,14 +157,14 @@ type ServiceInterface interface {
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
 	svc        ServiceInterface
-	errHandler ErrorHandler
+	errHandler OapiErrorHandler
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
-// If errHandler is nil, DefaultErrorHandler is used.
-func NewHTTPAdapter(svc ServiceInterface, errHandler ErrorHandler) *HTTPAdapter {
+// If errHandler is nil, OapiDefaultErrorHandler is used.
+func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdapter {
 	if errHandler == nil {
-		errHandler = &DefaultErrorHandler{}
+		errHandler = &OapiDefaultErrorHandler{}
 	}
 	return &HTTPAdapter{svc: svc, errHandler: errHandler}
 }
@@ -173,8 +173,8 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler ErrorHandler) *HTTPAdapter 
 // Returns true if an error was handled (caller should return), false otherwise.
 func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, paramName string, err error) bool {
 	if err != nil {
-		a.errHandler.HandleError(w, r, ErrorContext{
-			Kind:       ErrorKindParse,
+		a.errHandler.HandleError(w, r, OapiErrorContext{
+			Kind:       OapiErrorKindParse,
 			Err:        err,
 			ParamName:  paramName,
 			StatusCode: http.StatusBadRequest,
@@ -186,8 +186,8 @@ func (a *HTTPAdapter) handleParseError(w http.ResponseWriter, r *http.Request, p
 
 // handleDecodeError handles request body decoding errors using the error handler.
 func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, err error) {
-	a.errHandler.HandleError(w, r, ErrorContext{
-		Kind:       ErrorKindDecode,
+	a.errHandler.HandleError(w, r, OapiErrorContext{
+		Kind:       OapiErrorKindDecode,
 		Err:        err,
 		StatusCode: http.StatusBadRequest,
 	})
@@ -195,8 +195,8 @@ func (a *HTTPAdapter) handleDecodeError(w http.ResponseWriter, r *http.Request, 
 
 // handleServiceError handles service/business logic errors using the error handler.
 func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request, err error, code int) {
-	a.errHandler.HandleError(w, r, ErrorContext{
-		Kind:       ErrorKindService,
+	a.errHandler.HandleError(w, r, OapiErrorContext{
+		Kind:       OapiErrorKindService,
 		Err:        err,
 		StatusCode: code,
 	})
@@ -204,8 +204,8 @@ func (a *HTTPAdapter) handleServiceError(w http.ResponseWriter, r *http.Request,
 
 // handleValidationError handles request validation errors using the error handler.
 func (a *HTTPAdapter) handleValidationError(w http.ResponseWriter, r *http.Request, err error) {
-	a.errHandler.HandleError(w, r, ErrorContext{
-		Kind:       ErrorKindValidation,
+	a.errHandler.HandleError(w, r, OapiErrorContext{
+		Kind:       OapiErrorKindValidation,
 		Err:        err,
 		StatusCode: http.StatusBadRequest,
 	})
@@ -1280,7 +1280,7 @@ type RouterOption func(*routerConfig)
 
 type routerConfig struct {
 	middlewares []func(http.Handler) http.Handler
-	errHandler  ErrorHandler
+	errHandler  OapiErrorHandler
 }
 
 // WithMiddleware adds middleware to the router.
@@ -1291,8 +1291,8 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 }
 
 // WithErrorHandler sets a custom error handler for the router.
-// If not set, DefaultErrorHandler is used.
-func WithErrorHandler(h ErrorHandler) RouterOption {
+// If not set, OapiDefaultErrorHandler is used.
+func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.errHandler = h
 	}
