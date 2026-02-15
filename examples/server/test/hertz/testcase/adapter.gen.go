@@ -352,7 +352,7 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	defer r.Body.Close()
-	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		a.errHandler.HandleError(w, r, OapiErrorContext{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "ImportUsers",
