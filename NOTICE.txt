@@ -17,7 +17,7 @@ Bundled third-party components and their licenses:
    License: Apache-2.0
 
 4) github.com/gabriel-vasile/mimetype
-   Source: https://github.com/gabriel-vasile/mimetype/blob/v1.4.11/LICENSE
+   Source: https://github.com/gabriel-vasile/mimetype/blob/v1.4.13/LICENSE
    License: MIT
 
 5) github.com/go-playground/locales
@@ -29,7 +29,7 @@ Bundled third-party components and their licenses:
    License: MIT
 
 7) github.com/go-playground/validator/v10
-   Source: https://github.com/go-playground/validator/blob/v10.28.0/LICENSE
+   Source: https://github.com/go-playground/validator/blob/v10.30.1/LICENSE
    License: MIT
 
 8) github.com/google/uuid
@@ -45,11 +45,11 @@ Bundled third-party components and their licenses:
    License: MIT
 
 11) github.com/pb33f/jsonpath/pkg/jsonpath
-   Source: https://github.com/pb33f/jsonpath/blob/v0.7.0/LICENSE
+   Source: https://github.com/pb33f/jsonpath/blob/v0.8.1/LICENSE
    License: Apache-2.0
 
 12) github.com/pb33f/libopenapi
-   Source: https://github.com/pb33f/libopenapi/blob/v0.31.2/LICENSE
+   Source: https://github.com/pb33f/libopenapi/blob/v0.33.11/LICENSE
    License: MIT
 
 13) github.com/pb33f/ordered-map/v2
@@ -57,15 +57,15 @@ Bundled third-party components and their licenses:
    License: Apache-2.0
 
 14) go.yaml.in/yaml/v4
-   Source: https://github.com/yaml/go-yaml/blob/v4.0.0-rc.3/LICENSE
+   Source: https://github.com/yaml/go-yaml/blob/v4.0.0-rc.4/LICENSE
    License: Apache-2.0
 
 15) golang.org/x/crypto/sha3
-   Source: https://cs.opensource.google/go/x/crypto/+/v0.45.0:LICENSE
+   Source: https://cs.opensource.google/go/x/crypto/+/v0.48.0:LICENSE
    License: BSD-3-Clause
 
 16) golang.org/x/mod
-   Source: https://cs.opensource.google/go/x/mod/+/v0.30.0:LICENSE
+   Source: https://cs.opensource.google/go/x/mod/+/v0.33.0:LICENSE
    License: BSD-3-Clause
 
 17) golang.org/x/sync
@@ -73,17 +73,18 @@ Bundled third-party components and their licenses:
    License: BSD-3-Clause
 
 18) golang.org/x/sys/cpu
-   Source: https://cs.opensource.google/go/x/sys/+/v0.38.0:LICENSE
+   Source: https://cs.opensource.google/go/x/sys/+/v0.41.0:LICENSE
    License: BSD-3-Clause
 
 19) golang.org/x/text
-   Source: https://cs.opensource.google/go/x/text/+/v0.31.0:LICENSE
+   Source: https://cs.opensource.google/go/x/text/+/v0.34.0:LICENSE
    License: BSD-3-Clause
 
 20) golang.org/x/tools
-   Source: https://cs.opensource.google/go/x/tools/+/v0.39.0:LICENSE
+   Source: https://cs.opensource.google/go/x/tools/+/v0.42.0:LICENSE
    License: BSD-3-Clause
 
 --------------------------------------------------
 This NOTICE file must be updated whenever this project adds,
 vendors, or bundles additional third-party components.
+
