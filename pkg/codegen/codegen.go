@@ -81,6 +81,15 @@ func CreateParseContextFromDocument(doc libopenapi.Document, cfg Configuration) 
 	}
 	model := &builtModel.Model
 
+	return CreateParseContextFromModel(model, cfg)
+}
+
+// CreateParseContextFromModel creates a ParseContext from an already-built OpenAPI v3 model.
+// This is useful when the model has been modified in-place,
+// and you want to avoid rebuilding it from the document.
+func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*ParseContext, error) {
+	cfg = cfg.WithDefaults()
+
 	if model == nil {
 		return nil, nil
 	}
