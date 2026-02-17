@@ -222,6 +222,44 @@ type GetUserServiceRequestOptions struct {
 }
 ```
 
+### Form-Encoded Requests
+
+When your OpenAPI spec defines `application/x-www-form-urlencoded` as the request content type, 
+the generated adapter automatically parses form data into your typed request body.
+
+The adapter supports **deepObject encoding** as defined in OpenAPI 3.0, which allows nested objects and arrays in form data:
+
+```
+# Simple key-value pairs
+name=John&age=30&active=true
+
+# Nested objects (deepObject style)
+address[city]=Berlin&address[country]=DE
+
+# Arrays with indices
+items[0]=first&items[1]=second
+
+# Complex nested structures (e.g., Stripe API style)
+flow_data[subscription][items][0][id]=si_123&flow_data[subscription][items][0][quantity]=2
+```
+
+**Type conversion** is handled automatically:
+
+| Form Value | Converted To |
+|------------|--------------|
+| `true`, `false` | `bool` |
+| `42`, `-10` | `int64` |
+| `3.14`, `0.05` | `float64` |
+| Other values | `string` |
+
+**Conservative conversion** preserves string values that look like numbers but shouldn't be converted:
+
+- Phone numbers starting with `+` (e.g., `+1234567890`)
+- Values with leading zeros (e.g., `00123`)
+- Values containing spaces or parentheses
+
+This enables seamless integration with APIs like Stripe that use complex form-encoded request bodies.
+
 ### Response Data
 
 Return a `*<Operation>ResponseData` from your service method:
