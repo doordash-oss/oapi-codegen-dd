@@ -232,7 +232,7 @@ type SubmitContactFormResponse map[string]any
 
 type CreateNoteResponse = int
 
-type ProcessXMLDataResponse = XMLPayload
+type ProcessXMLDataResponse = []byte
 
 type ExportDataResponse = runtime.File
 
