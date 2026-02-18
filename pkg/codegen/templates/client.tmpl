@@ -157,6 +157,9 @@ responseParser := func(ctx context.Context, resp *runtime.Response) (*{{$op.Resp
 
     {{- if eq $op.Response.SuccessStatusCode 204 }}
         return nil, nil
+    {{ else if $op.Response.Success.IsRaw }}
+        result := {{ $respName }}(bodyBytes)
+        return &result, nil
     {{ else }}
         target := new({{ $respName }})
         {{ if eq $op.Response.Success.NameTag "Formdata" }}
