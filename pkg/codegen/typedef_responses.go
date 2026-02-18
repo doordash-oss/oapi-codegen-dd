@@ -199,6 +199,16 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			continue
 		}
 
+		// For raw content types (XML, YAML, etc.), override the schema to []byte
+		// since we can't automatically unmarshal these formats.
+		if isRawContentType(contentType) {
+			contentSchema = GoSchema{
+				GoType:         "[]byte",
+				DefineViaAlias: true,
+				Description:    contentSchema.Description,
+			}
+		}
+
 		var responseName string
 		tag := ""
 
@@ -372,18 +382,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 
 		// IsRaw is true for unsupported content types that require manual marshaling
 		// Use HasPrefix to handle content types with parameters (e.g., "text/html; charset=UTF-8")
-		isRaw := contentType != "" &&
-			contentType != "application/json" &&
-			!strings.HasPrefix(contentType, "application/json;") &&
-			!isMediaTypeJson(contentType) &&
-			contentType != "text/plain" &&
-			!strings.HasPrefix(contentType, "text/plain;") &&
-			contentType != "text/html" &&
-			!strings.HasPrefix(contentType, "text/html;") &&
-			contentType != "application/octet-stream" &&
-			!strings.HasPrefix(contentType, "application/octet-stream;") &&
-			contentType != "application/x-www-form-urlencoded" &&
-			!strings.HasPrefix(contentType, "application/x-www-form-urlencoded;")
+		isRaw := isRawContentType(contentType)
 
 		rcd := &ResponseContentDefinition{
 			ResponseName: responseName,
@@ -513,4 +512,21 @@ func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], op
 		res[hName] = hSchema
 	}
 	return res, nil
+}
+
+// isRawContentType returns true for content types that require manual marshaling
+// (XML, YAML, etc.) and should use []byte as the response type.
+func isRawContentType(contentType string) bool {
+	return contentType != "" &&
+		contentType != "application/json" &&
+		!strings.HasPrefix(contentType, "application/json;") &&
+		!isMediaTypeJson(contentType) &&
+		contentType != "text/plain" &&
+		!strings.HasPrefix(contentType, "text/plain;") &&
+		contentType != "text/html" &&
+		!strings.HasPrefix(contentType, "text/html;") &&
+		contentType != "application/octet-stream" &&
+		!strings.HasPrefix(contentType, "application/octet-stream;") &&
+		contentType != "application/x-www-form-urlencoded" &&
+		!strings.HasPrefix(contentType, "application/x-www-form-urlencoded;")
 }

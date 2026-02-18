@@ -1,0 +1,49 @@
+openapi: "3.0.0"
+info:
+  title: Raw Content Types Test
+  version: "1.0"
+paths:
+  /yaml-config:
+    get:
+      operationId: getYamlConfig
+      summary: Returns YAML configuration
+      responses:
+        "200":
+          description: YAML configuration
+          content:
+            text/yaml:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  value:
+                    type: integer
+  /xml-data:
+    get:
+      operationId: getXmlData
+      summary: Returns XML data
+      responses:
+        "200":
+          description: XML data
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+  /json-data:
+    get:
+      operationId: getJsonData
+      summary: Returns JSON data (for comparison)
+      responses:
+        "200":
+          description: JSON data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string

@@ -451,3 +451,41 @@ func TestOverlayInvalidSource(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error applying overlays")
 }
+
+// TestRawContentTypesGenerateByteSlice tests that raw content types (XML, YAML, etc.)
+// generate []byte response types instead of structs, since we can't automatically
+// unmarshal these formats.
+func TestRawContentTypesGenerateByteSlice(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+		Generate: &GenerateOptions{
+			Client: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "raw-content-types.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// Raw content types (YAML, XML) should generate []byte aliases
+	assert.Contains(t, code, "type GetYamlConfigResponse = []byte")
+	assert.Contains(t, code, "type GetXMLDataResponse = []byte")
+
+	// JSON content type should still generate a struct
+	assert.Contains(t, code, "type GetJSONDataResponse struct")
+
+	// Client code for raw types should use direct byte conversion, not json.Unmarshal
+	assert.Contains(t, code, "result := GetYamlConfigResponse(bodyBytes)")
+	assert.Contains(t, code, "result := GetXMLDataResponse(bodyBytes)")
+
+	// Client code for JSON should still use json.Unmarshal
+	assert.Contains(t, code, "json.Unmarshal(bodyBytes, target)")
+
+	// Verify that the code compiles
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
