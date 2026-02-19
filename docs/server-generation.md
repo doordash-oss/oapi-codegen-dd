@@ -24,7 +24,8 @@ output:
 generate:
   handler:
     kind: chi  # or echo, gin, fiber, std-http, etc.
-    middleware: {}
+    service: {}     # Generate service.go scaffold
+    middleware: {}  # Generate middleware.go scaffold
     server:
       directory: server
       handler-package: github.com/myorg/myapi/api
@@ -159,6 +160,21 @@ generate:
       package: api        # Package name for scaffold files
       overwrite: true     # Force regenerate scaffold files
 ```
+
+### `generate.handler.service`
+
+Enable service scaffold generation. Set to `{}` to generate `service.go`.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    service: {}  # Generates service.go
+```
+
+!!! note
+    Service generation is opt-in. If not specified, `service.go` will not be generated.
+    When `server` is configured, `service` must also be configured.
 
 ### `generate.handler.middleware`
 
