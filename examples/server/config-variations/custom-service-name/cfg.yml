@@ -9,3 +9,4 @@ generate:
     name: CustomServiceName
     output:
       overwrite: true
+    service: {}

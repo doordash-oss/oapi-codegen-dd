@@ -10,6 +10,7 @@ generate:
     kind: fiber
     output:
       overwrite: true
+    service: {}
     middleware: {}
     server:
       directory: server

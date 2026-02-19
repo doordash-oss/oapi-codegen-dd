@@ -34,4 +34,5 @@ var (
 	ErrHandlerKindRequired                       = errors.New("handler kind is required")
 	ErrHandlerKindUnsupported                    = errors.New("unsupported handler kind")
 	ErrServerHandlerPackageRequired              = errors.New("server handler-package is required when server generation is enabled")
+	ErrServerRequiresService                     = errors.New("server generation requires service generation: add 'service: {}' to handler config")
 )

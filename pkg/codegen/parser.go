@@ -16,6 +16,7 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
+	"log/slog"
 	"os"
 	"slices"
 	"sort"
@@ -226,6 +227,9 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 
 	// Generate handler code if handler generation is enabled
 	if len(p.ctx.Operations) > 0 && p.cfg.Generate.Handler != nil {
+		if err := p.cfg.Generate.Handler.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid handler options: %w", err)
+		}
 		opsCtx := &TplOperationsContext{
 			Operations: p.ctx.Operations,
 			Imports:    p.ctx.Imports,
@@ -315,31 +319,35 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			scaffoldOut[middlewareKey] = formattedMiddleware
 		}
 
-		// Generate service implementation stub - scaffolded file
-		serviceCtx := &TplOperationsContext{
-			Operations:  p.ctx.Operations,
-			Imports:     p.ctx.Imports,
-			Config:      p.cfg,
-			WithHeader:  withHeader,
-			PackageName: scaffoldPackage,
-		}
-		out, err := p.ParseTemplates([]string{sharedPrefix + "service.tmpl"}, serviceCtx)
-		if err != nil {
-			return GeneratedCode{}, fmt.Errorf("error generating code for handler implementation: %w", err)
-		}
+		// Generate service implementation stub if enabled - scaffolded file
+		if p.cfg.Generate.Handler.Service != nil {
+			serviceCtx := &TplOperationsContext{
+				Operations:  p.ctx.Operations,
+				Imports:     p.ctx.Imports,
+				Config:      p.cfg,
+				WithHeader:  withHeader,
+				PackageName: scaffoldPackage,
+			}
+			out, err := p.ParseTemplates([]string{sharedPrefix + "service.tmpl"}, serviceCtx)
+			if err != nil {
+				return GeneratedCode{}, fmt.Errorf("error generating code for handler implementation: %w", err)
+			}
 
-		// Scaffold files are always separate files, so always format them
-		formatted, err := FormatCode(out)
-		if err != nil {
-			return nil, fmt.Errorf("error formatting service: %w", err)
-		}
+			// Scaffold files are always separate files, so always format them
+			formatted, err := FormatCode(out)
+			if err != nil {
+				return nil, fmt.Errorf("error formatting service: %w", err)
+			}
 
-		// Use directory path as key if scaffold has different output directory
-		serviceKey := "service"
-		if scaffoldOutput.Directory != "" && scaffoldOutput.Directory != p.cfg.Output.Directory {
-			serviceKey = scaffoldOutput.Directory + "/service"
+			// Use directory path as key if scaffold has different output directory
+			serviceKey := "service"
+			if scaffoldOutput.Directory != "" && scaffoldOutput.Directory != p.cfg.Output.Directory {
+				serviceKey = scaffoldOutput.Directory + "/service"
+			}
+			scaffoldOut[serviceKey] = formatted
+		} else {
+			slog.Info("service.go scaffold not generated. To generate, add 'service: {}' under 'generate.handler' in your config")
 		}
-		scaffoldOut[serviceKey] = formatted
 
 		// Generate server main.go if server generation is enabled - scaffolded file
 		if p.cfg.Generate.Handler.Server != nil {

@@ -11,6 +11,7 @@ generate:
   handler:
     kind: chi
     models-package-alias: models
+    service: {}
     output:
       directory: service
       package: service

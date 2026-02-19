@@ -346,6 +346,7 @@ func TestIntegration(t *testing.T) {
 							Request:  true,
 							Response: true,
 						},
+						Service: &codegen.ServiceOptions{},
 					},
 					MCPServer: &codegen.MCPServerOptions{},
 				},
