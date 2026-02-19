@@ -7,3 +7,4 @@ generate:
   models: false
   handler:
     kind: fiber
+    service: {}

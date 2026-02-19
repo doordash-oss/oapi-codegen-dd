@@ -390,6 +390,10 @@ type HandlerOptions struct {
 	// Falls back to root output if nil.
 	Output *ScaffoldOutput `yaml:"output"`
 
+	// Service specifies options for generating service.go scaffold.
+	// If nil, no service scaffold is generated.
+	Service *ServiceOptions `yaml:"service"`
+
 	// Middleware specifies options for generating middleware.go.
 	// If nil, no middleware is generated.
 	Middleware *MiddlewareOptions `yaml:"middleware"`
@@ -433,6 +437,11 @@ func (o HandlerOptions) Validate() error {
 	if !o.Kind.IsValid() {
 		return fmt.Errorf("%w: %q", ErrHandlerKindUnsupported, o.Kind)
 	}
+
+	// Server generation requires service generation since server/main.go references the service
+	if o.Server != nil && o.Service == nil {
+		return ErrServerRequiresService
+	}
 	return nil
 }
 
@@ -449,6 +458,11 @@ type HandlerValidation struct {
 // MiddlewareOptions specifies options for generating middleware.go.
 // Currently empty but allows for future extensibility.
 type MiddlewareOptions struct {
+}
+
+// ServiceOptions specifies options for generating service.go scaffold.
+// Currently empty but allows for future extensibility.
+type ServiceOptions struct {
 }
 
 // MCPServerOptions specifies options for MCP (Model Context Protocol) server generation.

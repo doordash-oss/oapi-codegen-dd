@@ -7,4 +7,5 @@ generate:
   models: false
   handler:
     kind: hertz
+    service: {}
 

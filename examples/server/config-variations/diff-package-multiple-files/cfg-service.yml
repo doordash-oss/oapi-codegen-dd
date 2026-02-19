@@ -9,6 +9,7 @@ generate:
   handler:
     kind: chi
     models-package-alias: models
+    service: {}
     output:
       overwrite: true
       directory: service

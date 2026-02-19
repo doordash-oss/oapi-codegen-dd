@@ -10,6 +10,7 @@ generate:
     kind: kratos
     output:
       overwrite: true
+    service: {}
     middleware: {}
     server:
       directory: server

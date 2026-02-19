@@ -7,5 +7,6 @@ generate:
     kind: chi
     output:
       overwrite: true
+    service: {}
 error-mapping:
   Error: message

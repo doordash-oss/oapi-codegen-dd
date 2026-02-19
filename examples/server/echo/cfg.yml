@@ -10,6 +10,7 @@ generate:
     kind: echo
     output:
       overwrite: true
+    service: {}
     middleware: {}
     server:
       directory: server
