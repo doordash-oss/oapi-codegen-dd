@@ -21,6 +21,9 @@ beecontext "github.com/beego/beego/v2/server/web/context"{{end}}
 {{/* Beego uses r.PathValue() since we copy params from Beego context to request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to beego format: {param} -> :param, /** -> /*any */}}
+{{define "router-path"}}{{ escapeGoString (replace (replace (replace . "/**" "/*") "{" ":") "}" "") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []beego.MiddleWare
@@ -69,7 +72,7 @@ func RegisterRoutes(router *beego.ControllerRegister, svc {{ $serviceName }}Inte
     httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 
     {{- range $operations }}{{ $op := . }}
-        router.{{ $op.Method | lower | ucFirst }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", beegoHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ if $op.PathParams }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}{{ end }}))
+        router.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", beegoHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ if $op.PathParams }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}{{ end }}))
     {{- end }}
 }
 

@@ -19,6 +19,9 @@ limitations under the License.
 
 {{define "get-path-param"}}chi.URLParam(r, "{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to chi format: /** -> /* */}}
+{{define "router-path"}}{{ escapeGoString (replace . "/**" "/*") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []func(http.Handler) http.Handler
@@ -60,7 +63,7 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) chi.Router
     }
 
     {{- range $operations }}{{ $op := . }}
-        r.Method("{{ $op.Method }}", "{{ escapeGoString $op.Path }}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+        r.Method("{{ $op.Method }}", "{{template "router-path" $op.Path}}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
     {{- end }}
 
     return r

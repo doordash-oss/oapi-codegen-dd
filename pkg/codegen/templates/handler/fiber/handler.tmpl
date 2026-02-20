@@ -21,6 +21,9 @@ limitations under the License.
 {{/* Fiber uses adaptor to convert http.Handler, path params copied to request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to fiber format: {param} -> :param, /** -> /* */}}
+{{define "router-path"}}{{ escapeGoString (replace (replace (replace . "/**" "/*") "{" ":") "}" "") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []fiber.Handler
@@ -76,9 +79,9 @@ func NewRouter(app *fiber.App, svc {{ $serviceName }}Interface, opts ...RouterOp
 
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
-        app.{{ $op.Method | lower | ucFirst }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", fiberHTTPHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
+        app.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", fiberHTTPHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
         {{- else }}
-        app.{{ $op.Method | lower | ucFirst }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", adaptor.HTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
+        app.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", adaptor.HTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
         {{- end }}
     {{- end }}
 }

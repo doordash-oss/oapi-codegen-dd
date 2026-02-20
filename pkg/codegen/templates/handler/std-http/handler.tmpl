@@ -19,6 +19,9 @@ limitations under the License.
 
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to Go 1.22+ ServeMux format: /** -> /{path...} */}}
+{{define "router-path"}}{{ escapeGoString (replace . "/**" "/{path...}") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []func(http.Handler) http.Handler
@@ -57,7 +60,7 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *http.Serv
     mux := http.NewServeMux()
 
     {{- range $operations }}{{ $op := . }}
-        mux.HandleFunc("{{ $op.Method }} {{ escapeGoString $op.Path }}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
+        mux.HandleFunc("{{ $op.Method }} {{template "router-path" $op.Path}}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
     {{- end }}
 
     return mux

@@ -22,6 +22,9 @@ limitations under the License.
 {{/* fasthttp uses {name} for path params, accessed via ctx.UserValue */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to fasthttp format: {param} stays same, /** -> /* */}}
+{{define "router-path"}}{{ escapeGoString (replace . "/**" "/*") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []func(fasthttp.RequestHandler) fasthttp.RequestHandler
@@ -76,9 +79,9 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *router.Ro
 
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
-        r.{{ $op.Method }}("{{ $op.Path }}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
+        r.{{ $op.Method }}("{{template "router-path" $op.Path}}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
         {{- else }}
-        r.{{ $op.Method }}("{{ $op.Path }}", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
+        r.{{ $op.Method }}("{{template "router-path" $op.Path}}", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
         {{- end }}
     {{- end }}
 

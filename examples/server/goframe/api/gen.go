@@ -372,12 +372,12 @@ func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 	s.BindHandler("POST:/users", func(r *ghttp.Request) {
 		adapter.CreateUser(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/users/{id}", func(r *ghttp.Request) {
+	s.BindHandler("GET:/users/:id", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		adapter.GetUser(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("DELETE:/users/{id}", func(r *ghttp.Request) {
+	s.BindHandler("DELETE:/users/:id", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		adapter.DeleteUser(r.Response.Writer, r.Request)

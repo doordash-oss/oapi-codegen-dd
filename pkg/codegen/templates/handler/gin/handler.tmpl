@@ -20,6 +20,9 @@ limitations under the License.
 {{/* Gin uses r.PathValue() since we copy params from Gin context to request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to gin format: {param} -> :param, /** -> /*any */}}
+{{define "router-path"}}{{ escapeGoString (replace (replace (replace . "/**" "/*any") "{" ":") "}" "") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []gin.HandlerFunc
@@ -61,7 +64,7 @@ func NewRouter(r *gin.Engine, svc {{ $serviceName }}Interface, opts ...RouterOpt
     }
 
     {{- range $operations }}{{ $op := . }}
-        r.{{ $op.Method | caps }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", func(c *gin.Context) {
+        r.{{ $op.Method | caps }}("{{template "router-path" $op.Path}}", func(c *gin.Context) {
             {{- if $op.PathParams }}
             // Copy path params to request for http.Handler compatibility
             {{- range $op.PathParams.Schema.Properties }}

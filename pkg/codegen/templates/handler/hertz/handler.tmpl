@@ -24,6 +24,9 @@ limitations under the License.
 {{/* Hertz uses r.PathValue() since we copy params from Hertz request to http.Request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to hertz format: /** -> /*any */}}
+{{define "router-path"}}{{ escapeGoString (replace . "/**" "/*any") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []app.HandlerFunc
@@ -65,7 +68,7 @@ func NewRouter(h *server.Hertz, svc {{ $serviceName }}Interface, opts ...RouterO
     }
 
     {{- range $operations }}{{ $op := . }}
-        h.Handle("{{ $op.Method | caps }}", "{{ escapeGoString $op.Path }}", func(ctx context.Context, c *app.RequestContext) {
+        h.Handle("{{ $op.Method | caps }}", "{{template "router-path" $op.Path}}", func(ctx context.Context, c *app.RequestContext) {
             req, err := adaptor.GetCompatRequest(&c.Request)
             if err != nil {
                 c.String(500, "failed to get compat request: %v", err)

@@ -1369,22 +1369,22 @@ func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 	s.BindHandler("POST:/users/import", func(r *ghttp.Request) {
 		adapter.ImportUsers(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/users/{id}", func(r *ghttp.Request) {
+	s.BindHandler("GET:/users/:id", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		adapter.GetUser(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("DELETE:/users/{id}", func(r *ghttp.Request) {
+	s.BindHandler("DELETE:/users/:id", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		adapter.DeleteUser(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/users/{id}/avatar", func(r *ghttp.Request) {
+	s.BindHandler("GET:/users/:id/avatar", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		adapter.GetUserAvatar(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("PUT:/users/{id}/avatar", func(r *ghttp.Request) {
+	s.BindHandler("PUT:/users/:id/avatar", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		adapter.UploadUserAvatar(r.Response.Writer, r.Request)
@@ -1404,7 +1404,7 @@ func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 	s.BindHandler("POST:/oauth/token", func(r *ghttp.Request) {
 		adapter.GetOAuthToken(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/items/{type}", func(r *ghttp.Request) {
+	s.BindHandler("GET:/items/:type", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("type", r.Get("type").String())
 		adapter.GetItemsByType(r.Response.Writer, r.Request)
@@ -1421,18 +1421,18 @@ func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 	s.BindHandler("GET:/products", func(r *ghttp.Request) {
 		adapter.ListProducts(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/categories/{categoryId}", func(r *ghttp.Request) {
+	s.BindHandler("GET:/categories/:categoryId", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("categoryId", r.Get("categoryId").String())
 		adapter.GetCategory(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/items/{type}/{rating}", func(r *ghttp.Request) {
+	s.BindHandler("GET:/items/:type/:rating", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("type", r.Get("type").String())
 		r.Request.SetPathValue("rating", r.Get("rating").String())
 		adapter.GetItemsByStatus(r.Response.Writer, r.Request)
 	})
-	s.BindHandler("GET:/users/{id}/posts/{postId}", func(r *ghttp.Request) {
+	s.BindHandler("GET:/users/:id/posts/:postId", func(r *ghttp.Request) {
 		// Copy path params to request for http.Handler compatibility
 		r.Request.SetPathValue("id", r.Get("id").String())
 		r.Request.SetPathValue("postId", r.Get("postId").String())

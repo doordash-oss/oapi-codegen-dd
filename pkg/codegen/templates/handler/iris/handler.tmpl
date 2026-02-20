@@ -20,6 +20,9 @@ limitations under the License.
 {{/* Iris uses r.PathValue() since we copy params from Iris context to request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to Iris format: {param} stays same, /** -> /{path:path} */}}
+{{define "router-path"}}{{ escapeGoString (replace . "/**" "/{path:path}") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []iris.Handler
@@ -61,7 +64,7 @@ func NewRouter(app *iris.Application, svc {{ $serviceName }}Interface, opts ...R
     }
 
     {{- range $operations }}{{ $op := . }}
-        app.Handle("{{ $op.Method | caps }}", "{{ escapeGoString $op.Path }}", func(ctx iris.Context) {
+        app.Handle("{{ $op.Method | caps }}", "{{template "router-path" $op.Path}}", func(ctx iris.Context) {
             {{- if $op.PathParams }}
             // Copy path params to request for http.Handler compatibility
             {{- range $op.PathParams.Schema.Properties }}

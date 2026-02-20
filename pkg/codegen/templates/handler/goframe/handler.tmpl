@@ -20,6 +20,9 @@ limitations under the License.
 {{/* GoFrame uses r.PathValue() since we copy params from GoFrame request to http.Request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to GoFrame format: {param} -> :param, /** -> /* */}}
+{{define "router-path"}}{{ escapeGoString (replace (replace (replace . "/**" "/*") "{" ":") "}" "") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []ghttp.HandlerFunc
@@ -61,7 +64,7 @@ func NewRouter(s *ghttp.Server, svc {{ $serviceName }}Interface, opts ...RouterO
     }
 
     {{- range $operations }}{{ $op := . }}
-        s.BindHandler("{{ $op.Method | caps }}:{{ escapeGoString $op.Path }}", func(r *ghttp.Request) {
+        s.BindHandler("{{ $op.Method | caps }}:{{template "router-path" $op.Path}}", func(r *ghttp.Request) {
             {{- if $op.PathParams }}
             // Copy path params to request for http.Handler compatibility
             {{- range $op.PathParams.Schema.Properties }}

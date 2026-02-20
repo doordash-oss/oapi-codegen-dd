@@ -20,6 +20,9 @@ limitations under the License.
 {{/* Echo uses r.PathValue() since we copy params from Echo context to request */}}
 {{define "get-path-param"}}r.PathValue("{{ . }}"){{end}}
 
+{{/* router-path converts OpenAPI path to echo format: {param} -> :param, /** -> /*any */}}
+{{define "router-path"}}{{ escapeGoString (replace (replace (replace . "/**" "/*") "{" ":") "}" "") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []echo.MiddlewareFunc
@@ -61,7 +64,7 @@ func NewRouter(e *echo.Echo, svc {{ $serviceName }}Interface, opts ...RouterOpti
     }
 
     {{- range $operations }}{{ $op := . }}
-        e.{{ $op.Method | caps }}("{{ replace (replace $op.Path "{" ":") "}" "" }}", func(c echo.Context) error {
+        e.{{ $op.Method | caps }}("{{template "router-path" $op.Path}}", func(c echo.Context) error {
             {{- if $op.PathParams }}
             // Copy path params to request for http.Handler compatibility
             {{- range $op.PathParams.Schema.Properties }}
