@@ -216,7 +216,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			formatted := out
 			if !useSingleFile {
-				formatted, err = FormatCode(out)
+				formatted, err = p.formatCode(out)
 				if err != nil {
 					return nil, err
 				}
@@ -256,7 +256,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				if err != nil {
 					return nil, fmt.Errorf("error generating code for %s: %w", tmpl, err)
 				}
-				formatted, err := FormatCode(out)
+				formatted, err := p.formatCode(out)
 				if err != nil {
 					return nil, err
 				}
@@ -272,7 +272,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			formatted := out
 			if !useSingleFile {
-				formatted, err = FormatCode(out)
+				formatted, err = p.formatCode(out)
 				if err != nil {
 					return nil, fmt.Errorf("error formatting %s: %w", tmpl, err)
 				}
@@ -306,7 +306,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				}
 			}
 			// Scaffold files are always separate files, so always format them
-			formattedMiddleware, err := FormatCode(middlewareOut)
+			formattedMiddleware, err := p.formatCode(middlewareOut)
 			if err != nil {
 				return nil, fmt.Errorf("error formatting middleware: %w", err)
 			}
@@ -334,7 +334,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 
 			// Scaffold files are always separate files, so always format them
-			formatted, err := FormatCode(out)
+			formatted, err := p.formatCode(out)
 			if err != nil {
 				return nil, fmt.Errorf("error formatting service: %w", err)
 			}
@@ -376,7 +376,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				}
 			}
 
-			formatted, err := FormatCode(out)
+			formatted, err := p.formatCode(out)
 			if err != nil {
 				return nil, fmt.Errorf("error formatting server: %w", err)
 			}
@@ -401,7 +401,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 		formatted := out
 		if !useSingleFile {
-			formatted, err = FormatCode(out)
+			formatted, err = p.formatCode(out)
 			if err != nil {
 				return nil, fmt.Errorf("error formatting MCP tools: %w", err)
 			}
@@ -419,7 +419,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error generating code for validator: %w", err)
 		}
-		formatted, err := FormatCode(out)
+		formatted, err := p.formatCode(out)
 		if err != nil {
 			return nil, err
 		}
@@ -438,7 +438,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 		formatted := out
 		if !useSingleFile {
-			formatted, err = FormatCode(out)
+			formatted, err = p.formatCode(out)
 			if err != nil {
 				return nil, err
 			}
@@ -484,7 +484,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			formatted := out
 			if !useSingleFile {
-				formatted, err = FormatCode(out)
+				formatted, err = p.formatCode(out)
 				if err != nil {
 					return nil, err
 				}
@@ -508,7 +508,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			formatted := out
 			if !useSingleFile {
-				formatted, err = FormatCode(out)
+				formatted, err = p.formatCode(out)
 				if err != nil {
 					return nil, err
 				}
@@ -540,7 +540,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			res += code + "\n"
 		}
 
-		formatted, err := FormatCode(res)
+		formatted, err := p.formatCode(res)
 		if err != nil {
 			println(res)
 			return nil, err
@@ -573,6 +573,40 @@ func (p *Parser) ParseTemplates(templates []string, data any) (string, error) {
 	}
 
 	return strings.Join(generatedTemplates, "\n"), nil
+}
+
+// formatCode formats the provided Go code, respecting the skip-fmt config option.
+// When skip-fmt is true, only sanitization is performed (skips import optimization and gofmt).
+func (p *Parser) formatCode(src string) (string, error) {
+	src = strings.Trim(src, "\n") + "\n"
+	if src == "\n" || src == "" {
+		return src, nil
+	}
+
+	// remove any byte-order-marks which break Go-Code
+	// See: https://groups.google.com/forum/#!topic/golang-nuts/OToNIPdfkks
+	src = strings.ReplaceAll(src, "\uFEFF", "")
+
+	if p.cfg.Output != nil && p.cfg.Output.SkipFmt {
+		return src, nil
+	}
+
+	return FormatCode(src)
+}
+
+// FormatCode formats the provided Go code by optimizing imports and running gofmt.
+func FormatCode(src string) (string, error) {
+	res, err := imports.Process("gen.go", []byte(src), nil)
+	if err != nil {
+		return "", fmt.Errorf("error optimizing imports: %w", err)
+	}
+
+	res, err = format.Source(res)
+	if err != nil {
+		return "", fmt.Errorf("error formatting code: %w", err)
+	}
+
+	return string(res), nil
 }
 
 func loadTemplates(cfg Configuration) (*template.Template, error) {
@@ -625,43 +659,6 @@ func loadTemplates(cfg Configuration) (*template.Template, error) {
 	}
 
 	return tpl, nil
-}
-
-// FormatCode formats the provided Go code.
-// It optimizes imports and formats the code using gofmt.
-func FormatCode(src string) (string, error) {
-	src = strings.Trim(src, "\n") + "\n"
-	if src == "\n" || src == "" {
-		return src, nil
-	}
-
-	res, err := optimizeImports([]byte(src))
-	if err != nil {
-		return "", fmt.Errorf("error optimizing imports: %w", err)
-	}
-
-	res, err = format.Source(res)
-	if err != nil {
-		return "", fmt.Errorf("error formatting code: %w", err)
-	}
-
-	return sanitizeCode(string(res)), nil
-}
-
-// sanitizeCode runs sanitizers across the generated Go code to ensure the
-// generated code will be able to compile.
-func sanitizeCode(src string) string {
-	// remove any byte-order-marks which break Go-Code
-	// See: https://groups.google.com/forum/#!topic/golang-nuts/OToNIPdfkks
-	return strings.ReplaceAll(src, "\uFEFF", "")
-}
-
-func optimizeImports(src []byte) ([]byte, error) {
-	outBytes, err := imports.Process("gen.go", src, nil)
-	if err != nil {
-		return nil, err
-	}
-	return outBytes, nil
 }
 
 func getSpecLocationOutName(specLocation SpecLocation) string {

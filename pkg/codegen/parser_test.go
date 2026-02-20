@@ -23,13 +23,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"slices"
-	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/codegen"
-	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/codegen/ast"
 )
 func main() {
-	fmt.Println("Hello, World!")
+fmt.Println("Hello, World!")
 }
 `
 
@@ -48,13 +44,12 @@ func main() {
 	require.Equal(t, expected, res)
 }
 
-func TestOptimizeImports(t *testing.T) {
+func Test_formatCode(t *testing.T) {
 	src := `
 package main
 import (
 	"fmt"
-	"foo"
-	"bar"
+	"os"
 )
 func main() {
 	fmt.Println("Hello, World!")
@@ -71,9 +66,47 @@ func main() {
 	fmt.Println("Hello, World!")
 }
 `
-	res, err := optimizeImports([]byte(src))
+	p := &Parser{cfg: Configuration{Output: &Output{SkipFmt: false}}}
+	res, err := p.formatCode(src)
 	require.NoError(t, err)
-	require.Equal(t, expected, string(res))
+	require.Equal(t, expected, res)
+}
+
+func Test_formatCode_skip(t *testing.T) {
+	// Unformatted code with unused imports
+	src := `
+package main
+import (
+	"fmt"
+	"os"
+)
+func main() {
+fmt.Println("Hello, World!")
+}
+`
+
+	// When SkipFmt=true, no processing is done (no import optimization, no gofmt)
+	p := &Parser{cfg: Configuration{Output: &Output{SkipFmt: true}}}
+	res, err := p.formatCode(src)
+	require.NoError(t, err)
+
+	// Verify unused import "os" is NOT removed (imports not optimized)
+	require.Contains(t, res, `"os"`)
+
+	// Verify the code is returned as-is (gofmt skipped, bad indentation remains)
+	require.Contains(t, res, "fmt.Println")
+	require.NotContains(t, res, "\tfmt.Println")
+
+	// When SkipFmt=false, full formatting is applied
+	p = &Parser{cfg: Configuration{Output: &Output{SkipFmt: false}}}
+	res, err = p.formatCode(src)
+	require.NoError(t, err)
+
+	// Verify unused import "os" IS removed
+	require.NotContains(t, res, `"os"`)
+
+	// gofmt fixes the indentation
+	require.Contains(t, res, "\tfmt.Println")
 }
 
 func TestParser_Parse(t *testing.T) {
