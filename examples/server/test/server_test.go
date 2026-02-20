@@ -26,6 +26,7 @@ import (
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/std-http/testcase"
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v3"
+	iris "github.com/kataras/iris/v12"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,6 +109,17 @@ func (f fasthttpHandler) Do(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+// irisHandler wraps an Iris application for testing.
+type irisHandler struct {
+	app *iris.Application
+}
+
+func (h irisHandler) Do(req *http.Request) (*http.Response, error) {
+	rr := httptest.NewRecorder()
+	h.app.ServeHTTP(rr, req)
+	return rr.Result(), nil
+}
+
 func testServers() []serverTestCase {
 	// Initialize beego for testing
 	web.BConfig.RunMode = web.DEV
@@ -133,10 +145,16 @@ func testServers() []serverTestCase {
 			return app
 		}()}},
 		{"go-zero", httpHandler{gozeroapi.NewRouter(gozeroapi.NewService())}},
+		// GoFrame requires complex session setup for ServeHTTP testing, use fallback Handler
 		{"goframe", httpHandler{goframeapi.Handler(goframeapi.NewService())}},
 		{"gorilla-mux", httpHandler{gorillamuxapi.NewRouter(gorillamuxapi.NewService())}},
 		{"hertz", httpHandler{hertzapi.Handler(hertzapi.NewService())}},
-		{"iris", httpHandler{irisapi.Handler(irisapi.NewService())}},
+		{"iris", irisHandler{func() *iris.Application {
+			app := iris.New()
+			irisapi.NewRouter(app, irisapi.NewService())
+			_ = app.Build()
+			return app
+		}()}},
 		{"kratos", httpHandler{kratosapi.NewRouter(kratosapi.NewService())}},
 		{"fasthttp", fasthttpHandler{fasthttpapi.Handler(fasthttpapi.NewService())}},
 	}

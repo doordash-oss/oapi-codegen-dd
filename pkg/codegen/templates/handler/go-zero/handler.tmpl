@@ -21,6 +21,9 @@ limitations under the License.
 
 {{define "get-path-param"}}pathvar.Vars(r)["{{ . }}"]{{end}}
 
+{{/* router-path converts OpenAPI path to go-zero format: {param} -> :param */}}
+{{define "router-path"}}{{ escapeGoString (replace (replace . "{" ":") "}" "") }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []rest.Middleware
@@ -60,7 +63,7 @@ func RegisterRoutes(server *rest.Server, svc {{ $serviceName }}Interface, opts .
     {{- range $operations }}{{ $op := . }}
         {
             Method:  "{{ $op.Method }}",
-            Path:    "{{ replace (replace $op.Path "{" ":") "}" "" }}",
+            Path:    "{{template "router-path" $op.Path}}",
             Handler: adapter.{{ $op.ID | ucFirst }},
         },
     {{- end }}
@@ -86,7 +89,7 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handl
     r := router.NewRouter()
 
     {{- range $operations }}{{ $op := . }}
-    _ = r.Handle("{{ $op.Method }}", "{{ replace (replace $op.Path "{" ":") "}" "" }}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+    _ = r.Handle("{{ $op.Method }}", "{{template "router-path" $op.Path}}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
     {{- end }}
 
     return r

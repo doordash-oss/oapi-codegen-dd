@@ -20,6 +20,9 @@ limitations under the License.
 
 {{define "get-path-param"}}mux.Vars(r)["{{ . }}"]{{end}}
 
+{{/* router-path: kratos uses gorilla mux underneath, {param} same as OpenAPI */}}
+{{define "router-path"}}{{ escapeGoString . }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []func(http.Handler) http.Handler
@@ -65,7 +68,7 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handl
     r := mux.NewRouter()
 
     {{- range $operations }}{{ $op := . }}
-    r.HandleFunc("{{ $op.Path }}", adapter.{{ $op.ID | ucFirst }}).Methods("{{ $op.Method }}")
+    r.HandleFunc("{{template "router-path" $op.Path}}", adapter.{{ $op.ID | ucFirst }}).Methods("{{ $op.Method }}")
     {{- end }}
 
     // Apply middlewares

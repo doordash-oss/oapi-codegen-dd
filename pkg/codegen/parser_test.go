@@ -252,3 +252,118 @@ type AddressOneOf struct {
 		}
 	})
 }
+
+func TestFilterAmbiguousRoutes(t *testing.T) {
+	tests := []struct {
+		name     string
+		ops      []OperationDefinition
+		expected []string // expected remaining paths
+	}{
+		{
+			name: "no conflicts",
+			ops: []OperationDefinition{
+				{Method: "GET", Path: "/users"},
+				{Method: "GET", Path: "/users/{id}"},
+				{Method: "POST", Path: "/users"},
+			},
+			expected: []string{"/users", "/users/{id}", "/users"},
+		},
+		{
+			name: "different methods no conflict",
+			ops: []OperationDefinition{
+				{Method: "GET", Path: "/queues/{id}/position"},
+				{Method: "POST", Path: "/queues/functions/{id}"},
+			},
+			expected: []string{"/queues/{id}/position", "/queues/functions/{id}"},
+		},
+		{
+			name: "ambiguous wildcard patterns",
+			ops: []OperationDefinition{
+				{Method: "GET", Path: "/queues/{requestId}/position"},
+				{Method: "GET", Path: "/queues/functions/{functionId}"},
+			},
+			expected: []string{"/queues/{requestId}/position"}, // second one filtered
+		},
+		{
+			name: "multiple conflicts keeps first",
+			ops: []OperationDefinition{
+				{Method: "GET", Path: "/api/{version}/users"},
+				{Method: "GET", Path: "/api/v1/{resource}"},
+				{Method: "GET", Path: "/api/{name}/config"},
+			},
+			expected: []string{"/api/{version}/users"}, // others conflict with first
+		},
+		{
+			name: "catch-all wildcard conflicts",
+			ops: []OperationDefinition{
+				{Method: "GET", Path: "/files/{path...}"},
+				{Method: "GET", Path: "/files/special"},
+			},
+			expected: []string{"/files/{path...}"}, // catch-all matches /files/special, conflict
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := filterAmbiguousRoutes(tt.ops, "test")
+			var paths []string
+			for _, op := range result {
+				paths = append(paths, op.Path)
+			}
+			assert.Equal(t, tt.expected, paths)
+		})
+	}
+}
+
+func TestHasRouteConflict(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        []string
+		b        []string
+		conflict bool
+	}{
+		{
+			name:     "both literal same",
+			a:        []string{"users", "list"},
+			b:        []string{"users", "list"},
+			conflict: true,
+		},
+		{
+			name:     "both literal different",
+			a:        []string{"users", "list"},
+			b:        []string{"users", "detail"},
+			conflict: false,
+		},
+		{
+			name:     "wildcard vs literal same prefix",
+			a:        []string{"queues", "{id}", "position"},
+			b:        []string{"queues", "functions", "{id}"},
+			conflict: true,
+		},
+		{
+			name:     "different lengths no catchall",
+			a:        []string{"users"},
+			b:        []string{"users", "{id}"},
+			conflict: false,
+		},
+		{
+			name:     "catchall vs longer",
+			a:        []string{"files", "{path...}"},
+			b:        []string{"files", "a", "b"},
+			conflict: true,
+		},
+		{
+			name:     "both wildcards",
+			a:        []string{"api", "{version}", "users"},
+			b:        []string{"api", "{name}", "users"},
+			conflict: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasRouteConflict(tt.a, tt.b)
+			assert.Equal(t, tt.conflict, result)
+		})
+	}
+}

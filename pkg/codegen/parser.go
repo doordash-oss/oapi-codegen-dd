@@ -230,14 +230,18 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		if err := p.cfg.Generate.Handler.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid handler options: %w", err)
 		}
+		// Determine which templates to use based on handler kind
+		handlerKind := p.cfg.Generate.Handler.Kind
+
+		// Filter out conflicting routes for frameworks that don't support ambiguous patterns
+		ops := filterRouteConflicts(p.ctx.Operations, handlerKind)
+
 		opsCtx := &TplOperationsContext{
-			Operations: p.ctx.Operations,
+			Operations: ops,
 			Imports:    p.ctx.Imports,
 			Config:     p.cfg,
 			WithHeader: withHeader,
 		}
-		// Determine which templates to use based on handler kind
-		handlerKind := p.cfg.Generate.Handler.Kind
 		templatePrefix := "handler/" + string(handlerKind) + "/"
 		sharedPrefix := "handler/"
 
@@ -290,7 +294,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		// Generate middleware if enabled - scaffolded file
 		if p.cfg.Generate.Handler.Middleware != nil {
 			middlewareCtx := &TplOperationsContext{
-				Operations:  p.ctx.Operations,
+				Operations:  ops,
 				Imports:     p.ctx.Imports,
 				Config:      p.cfg,
 				WithHeader:  withHeader,
@@ -322,7 +326,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		// Generate service implementation stub if enabled - scaffolded file
 		if p.cfg.Generate.Handler.Service != nil {
 			serviceCtx := &TplOperationsContext{
-				Operations:  p.ctx.Operations,
+				Operations:  ops,
 				Imports:     p.ctx.Imports,
 				Config:      p.cfg,
 				WithHeader:  withHeader,
@@ -357,7 +361,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			}
 			serverOutput := p.cfg.Generate.Handler.ResolveServerOutput()
 			serverCtx := &TplOperationsContext{
-				Operations:    p.ctx.Operations,
+				Operations:    ops,
 				Imports:       p.ctx.Imports,
 				Config:        p.cfg,
 				WithHeader:    withHeader,
@@ -703,4 +707,99 @@ func getUserTemplateText(inputData string) (template string, err error) {
 	}
 
 	return string(data), nil
+}
+
+// filterRouteConflicts removes operations with route patterns that would conflict
+// for certain frameworks. Some routers (like Go 1.22+ ServeMux) reject ambiguous
+// patterns at registration time. This function detects such conflicts and skips
+// them with a warning.
+func filterRouteConflicts(ops []OperationDefinition, kind HandlerKind) []OperationDefinition {
+	switch kind {
+	case HandlerKindStdHTTP:
+		// Go 1.22+ ServeMux rejects ambiguous patterns
+		return filterAmbiguousRoutes(ops, string(kind))
+	default:
+		// Most routers use first-match semantics and handle conflicts gracefully
+		return ops
+	}
+}
+
+// filterAmbiguousRoutes removes operations with ambiguous route patterns.
+func filterAmbiguousRoutes(ops []OperationDefinition, framework string) []OperationDefinition {
+	// Build pattern segments for conflict detection
+	type patternInfo struct {
+		op       OperationDefinition
+		segments []string
+	}
+
+	patterns := make([]patternInfo, 0, len(ops))
+	for _, op := range ops {
+		// Convert OpenAPI path to ServeMux pattern
+		path := strings.ReplaceAll(op.Path, "/**", "/{path...}")
+		segments := strings.Split(strings.Trim(path, "/"), "/")
+		patterns = append(patterns, patternInfo{op: op, segments: segments})
+	}
+
+	// Check for conflicts: two patterns conflict if they could match the same path
+	// but neither is more specific than the other
+	conflicts := make(map[int]bool)
+	for i := 0; i < len(patterns); i++ {
+		for j := i + 1; j < len(patterns); j++ {
+			if patterns[i].op.Method != patterns[j].op.Method {
+				continue
+			}
+			if hasRouteConflict(patterns[i].segments, patterns[j].segments) {
+				// Mark the second one as conflicting (keep first)
+				conflicts[j] = true
+				slog.Warn(framework+": skipping conflicting route",
+					"skipped", patterns[j].op.Method+" "+patterns[j].op.Path,
+					"conflicts_with", patterns[i].op.Method+" "+patterns[i].op.Path)
+			}
+		}
+	}
+
+	// Filter out conflicting operations
+	result := make([]OperationDefinition, 0, len(ops)-len(conflicts))
+	for i, op := range ops {
+		if !conflicts[i] {
+			result = append(result, op)
+		}
+	}
+
+	return result
+}
+
+// hasRouteConflict checks if two route patterns would conflict.
+// Patterns conflict if they could match the same path but neither is more specific.
+func hasRouteConflict(a, b []string) bool {
+	// Different segment counts with no wildcards can't conflict
+	if len(a) != len(b) {
+		// Unless one has a catch-all wildcard
+		aHasCatchAll := len(a) > 0 && strings.HasSuffix(a[len(a)-1], "...}")
+		bHasCatchAll := len(b) > 0 && strings.HasSuffix(b[len(b)-1], "...}")
+		if !aHasCatchAll && !bHasCatchAll {
+			return false
+		}
+	}
+
+	// Check each segment pair
+	for i := 0; i < len(a) && i < len(b); i++ {
+		aIsWildcard := strings.HasPrefix(a[i], "{")
+		bIsWildcard := strings.HasPrefix(b[i], "{")
+
+		if !aIsWildcard && !bIsWildcard {
+			// Both literal - must match exactly to potentially conflict
+			if a[i] != b[i] {
+				return false
+			}
+		} else if aIsWildcard != bIsWildcard {
+			// One wildcard, one literal - this is a potential conflict
+			// e.g., /queues/{id}/position vs /queues/functions/{id}
+			// They conflict because /queues/functions/position matches both
+			continue
+		}
+		// Both wildcards - continue checking
+	}
+
+	return true
 }

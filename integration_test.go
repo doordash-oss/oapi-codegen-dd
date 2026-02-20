@@ -64,20 +64,40 @@ var (
 	skipSpecs = map[string]bool{
 		// Example: "testdata/specs/3.0/aws/ec2.yml": true,
 	}
+
+	defaultFrameworks = []codegen.HandlerKind{codegen.HandlerKindStdHTTP}
 )
 
 //go:embed testdata/specs
 var specsFS embed.FS
 
 type testResult struct {
-	name   string
-	passed bool
+	name      string
+	framework string // empty for default, or framework name when testing all frameworks
+	passed    bool
 
 	// "read", "generate", "write", "mod-init", "mod-tidy", "build"
 	stage       string
 	err         string
 	tmpDir      string
 	linesOfCode int
+}
+
+// All supported server frameworks for multi-framework testing
+var allFrameworks = []codegen.HandlerKind{
+	codegen.HandlerKindBeego,
+	codegen.HandlerKindChi,
+	codegen.HandlerKindEcho,
+	codegen.HandlerKindFastHTTP,
+	codegen.HandlerKindFiber,
+	codegen.HandlerKindGin,
+	codegen.HandlerKindGoFrame,
+	codegen.HandlerKindGoZero,
+	codegen.HandlerKindGorillaMux,
+	codegen.HandlerKindHertz,
+	codegen.HandlerKindIris,
+	codegen.HandlerKindKratos,
+	codegen.HandlerKindStdHTTP,
 }
 
 func TestIntegration(t *testing.T) {
@@ -89,6 +109,9 @@ func TestIntegration(t *testing.T) {
 	if specs := os.Getenv("SPECS"); specs != "" {
 		specPaths = append(specPaths, strings.Fields(specs)...)
 	}
+
+	// Collect frameworks to test (default: std-http only, FRAMEWORKS=all for all)
+	frameworks := getFrameworks()
 
 	// Get project root (current directory since test is at root)
 	projectRoot, err := filepath.Abs(".")
@@ -186,14 +209,20 @@ func TestIntegration(t *testing.T) {
 	}
 	defer os.Remove(binaryPath)
 
-	fmt.Fprintf(os.Stderr, "⚙️ Running tests in parallel...\n\n")
+	multiFramework := len(frameworks) > 1
+	if multiFramework {
+		fmt.Fprintf(os.Stderr, "⚙️ Running tests in parallel (%d specs × %d frameworks)...\n\n",
+			len(specs), len(frameworks))
+	} else {
+		fmt.Fprintf(os.Stderr, "⚙️ Running tests in parallel...\n\n")
+	}
 
 	// Track results for summary
 	var (
 		mu          sync.Mutex
 		wg          sync.WaitGroup
-		results     = make([]testResult, 0, len(specs))
-		total       = len(specs)
+		results     = make([]testResult, 0, len(specs)*len(frameworks))
+		total       = len(specs) * len(frameworks)
 		completed   = 0
 		inProgress  = make(map[string]time.Time) // spec -> start time
 		hasFailures = false
@@ -210,32 +239,10 @@ func TestIntegration(t *testing.T) {
 		printProgress := func() {
 			mu.Lock()
 			c := completed
-			// Build list of in-progress specs with durations
-			var running []string
-			for spec, started := range inProgress {
-				// Shorten spec name
-				name := spec
-				if len(name) > 30 {
-					name = "..." + name[len(name)-27:]
-				}
-				running = append(running, fmt.Sprintf("%s(%.0fs)", name, time.Since(started).Seconds()))
-			}
+			inProgressCount := len(inProgress)
 			mu.Unlock()
 
-			// Sort for consistent output
-			sort.Strings(running)
-
-			var msg string
-			if len(running) > 0 {
-				if len(running) > 3 {
-					msg = fmt.Sprintf("⏳ %d/%d | %s +%d more", c, total, strings.Join(running[:3], ", "), len(running)-3)
-				} else {
-					msg = fmt.Sprintf("⏳ %d/%d | %s", c, total, strings.Join(running, ", "))
-				}
-			} else {
-				msg = fmt.Sprintf("⏳ %d/%d completed", c, total)
-			}
-			fmt.Fprintf(os.Stderr, "\r%-120s", msg)
+			fmt.Fprintf(os.Stderr, "⏳ %d/%d completed, %d in progress\n", c, total, inProgressCount)
 		}
 
 		for {
@@ -258,6 +265,23 @@ func TestIntegration(t *testing.T) {
 	semaphore := make(chan struct{}, maxConcurrency)
 
 	for _, name := range specs {
+		if multiFramework {
+			// Multi-framework mode: generate models once, then each handler
+			onResult := func(r testResult) {
+				mu.Lock()
+				results = append(results, r)
+				completed++
+				if !r.passed {
+					hasFailures = true
+				}
+				mu.Unlock()
+			}
+			processSpecMultiFramework(name, frameworks, binaryPath, projectRoot, sandboxDir, verbose, onResult)
+			continue
+		}
+
+		// Single framework mode: parallel processing
+		fw := frameworks[0]
 		wg.Add(1)
 
 		go func() {
@@ -284,14 +308,13 @@ func TestIntegration(t *testing.T) {
 				}
 				mu.Unlock()
 
-				// Update cache immediately after each spec (survives timeout)
+				// Update cache immediately after each spec
 				if cache != nil {
 					if result.passed {
 						cache.MarkPassed(name)
 					} else {
 						cache.MarkFailed(name)
 					}
-					// Best effort, ignore errors
 					_ = cache.Save()
 				}
 			}()
@@ -306,8 +329,7 @@ func TestIntegration(t *testing.T) {
 				}
 			}
 
-			// Create temp directory for this test inside .sandbox with spec-based name
-			// Convert spec path to safe directory name
+			// Create temp directory
 			safeName := strings.ReplaceAll(name, "/", "_")
 			safeName = strings.ReplaceAll(safeName, "testdata_specs_", "")
 			safeName = strings.TrimSuffix(safeName, ".yaml")
@@ -324,14 +346,12 @@ func TestIntegration(t *testing.T) {
 			genFile := filepath.Join(tmpDir, "generated.go")
 			configFile := filepath.Join(tmpDir, "config.yaml")
 
-			// Get absolute path to spec file
 			specPath, err := filepath.Abs(name)
 			if err != nil {
 				recordFailure("setup", "failed to get absolute path: %s", err)
 				return
 			}
 
-			// Create config file
 			cfg := codegen.Configuration{
 				PackageName: "integration",
 				Generate: &codegen.GenerateOptions{
@@ -340,7 +360,7 @@ func TestIntegration(t *testing.T) {
 						Response: true,
 					},
 					Handler: &codegen.HandlerOptions{
-						Kind: codegen.HandlerKindStdHTTP,
+						Kind: fw,
 						Name: "IntegrationHandler",
 						Validation: codegen.HandlerValidation{
 							Request:  true,
@@ -472,7 +492,7 @@ func TestIntegration(t *testing.T) {
 	// Stop progress tracker and wait for it to finish
 	close(stopProgress)
 	<-progressDone
-	fmt.Fprintf(os.Stderr, "\r✅ Progress: %d/%d completed%-80s\n\n", total, total, "")
+	fmt.Fprintf(os.Stderr, "✅ Progress: %d/%d completed\n\n", total, total)
 
 	if cache != nil {
 		fmt.Fprintf(os.Stderr, "💾 Cache has %d entries\n", cache.Size())
@@ -484,6 +504,257 @@ func TestIntegration(t *testing.T) {
 	// Fail the test if there were any failures
 	if hasFailures {
 		t.Fail()
+	}
+}
+
+// processSpecMultiFramework generates models once, then each handler, builds all together
+func processSpecMultiFramework(name string, frameworks []codegen.HandlerKind, binaryPath, projectRoot, sandboxDir string, verbose bool, onResult func(testResult)) {
+	// Create temp directory
+	safeName := strings.ReplaceAll(name, "/", "_")
+	safeName = strings.ReplaceAll(safeName, "testdata_specs_", "")
+	safeName = strings.TrimSuffix(safeName, ".yaml")
+	safeName = strings.TrimSuffix(safeName, ".yml")
+	safeName = strings.TrimSuffix(safeName, ".json")
+
+	tmpDir := filepath.Join(sandboxDir, safeName)
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		for _, fw := range frameworks {
+			onResult(testResult{name: name, framework: string(fw), passed: false, stage: "setup", err: err.Error()})
+		}
+		return
+	}
+
+	specPath, err := filepath.Abs(name)
+	if err != nil {
+		for _, fw := range frameworks {
+			onResult(testResult{name: name, framework: string(fw), passed: false, stage: "setup", err: err.Error()})
+		}
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), specTimeout)
+	defer cancel()
+
+	var results []testResult
+
+	// 1. Generate models
+	modelsCfg := codegen.Configuration{
+		PackageName: "integration",
+		Generate:    &codegen.GenerateOptions{},
+		Output:      &codegen.Output{UseSingleFile: true, Filename: "models.go"},
+	}
+	modelsConfigFile := filepath.Join(tmpDir, "models_config.yaml")
+	configContent, _ := yaml.Marshal(modelsCfg)
+	if err := os.WriteFile(modelsConfigFile, configContent, 0644); err != nil {
+		for _, fw := range frameworks {
+			onResult(testResult{name: name, framework: string(fw), passed: false, stage: "setup", err: err.Error(), tmpDir: tmpDir})
+		}
+		return
+	}
+
+	cmd := exec.CommandContext(ctx, binaryPath, "-config", modelsConfigFile, specPath)
+	cmd.Dir = tmpDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		for _, fw := range frameworks {
+			onResult(testResult{name: name, framework: string(fw), passed: false, stage: "generate-models", err: string(output), tmpDir: tmpDir})
+		}
+		return
+	}
+
+	// 2. Generate handler for each framework
+	for _, fw := range frameworks {
+		fwDir := filepath.Join(tmpDir, string(fw))
+		handlerCfg := codegen.Configuration{
+			PackageName: "integration",
+			Generate: &codegen.GenerateOptions{
+				Models:  boolPtr(false),
+				Handler: &codegen.HandlerOptions{Kind: fw, Service: &codegen.ServiceOptions{}},
+			},
+			Output: &codegen.Output{Directory: string(fw), UseSingleFile: true, Filename: "handler.go"},
+		}
+		cfgFile := filepath.Join(tmpDir, fmt.Sprintf("config_%s.yaml", fw))
+		configContent, _ := yaml.Marshal(handlerCfg)
+		if err := os.WriteFile(cfgFile, configContent, 0644); err != nil {
+			results = append(results, testResult{name: name, framework: string(fw), passed: false, stage: "setup", err: err.Error(), tmpDir: fwDir})
+			continue
+		}
+		cmd := exec.CommandContext(ctx, binaryPath, "-config", cfgFile, specPath)
+		cmd.Dir = tmpDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			results = append(results, testResult{name: name, framework: string(fw), passed: false, stage: "generate", err: string(output), tmpDir: fwDir})
+			continue
+		}
+		results = append(results, testResult{name: name, framework: string(fw), passed: true, tmpDir: fwDir})
+	}
+
+	// Helper to report all results and return
+	reportAndReturn := func() {
+		for _, r := range results {
+			onResult(r)
+		}
+	}
+
+	// 3. Initialize go module
+	cmd = exec.CommandContext(ctx, "go", "mod", "init", "integration")
+	cmd.Dir = tmpDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		for i := range results {
+			if results[i].passed {
+				results[i].passed = false
+				results[i].stage = "mod-init"
+				results[i].err = string(output)
+			}
+		}
+		reportAndReturn()
+		return
+	}
+
+	cmd = exec.CommandContext(ctx, "go", "mod", "edit", "-replace", fmt.Sprintf("github.com/doordash-oss/oapi-codegen-dd/v3=%s", projectRoot))
+	cmd.Dir = tmpDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		for i := range results {
+			if results[i].passed {
+				results[i].passed = false
+				results[i].stage = "mod-edit"
+				results[i].err = string(output)
+			}
+		}
+		reportAndReturn()
+		return
+	}
+
+	cmd = exec.CommandContext(ctx, "go", "mod", "tidy")
+	cmd.Dir = tmpDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		for i := range results {
+			if results[i].passed {
+				results[i].passed = false
+				results[i].stage = "mod-tidy"
+				results[i].err = string(output)
+			}
+		}
+		reportAndReturn()
+		return
+	}
+
+	// 4. Build each handler
+	modelsFile := filepath.Join(tmpDir, "models.go")
+	modelsContent, err := os.ReadFile(modelsFile)
+	if err != nil {
+		for i := range results {
+			if results[i].passed {
+				results[i].passed = false
+				results[i].stage = "build"
+				results[i].err = fmt.Sprintf("failed to read models.go: %s", err)
+			}
+		}
+		reportAndReturn()
+		return
+	}
+
+	var passed, failed []string
+	for i := range results {
+		if !results[i].passed {
+			failed = append(failed, results[i].framework)
+			continue
+		}
+		fw := results[i].framework
+		fwDir := filepath.Join(tmpDir, fw)
+
+		if err := os.WriteFile(filepath.Join(fwDir, "models.go"), modelsContent, 0644); err != nil {
+			results[i].passed = false
+			results[i].stage = "build"
+			results[i].err = fmt.Sprintf("failed to copy models.go: %s", err)
+			failed = append(failed, fw)
+			continue
+		}
+
+		cmd = exec.CommandContext(ctx, "go", "build", "-o", "/dev/null", "./...")
+		cmd.Dir = fwDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			results[i].passed = false
+			results[i].stage = "build"
+			results[i].err = string(output)
+			failed = append(failed, fw)
+			continue
+		}
+
+		// Runtime init test - catches invalid route patterns (e.g. chi panics on /**)
+		initTest := routerInitTest(codegen.HandlerKind(fw))
+		if err := os.WriteFile(filepath.Join(fwDir, "router_init_test.go"), []byte(initTest), 0644); err != nil {
+			results[i].passed = false
+			results[i].stage = "init-test"
+			results[i].err = fmt.Sprintf("failed to write test: %s", err)
+			failed = append(failed, fw)
+			continue
+		}
+		cmd = exec.CommandContext(ctx, "go", "test", "-run", "TestRouterInit", "./...")
+		cmd.Dir = fwDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			results[i].passed = false
+			results[i].stage = "init-test"
+			results[i].err = string(output)
+			failed = append(failed, fw)
+		} else {
+			passed = append(passed, fw)
+		}
+	}
+
+	// Compact output
+	if verbose {
+		fmt.Fprintf(os.Stderr, "📝 %s: ", filepath.Base(name))
+		if len(failed) == 0 {
+			fmt.Fprintf(os.Stderr, "✅ all %d frameworks passed\n", len(passed))
+		} else {
+			fmt.Fprintf(os.Stderr, "✅ %d passed, ❌ %d failed (%s)\n", len(passed), len(failed), strings.Join(failed, ", "))
+		}
+	}
+
+	reportAndReturn()
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+// routerInitTest returns framework-specific test code for router initialization.
+func routerInitTest(fw codegen.HandlerKind) string {
+	// Frameworks where NewRouter takes framework instance first and returns nothing
+	switch fw {
+	case codegen.HandlerKindEcho:
+		return `package integration
+import ("testing"; "github.com/labstack/echo/v4")
+func TestRouterInit(t *testing.T) { NewRouter(echo.New(), nil) }
+`
+	case codegen.HandlerKindFiber:
+		return `package integration
+import ("testing"; fiber "github.com/gofiber/fiber/v3")
+func TestRouterInit(t *testing.T) { NewRouter(fiber.New(), nil) }
+`
+	case codegen.HandlerKindGin:
+		return `package integration
+import ("testing"; "github.com/gin-gonic/gin")
+func TestRouterInit(t *testing.T) { NewRouter(gin.New(), nil) }
+`
+	case codegen.HandlerKindGoFrame:
+		return `package integration
+import ("testing"; "github.com/gogf/gf/v2/net/ghttp")
+func TestRouterInit(t *testing.T) { NewRouter(ghttp.GetServer(), nil) }
+`
+	case codegen.HandlerKindHertz:
+		return `package integration
+import ("testing"; "github.com/cloudwego/hertz/pkg/app/server")
+func TestRouterInit(t *testing.T) { NewRouter(server.Default(), nil) }
+`
+	case codegen.HandlerKindIris:
+		return `package integration
+import ("testing"; "github.com/kataras/iris/v12")
+func TestRouterInit(t *testing.T) { NewRouter(iris.New(), nil) }
+`
+	default:
+		// Frameworks where NewRouter(svc, opts...) returns a router
+		return `package integration
+import "testing"
+func TestRouterInit(t *testing.T) { _ = NewRouter(nil) }
+`
 	}
 }
 
@@ -534,6 +805,36 @@ func collectSpecs(t *testing.T, specPaths []string) []string {
 	}
 
 	return specs
+}
+
+// getFrameworks returns the list of frameworks to test based on FRAMEWORKS env var.
+// Default: all frameworks. FRAMEWORKS=std-http tests only std-http.
+func getFrameworks() []codegen.HandlerKind {
+	env := os.Getenv("FRAMEWORKS")
+	if env == "" {
+		return defaultFrameworks
+	}
+	if env == "all" {
+		return allFrameworks
+	}
+
+	// Parse comma-separated list
+	var frameworks []codegen.HandlerKind
+	for _, name := range strings.Split(env, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		fw := codegen.HandlerKind(name)
+		if fw.IsValid() {
+			frameworks = append(frameworks, fw)
+		}
+	}
+
+	if len(frameworks) == 0 {
+		return defaultFrameworks
+	}
+	return frameworks
 }
 
 // collectSpecsFromPath collects specs from a single path (file or directory)
@@ -667,7 +968,11 @@ func printSummary(total int, results []testResult) {
 			if len(specName) > 60 {
 				specName = "..." + specName[len(specName)-57:]
 			}
-			fmt.Fprintf(os.Stderr, "\n   %d. %s\n", i+1, specName)
+			if r.framework != "" {
+				fmt.Fprintf(os.Stderr, "\n   %d. %s [%s]\n", i+1, specName, r.framework)
+			} else {
+				fmt.Fprintf(os.Stderr, "\n   %d. %s\n", i+1, specName)
+			}
 			fmt.Fprintf(os.Stderr, "      Stage: %s\n", r.stage)
 
 			// Show error lines for better debugging
@@ -709,7 +1014,11 @@ func printSummary(total int, results []testResult) {
 	if len(failed) > 0 {
 		fmt.Fprintln(os.Stderr, "\n📋 FAILED SPECS LIST:")
 		for _, r := range failed {
-			fmt.Fprintf(os.Stderr, "  %s\n", r.name)
+			if r.framework != "" {
+				fmt.Fprintf(os.Stderr, "  %s [%s]\n", r.name, r.framework)
+			} else {
+				fmt.Fprintf(os.Stderr, "  %s\n", r.name)
+			}
 		}
 		fmt.Fprintln(os.Stderr)
 	}

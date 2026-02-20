@@ -19,6 +19,9 @@ limitations under the License.
 
 {{define "get-path-param"}}mux.Vars(r)["{{ . }}"]{{end}}
 
+{{/* router-path: gorilla mux uses {param} same as OpenAPI, no transformation needed */}}
+{{define "router-path"}}{{ escapeGoString . }}{{end}}
+
 {{define "router-config"}}
 type routerConfig struct {
     middlewares []mux.MiddlewareFunc
@@ -60,7 +63,7 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *mux.Route
     }
 
     {{- range $operations }}{{ $op := . }}
-        r.HandleFunc("{{ escapeGoString $op.Path }}", adapter.{{ $op.ID | ucFirst }}).Methods("{{ $op.Method }}")
+        r.HandleFunc("{{template "router-path" $op.Path}}", adapter.{{ $op.ID | ucFirst }}).Methods("{{ $op.Method }}")
     {{- end }}
 
     return r
