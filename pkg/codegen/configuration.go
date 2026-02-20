@@ -321,6 +321,7 @@ type Output struct {
 	UseSingleFile bool   `yaml:"use-single-file"`
 	Directory     string `yaml:"directory"`
 	Filename      string `yaml:"filename"`
+	SkipFmt       bool   `yaml:"skip-fmt"`
 }
 
 // OverlayOptions specifies OpenAPI Overlay files to apply to the spec before generation.

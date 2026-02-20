@@ -175,7 +175,7 @@ generate: ✅
         handler-package: string
 compatibility: ❌
 output-options: ➡️renamed to output
-    skip-fmt: ❌
+    skip-fmt: ➡️ moved to output.skip-fmt
     skip-prune: ➡ moved to config root
     include-tags: ➡ moved to filter include
     exclude-tags: ➡ moved to filter.exclude

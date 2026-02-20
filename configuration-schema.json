@@ -82,6 +82,10 @@
         "filename": {
           "type": "string",
           "description": "Filename to use if single file output is enabled."
+        },
+        "skip-fmt": {
+          "type": "boolean",
+          "description": "Skip running gofmt on generated code. Useful for faster generation when formatting will be done separately."
         }
       },
       "required": []

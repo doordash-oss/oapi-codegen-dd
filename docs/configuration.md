@@ -101,6 +101,16 @@ output:
   filename: "api.gen.go"
 ```
 
+#### `output.skip-fmt`
+**Type:** `boolean` | **Default:** `false`
+
+Skip running `goimports` and `gofmt` on generated code. Only byte-order-mark sanitization is performed. Useful for faster generation or when using custom import handling (e.g., yaml v4 instead of v3).
+
+```yaml
+output:
+  skip-fmt: true
+```
+
 ### Generation Settings
 
 #### `generate.client`

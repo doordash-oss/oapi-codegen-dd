@@ -61,11 +61,7 @@ func main() {
 	if cfg.Output.UseSingleFile {
 		// Single file output
 		outPath := filepath.Join(cfg.Output.Directory, cfg.Output.Filename)
-		formatted, err := codegen.FormatCode(codes["all"])
-		if err != nil {
-			panic(fmt.Sprintf("formatting code: %v", err))
-		}
-		if err := os.WriteFile(outPath, []byte(formatted), 0644); err != nil {
+		if err := os.WriteFile(outPath, []byte(codes.GetCombined()), 0644); err != nil {
 			panic(fmt.Sprintf("writing file: %v", err))
 		}
 		fmt.Printf("\nGenerated code written to: %s\n", outPath)
@@ -76,11 +72,7 @@ func main() {
 				continue // Skip the combined output
 			}
 			outPath := filepath.Join(cfg.Output.Directory, name+".go")
-			formatted, err := codegen.FormatCode(code)
-			if err != nil {
-				panic(fmt.Sprintf("formatting %s: %v", name, err))
-			}
-			if err := os.WriteFile(outPath, []byte(formatted), 0644); err != nil {
+			if err := os.WriteFile(outPath, []byte(code), 0644); err != nil {
 				panic(fmt.Sprintf("writing %s: %v", name, err))
 			}
 			fmt.Printf("Generated: %s\n", outPath)
