@@ -372,12 +372,12 @@ func NewRouter(app *fiber.App, svc ServiceInterface, opts ...RouterOption) {
 		opt(cfg)
 	}
 
-	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
 		app.Use(mw)
 	}
+
+	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	app.Get("/health", adaptor.HTTPHandlerFunc(httpAdapter.HealthCheck))
 	app.Get("/users", adaptor.HTTPHandlerFunc(httpAdapter.ListUsers))
 	app.Post("/users", adaptor.HTTPHandlerFunc(httpAdapter.CreateUser))

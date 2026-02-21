@@ -55,15 +55,19 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) chi.Router
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
     r := chi.NewRouter()
     for _, mw := range cfg.middlewares {
         r.Use(mw)
     }
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         r.Method("{{ $op.Method }}", "{{template "router-path" $op.Path}}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 
     return r

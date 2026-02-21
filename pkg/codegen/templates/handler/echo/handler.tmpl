@@ -56,13 +56,14 @@ func NewRouter(e *echo.Echo, svc {{ $serviceName }}Interface, opts ...RouterOpti
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
     // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
         e.Use(mw)
     }
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         e.{{ $op.Method | caps }}("{{template "router-path" $op.Path}}", func(c echo.Context) error {
             {{- if $op.PathParams }}
@@ -74,6 +75,9 @@ func NewRouter(e *echo.Echo, svc {{ $serviceName }}Interface, opts ...RouterOpti
             adapter.{{ $op.ID | ucFirst }}(c.Response(), c.Request())
             return nil
         })
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 }
 {{end}}

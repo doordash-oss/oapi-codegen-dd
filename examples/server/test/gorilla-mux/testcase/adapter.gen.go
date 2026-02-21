@@ -1351,12 +1351,12 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *mux.Router {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	r := mux.NewRouter()
 	for _, mw := range cfg.middlewares {
 		r.Use(mw)
 	}
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r.HandleFunc("/health", adapter.HealthCheck).Methods("GET")
 	r.HandleFunc("/users", adapter.ListUsers).Methods("GET")
 	r.HandleFunc("/users", adapter.CreateUser).Methods("POST")

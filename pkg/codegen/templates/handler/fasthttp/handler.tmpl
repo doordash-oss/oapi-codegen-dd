@@ -74,15 +74,20 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *router.Ro
         opt(cfg)
     }
 
-    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
     r := router.New()
 
+    {{- if $operations }}
+
+    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
         r.{{ $op.Method }}("{{template "router-path" $op.Path}}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
         {{- else }}
         r.{{ $op.Method }}("{{template "router-path" $op.Path}}", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
         {{- end }}
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 
     // Apply middlewares (in reverse order so first added is outermost)
@@ -108,15 +113,20 @@ func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) fasthttp.Req
         opt(cfg)
     }
 
-    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
     r := router.New()
 
+    {{- if $operations }}
+
+    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
         r.{{ $op.Method }}("{{ $op.Path }}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
         {{- else }}
         r.{{ $op.Method }}("{{ $op.Path }}", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
         {{- end }}
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 
     // Apply middlewares (in reverse order so first added is outermost)

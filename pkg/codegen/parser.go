@@ -226,7 +226,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 	}
 
 	// Generate handler code if handler generation is enabled
-	if len(p.ctx.Operations) > 0 && p.cfg.Generate.Handler != nil {
+	if p.cfg.Generate.Handler != nil {
 		if err := p.cfg.Generate.Handler.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid handler options: %w", err)
 		}
@@ -389,7 +389,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 	}
 
 	// Generate MCP server tools if MCP server generation is enabled
-	if len(p.ctx.Operations) > 0 && p.cfg.Generate.MCPServer != nil {
+	if p.cfg.Generate.MCPServer != nil {
 		if !p.cfg.Generate.Client {
 			return nil, fmt.Errorf("MCP server generation requires client generation to be enabled (set generate.client: true)")
 		}

@@ -55,12 +55,16 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *http.Serv
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
     mux := http.NewServeMux()
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         mux.HandleFunc("{{ $op.Method }} {{template "router-path" $op.Path}}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 
     return mux

@@ -1351,12 +1351,12 @@ func NewRouter(e *echo.Echo, svc ServiceInterface, opts ...RouterOption) {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
 		e.Use(mw)
 	}
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	e.GET("/health", func(c echo.Context) error {
 		adapter.HealthCheck(c.Response(), c.Request())
 		return nil

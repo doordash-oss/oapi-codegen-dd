@@ -69,10 +69,14 @@ func RegisterRoutes(router *beego.ControllerRegister, svc {{ $serviceName }}Inte
         opt(cfg)
     }
 
-    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
+    {{- if $operations }}
 
+    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         router.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", beegoHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ if $op.PathParams }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}{{ end }}))
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 }
 

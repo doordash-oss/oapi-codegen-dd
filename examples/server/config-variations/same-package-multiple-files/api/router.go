@@ -37,12 +37,12 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	r := chi.NewRouter()
 	for _, mw := range cfg.middlewares {
 		r.Use(mw)
 	}
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r.Method("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
 	r.Method("GET", "/users", http.HandlerFunc(adapter.ListUsers))
 	r.Method("POST", "/users", http.HandlerFunc(adapter.CreateUser))

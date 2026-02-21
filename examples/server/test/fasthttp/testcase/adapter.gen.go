@@ -1369,8 +1369,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *router.Router {
 		opt(cfg)
 	}
 
-	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r := router.New()
+
+	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r.GET("/health", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.HealthCheck))
 	r.GET("/users", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.ListUsers))
 	r.POST("/users", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.CreateUser))
@@ -1418,8 +1419,9 @@ func Handler(svc ServiceInterface, opts ...RouterOption) fasthttp.RequestHandler
 		opt(cfg)
 	}
 
-	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r := router.New()
+
+	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r.GET("/health", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.HealthCheck))
 	r.GET("/users", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.ListUsers))
 	r.POST("/users", fasthttpadaptor.NewFastHTTPHandlerFunc(httpAdapter.CreateUser))

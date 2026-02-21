@@ -57,6 +57,8 @@ func RegisterRoutes(server *rest.Server, svc {{ $serviceName }}Interface, opts .
         opt(cfg)
     }
 
+    {{- if $operations }}
+
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
 
     routes := []rest.Route{
@@ -75,6 +77,9 @@ func RegisterRoutes(server *rest.Server, svc {{ $serviceName }}Interface, opts .
     }
 
     server.AddRoutes(routes)
+    {{- else }}
+    _ = svc // unused when no operations
+    {{- end }}
 }
 
 // NewRouter creates a new http.Handler with the given service implementation.
@@ -85,11 +90,16 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handl
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     r := router.NewRouter()
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
     _ = r.Handle("{{ $op.Method }}", "{{template "router-path" $op.Path}}", http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}))
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 
     return r

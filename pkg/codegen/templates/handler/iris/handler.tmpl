@@ -56,13 +56,14 @@ func NewRouter(app *iris.Application, svc {{ $serviceName }}Interface, opts ...R
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
     // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
         app.Use(mw)
     }
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         app.Handle("{{ $op.Method | caps }}", "{{template "router-path" $op.Path}}", func(ctx iris.Context) {
             {{- if $op.PathParams }}
@@ -74,6 +75,9 @@ func NewRouter(app *iris.Application, svc {{ $serviceName }}Interface, opts ...R
             adapter.{{ $op.ID | ucFirst }}(ctx.ResponseWriter(), ctx.Request())
         })
     {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
+    {{- end }}
 }
 
 // Handler returns an http.Handler for use with net/http or testing.
@@ -84,11 +88,18 @@ func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handler
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     mux := http.NewServeMux()
+
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
     mux.HandleFunc("{{ $op.Method | caps }} {{ escapeGoString $op.Path }}", adapter.{{ $op.ID | ucFirst }})
     {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
+    {{- end }}
+
     return mux
 }
 {{end}}
