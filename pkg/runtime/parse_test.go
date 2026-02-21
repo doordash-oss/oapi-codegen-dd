@@ -162,6 +162,87 @@ func TestParseString(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uuid.UUID{}, v) // Zero value since no format hint
 	})
+
+	// Tests for type aliases - these are the bug cases that were reported
+	// Type switches don't match aliased types, so we use reflection
+	t.Run("string alias", func(t *testing.T) {
+		type VersionHeader string
+		v, err := ParseString[VersionHeader]("2020-04-02")
+		require.NoError(t, err)
+		assert.Equal(t, VersionHeader("2020-04-02"), v)
+	})
+
+	t.Run("int alias", func(t *testing.T) {
+		type StatusCode int
+		v, err := ParseString[StatusCode]("200")
+		require.NoError(t, err)
+		assert.Equal(t, StatusCode(200), v)
+	})
+
+	t.Run("int64 alias", func(t *testing.T) {
+		type UserID int64
+		v, err := ParseString[UserID]("9223372036854775807")
+		require.NoError(t, err)
+		assert.Equal(t, UserID(9223372036854775807), v)
+	})
+
+	t.Run("uint alias", func(t *testing.T) {
+		type Count uint
+		v, err := ParseString[Count]("42")
+		require.NoError(t, err)
+		assert.Equal(t, Count(42), v)
+	})
+
+	t.Run("float32 alias", func(t *testing.T) {
+		type Priority float32
+		v, err := ParseString[Priority]("2.5")
+		require.NoError(t, err)
+		assert.InDelta(t, float32(2.5), float32(v), 0.001)
+	})
+
+	t.Run("float64 alias", func(t *testing.T) {
+		type Score float64
+		v, err := ParseString[Score]("3.14159")
+		require.NoError(t, err)
+		assert.InDelta(t, float64(3.14159), float64(v), 0.0001)
+	})
+
+	t.Run("bool alias", func(t *testing.T) {
+		type Enabled bool
+		v, err := ParseString[Enabled]("true")
+		require.NoError(t, err)
+		assert.Equal(t, Enabled(true), v)
+	})
+
+	t.Run("string alias with enum-like values", func(t *testing.T) {
+		type Color string
+		const ColorGreen Color = "green"
+
+		v, err := ParseString[Color]("green")
+		require.NoError(t, err)
+		assert.Equal(t, ColorGreen, v)
+	})
+
+	t.Run("int alias with enum-like values", func(t *testing.T) {
+		type HTTPStatus int
+		const HTTPStatusNotFound HTTPStatus = 404
+
+		v, err := ParseString[HTTPStatus]("404")
+		require.NoError(t, err)
+		assert.Equal(t, HTTPStatusNotFound, v)
+	})
+
+	t.Run("invalid int alias", func(t *testing.T) {
+		type StatusCode int
+		_, err := ParseString[StatusCode]("not-a-number")
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid bool alias", func(t *testing.T) {
+		type Enabled bool
+		_, err := ParseString[Enabled]("maybe")
+		assert.Error(t, err)
+	})
 }
 
 func TestParseStringSlice(t *testing.T) {
@@ -221,4 +302,72 @@ func TestParseStringSlice(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, result)
 	})
+
+	// Tests for type alias slices
+	t.Run("string alias slice", func(t *testing.T) {
+		type Color string
+		result, err := ParseStringSlice[Color]([]string{"red", "green", "blue"})
+		assert.NoError(t, err)
+		assert.Equal(t, []Color{"red", "green", "blue"}, result)
+	})
+
+	t.Run("int alias slice", func(t *testing.T) {
+		type StatusCode int
+		result, err := ParseStringSlice[StatusCode]([]string{"200", "404", "500"})
+		assert.NoError(t, err)
+		assert.Equal(t, []StatusCode{200, 404, 500}, result)
+	})
+
+	t.Run("int alias slice with invalid", func(t *testing.T) {
+		type StatusCode int
+		result, err := ParseStringSlice[StatusCode]([]string{"200", "invalid", "500"})
+		assert.Error(t, err)
+		assert.Nil(t, result)
+	})
+}
+
+// Benchmarks for ParseString to measure reflection overhead
+
+func BenchmarkParseString_String(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[string]("hello")
+	}
+}
+
+func BenchmarkParseString_StringAlias(b *testing.B) {
+	type MyString string
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[MyString]("hello")
+	}
+}
+
+func BenchmarkParseString_Int(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[int]("12345")
+	}
+}
+
+func BenchmarkParseString_IntAlias(b *testing.B) {
+	type StatusCode int
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[StatusCode]("200")
+	}
+}
+
+func BenchmarkParseString_Int64(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[int64]("9223372036854775807")
+	}
+}
+
+func BenchmarkParseString_Float64(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[float64]("3.14159265359")
+	}
+}
+
+func BenchmarkParseString_Bool(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[bool]("true")
+	}
 }
