@@ -709,24 +709,35 @@ func getUserTemplateText(inputData string) (template string, err error) {
 	return string(data), nil
 }
 
-// filterRouteConflicts removes operations with route patterns that would conflict
-// for certain frameworks. Some routers (like Go 1.22+ ServeMux) reject ambiguous
-// patterns at registration time. This function detects such conflicts and skips
-// them with a warning.
+// filterRouteConflicts removes operations with route patterns that would conflict.
+// Filters applied:
+// - Duplicate param names (e.g., /teams/{id}/members/{id}) - all frameworks
+// - Ambiguous patterns (e.g., /{a}/b vs /a/{b}) - std-http only
 func filterRouteConflicts(ops []OperationDefinition, kind HandlerKind) []OperationDefinition {
-	switch kind {
-	case HandlerKindStdHTTP:
-		// Go 1.22+ ServeMux rejects ambiguous patterns
-		return filterAmbiguousRoutes(ops, string(kind))
-	default:
-		// Most routers use first-match semantics and handle conflicts gracefully
-		return ops
+	framework := string(kind)
+
+	// Filter duplicates (all frameworks)
+	result := make([]OperationDefinition, 0, len(ops))
+	for _, op := range ops {
+		if hasDuplicateParamNames(op.Path) {
+			slog.Warn(framework+": skipping route with duplicate param names",
+				"path", op.Method+" "+op.Path)
+			continue
+		}
+		result = append(result, op)
 	}
+
+	// Filter ambiguous patterns (std-http only)
+	if kind == HandlerKindStdHTTP {
+		result = filterAmbiguousRoutes(result, framework)
+	}
+
+	return result
 }
 
 // filterAmbiguousRoutes removes operations with ambiguous route patterns.
+// Only needed for Go 1.22+ ServeMux which rejects ambiguous patterns.
 func filterAmbiguousRoutes(ops []OperationDefinition, framework string) []OperationDefinition {
-	// Build pattern segments for conflict detection
 	type patternInfo struct {
 		op       OperationDefinition
 		segments []string
@@ -734,14 +745,11 @@ func filterAmbiguousRoutes(ops []OperationDefinition, framework string) []Operat
 
 	patterns := make([]patternInfo, 0, len(ops))
 	for _, op := range ops {
-		// Convert OpenAPI path to ServeMux pattern
 		path := strings.ReplaceAll(op.Path, "/**", "/{path...}")
 		segments := strings.Split(strings.Trim(path, "/"), "/")
 		patterns = append(patterns, patternInfo{op: op, segments: segments})
 	}
 
-	// Check for conflicts: two patterns conflict if they could match the same path
-	// but neither is more specific than the other
 	conflicts := make(map[int]bool)
 	for i := 0; i < len(patterns); i++ {
 		for j := i + 1; j < len(patterns); j++ {
@@ -749,7 +757,6 @@ func filterAmbiguousRoutes(ops []OperationDefinition, framework string) []Operat
 				continue
 			}
 			if hasRouteConflict(patterns[i].segments, patterns[j].segments) {
-				// Mark the second one as conflicting (keep first)
 				conflicts[j] = true
 				slog.Warn(framework+": skipping conflicting route",
 					"skipped", patterns[j].op.Method+" "+patterns[j].op.Path,
@@ -758,15 +765,35 @@ func filterAmbiguousRoutes(ops []OperationDefinition, framework string) []Operat
 		}
 	}
 
-	// Filter out conflicting operations
-	result := make([]OperationDefinition, 0, len(ops)-len(conflicts))
-	for i, op := range ops {
+	result := make([]OperationDefinition, 0, len(patterns)-len(conflicts))
+	for i, p := range patterns {
 		if !conflicts[i] {
-			result = append(result, op)
+			result = append(result, p.op)
 		}
 	}
-
 	return result
+}
+
+// hasDuplicateParamNames checks if a path has duplicate parameter names.
+// e.g., /teams/{id}/members/{id} has duplicate "id" param.
+func hasDuplicateParamNames(path string) bool {
+	seen := make(map[string]bool)
+	segments := strings.Split(path, "/")
+	for _, seg := range segments {
+		if strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}") {
+			// Extract param name (handle {param} and {param:type} formats)
+			paramName := strings.TrimPrefix(seg, "{")
+			paramName = strings.TrimSuffix(paramName, "}")
+			if idx := strings.Index(paramName, ":"); idx != -1 {
+				paramName = paramName[:idx]
+			}
+			if seen[paramName] {
+				return true
+			}
+			seen[paramName] = true
+		}
+	}
+	return false
 }
 
 // hasRouteConflict checks if two route patterns would conflict.
