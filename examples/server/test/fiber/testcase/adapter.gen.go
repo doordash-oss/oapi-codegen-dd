@@ -258,7 +258,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
@@ -1235,7 +1235,7 @@ func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateOrderBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateOrder",
@@ -1283,7 +1283,7 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateCompanyBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateCompany",

@@ -15,7 +15,9 @@ package runtime
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"strings"
@@ -209,6 +211,37 @@ func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	var res T
 	err := json.Unmarshal(v, &res)
 	return res, err
+}
+
+// DecodeJSONBody decodes a JSON request body into the target value.
+// It wraps common JSON decoding errors with user-friendly messages:
+//   - io.EOF or empty body -> "request body is empty"
+//   - Syntax errors -> includes position information
+//   - Type errors -> includes field and expected type information
+func DecodeJSONBody(body io.Reader, target any) error {
+	err := json.NewDecoder(body).Decode(target)
+	if err == nil {
+		return nil
+	}
+
+	// Handle empty body
+	if errors.Is(err, io.EOF) {
+		return ErrRequestBodyEmpty
+	}
+
+	// Handle syntax errors
+	var syntaxErr *json.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		return fmt.Errorf("malformed JSON at position %d: %w", syntaxErr.Offset, err)
+	}
+
+	// Handle type errors
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) {
+		return fmt.Errorf("invalid type for field %q: expected %s, got %s", typeErr.Field, typeErr.Type, typeErr.Value)
+	}
+
+	return err
 }
 
 // MarshalEitherWithDiscriminator marshals data and adds/overwrites a discriminator field.
