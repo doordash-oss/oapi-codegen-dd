@@ -367,3 +367,46 @@ func TestHasRouteConflict(t *testing.T) {
 		})
 	}
 }
+
+func TestHasDuplicateParamNames(t *testing.T) {
+	tests := []struct {
+		path      string
+		duplicate bool
+	}{
+		{"/users", false},
+		{"/users/{id}", false},
+		{"/users/{id}/posts/{postId}", false},
+		{"/teams/{id}/members/{id}", true},         // duplicate "id"
+		{"/a/{x}/b/{y}/c/{x}", true},               // duplicate "x"
+		{"/items/{id}/sub/{id}/detail/{id}", true}, // multiple duplicates
+		{"/users/{userId}/posts/{postId}", false},  // different names
+		{"/{org}/{repo}/issues/{id}", false},       // all different
+		{"/{id}/{id}", true},                       // adjacent duplicates
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := hasDuplicateParamNames(tt.path)
+			assert.Equal(t, tt.duplicate, result, "path: %s", tt.path)
+		})
+	}
+}
+
+func TestFilterRouteConflicts_DuplicateParamNames(t *testing.T) {
+	ops := []OperationDefinition{
+		{Method: "GET", Path: "/users/{id}"},
+		{Method: "GET", Path: "/teams/{id}/members/{id}"}, // duplicate - filtered
+		{Method: "GET", Path: "/users/{userId}/posts/{postId}"},
+		{Method: "POST", Path: "/a/{x}/b/{x}"}, // duplicate - filtered
+	}
+
+	// Test with chi (non-std-http, only filters duplicates)
+	result := filterRouteConflicts(ops, HandlerKindChi)
+
+	expected := []string{"/users/{id}", "/users/{userId}/posts/{postId}"}
+	var paths []string
+	for _, op := range result {
+		paths = append(paths, op.Path)
+	}
+	assert.Equal(t, expected, paths)
+}
