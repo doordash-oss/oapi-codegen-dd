@@ -23,6 +23,7 @@ var (
 	ErrValidationEmail         = errors.New("email: failed to pass regex validation")
 	ErrFailedToUnmarshalAsAOrB = errors.New("failed to unmarshal as either A or B")
 	ErrMustBeMap               = errors.New("value must be map[string]any")
+	ErrRequestBodyEmpty        = errors.New("request body is empty")
 )
 
 type ClientAPIErrorOption func(*ClientAPIError)

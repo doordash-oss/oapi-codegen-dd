@@ -12,6 +12,7 @@ package runtime
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -511,5 +512,50 @@ func TestMarshalEitherWithDiscriminator(t *testing.T) {
 		var parsed map[string]string
 		require.NoError(t, json.Unmarshal(result, &parsed))
 		assert.Equal(t, `value with "quotes" and \backslash`, parsed["type"])
+	})
+}
+
+func TestDecodeJSONBody(t *testing.T) {
+	type TestRequest struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+
+	t.Run("decodes valid JSON", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"test","count":42}`)
+		var req TestRequest
+		err := DecodeJSONBody(body, &req)
+
+		require.NoError(t, err)
+		assert.Equal(t, "test", req.Name)
+		assert.Equal(t, 42, req.Count)
+	})
+
+	t.Run("returns friendly error for empty body", func(t *testing.T) {
+		body := strings.NewReader("")
+		var req TestRequest
+		err := DecodeJSONBody(body, &req)
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrRequestBodyEmpty)
+	})
+
+	t.Run("returns friendly error for syntax error", func(t *testing.T) {
+		body := strings.NewReader(`{"name": invalid}`)
+		var req TestRequest
+		err := DecodeJSONBody(body, &req)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "malformed JSON at position")
+	})
+
+	t.Run("returns friendly error for type mismatch", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"test","count":"not a number"}`)
+		var req TestRequest
+		err := DecodeJSONBody(body, &req)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid type for field")
+		assert.Contains(t, err.Error(), "count")
 	})
 }
