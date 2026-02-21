@@ -56,13 +56,14 @@ func NewRouter(s *ghttp.Server, svc {{ $serviceName }}Interface, opts ...RouterO
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
     // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
         s.Use(mw)
     }
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         s.BindHandler("{{ $op.Method | caps }}:{{template "router-path" $op.Path}}", func(r *ghttp.Request) {
             {{- if $op.PathParams }}
@@ -74,6 +75,9 @@ func NewRouter(s *ghttp.Server, svc {{ $serviceName }}Interface, opts ...RouterO
             adapter.{{ $op.ID | ucFirst }}(r.Response.Writer, r.Request)
         })
     {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
+    {{- end }}
 }
 
 // Handler returns an http.Handler for use with net/http or testing.
@@ -84,11 +88,16 @@ func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handler
         opt(cfg)
     }
 
-    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     mux := http.NewServeMux()
 
+    {{- if $operations }}
+
+    adapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         mux.HandleFunc("{{ $op.Method | caps }} {{ $op.Path }}", adapter.{{ $op.ID | ucFirst }})
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 
     return mux

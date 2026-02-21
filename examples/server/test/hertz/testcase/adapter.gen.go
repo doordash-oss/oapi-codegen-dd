@@ -1354,12 +1354,12 @@ func NewRouter(h *server.Hertz, svc ServiceInterface, opts ...RouterOption) {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
 		h.Use(mw)
 	}
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	h.Handle("GET", "/health", func(ctx context.Context, c *app.RequestContext) {
 		req, err := adaptor.GetCompatRequest(&c.Request)
 		if err != nil {
@@ -1595,8 +1595,9 @@ func Handler(svc ServiceInterface, opts ...RouterOption) http.Handler {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	mux := http.NewServeMux()
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	mux.HandleFunc("GET /health", adapter.HealthCheck)
 	mux.HandleFunc("GET /users", adapter.ListUsers)
 	mux.HandleFunc("POST /users", adapter.CreateUser)

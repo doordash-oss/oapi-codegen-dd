@@ -366,8 +366,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) http.Handler {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r := mux.NewRouter()
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r.HandleFunc("/health", adapter.HealthCheck).Methods("GET")
 	r.HandleFunc("/users", adapter.ListUsers).Methods("GET")
 	r.HandleFunc("/users", adapter.CreateUser).Methods("POST")

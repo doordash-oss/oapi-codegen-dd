@@ -405,8 +405,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) http.Handler {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r := router.NewRouter()
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	_ = r.Handle("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
 	_ = r.Handle("GET", "/users", http.HandlerFunc(adapter.ListUsers))
 	_ = r.Handle("POST", "/users", http.HandlerFunc(adapter.CreateUser))

@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+package: api
+output:
+  use-single-file: false
+generate:
+  handler:
+    kind: chi
+    output:
+      overwrite: true
+    service: {}
+    server:
+      directory: server
+      handler-package: github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/config-variations/zero-endpoints/api
+error-mapping:
+  Error: message

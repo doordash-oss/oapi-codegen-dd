@@ -70,19 +70,23 @@ func NewRouter(app *fiber.App, svc {{ $serviceName }}Interface, opts ...RouterOp
         opt(cfg)
     }
 
-    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
-
     // Apply middleware to all routes
     for _, mw := range cfg.middlewares {
         app.Use(mw)
     }
 
+    {{- if $operations }}
+
+    httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
         app.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", fiberHTTPHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
         {{- else }}
         app.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", adaptor.HTTPHandlerFunc(httpAdapter.{{ $op.ID | ucFirst }}))
         {{- end }}
+    {{- end }}
+    {{- else }}
+    _ = svc // unused when no operations
     {{- end }}
 }
 {{end}}

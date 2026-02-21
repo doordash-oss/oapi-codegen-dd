@@ -357,12 +357,12 @@ func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
 		s.Use(mw)
 	}
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	s.BindHandler("GET:/health", func(r *ghttp.Request) {
 		adapter.HealthCheck(r.Response.Writer, r.Request)
 	})
@@ -392,8 +392,9 @@ func Handler(svc ServiceInterface, opts ...RouterOption) http.Handler {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	mux := http.NewServeMux()
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	mux.HandleFunc("GET /health", adapter.HealthCheck)
 	mux.HandleFunc("GET /users", adapter.ListUsers)
 	mux.HandleFunc("POST /users", adapter.CreateUser)

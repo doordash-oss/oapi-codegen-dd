@@ -1350,9 +1350,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *http.ServeMux {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	mux := http.NewServeMux()
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	mux.HandleFunc("GET /health", applyMiddleware(http.HandlerFunc(adapter.HealthCheck), cfg.middlewares...))
 	mux.HandleFunc("GET /users", applyMiddleware(http.HandlerFunc(adapter.ListUsers), cfg.middlewares...))
 	mux.HandleFunc("POST /users", applyMiddleware(http.HandlerFunc(adapter.CreateUser), cfg.middlewares...))

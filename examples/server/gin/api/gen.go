@@ -358,12 +358,12 @@ func NewRouter(r *gin.Engine, svc ServiceInterface, opts ...RouterOption) {
 		opt(cfg)
 	}
 
-	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-
 	// Apply middleware to all routes
 	for _, mw := range cfg.middlewares {
 		r.Use(mw)
 	}
+
+	adapter := NewHTTPAdapter(svc, cfg.errHandler)
 	r.GET("/health", func(c *gin.Context) {
 		adapter.HealthCheck(c.Writer, c.Request)
 	})
