@@ -325,3 +325,49 @@ func TestParseStringSlice(t *testing.T) {
 		assert.Nil(t, result)
 	})
 }
+
+// Benchmarks for ParseString to measure reflection overhead
+
+func BenchmarkParseString_String(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[string]("hello")
+	}
+}
+
+func BenchmarkParseString_StringAlias(b *testing.B) {
+	type MyString string
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[MyString]("hello")
+	}
+}
+
+func BenchmarkParseString_Int(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[int]("12345")
+	}
+}
+
+func BenchmarkParseString_IntAlias(b *testing.B) {
+	type StatusCode int
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[StatusCode]("200")
+	}
+}
+
+func BenchmarkParseString_Int64(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[int64]("9223372036854775807")
+	}
+}
+
+func BenchmarkParseString_Float64(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[float64]("3.14159265359")
+	}
+}
+
+func BenchmarkParseString_Bool(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseString[bool]("true")
+	}
+}
