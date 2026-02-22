@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: noendpoints
+output:
+  use-single-file: false
+error-mapping:
+  GetClientErrorResponse: message
+  UpdateClientErrorResponseJSON: code
+generate:
+  client: true
+  omit-description: true
+  always-prefix-enum-values: true
+  mcp-server: {}

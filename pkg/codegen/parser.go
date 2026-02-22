@@ -202,7 +202,7 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 	}
 
-	if len(p.ctx.Operations) > 0 && p.cfg.Generate.Client {
+	if p.cfg.Generate.Client {
 		opsCtx := &TplOperationsContext{
 			Operations: p.ctx.Operations,
 			Imports:    p.ctx.Imports,
