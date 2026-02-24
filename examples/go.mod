@@ -13,7 +13,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/go-playground/validator/v10 v10.30.1
-	github.com/gofiber/fiber/v3 v3.0.0
+	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/gogf/gf/v2 v2.10.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -62,8 +62,8 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
-	github.com/gofiber/schema v1.6.0 // indirect
-	github.com/gofiber/utils/v2 v2.0.0 // indirect
+	github.com/gofiber/schema v1.7.0 // indirect
+	github.com/gofiber/utils/v2 v2.0.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomarkdown/markdown v0.0.0-20240328165702-4d01890c35c0 // indirect
@@ -84,7 +84,7 @@ require (
 	github.com/kataras/pio v0.0.13 // indirect
 	github.com/kataras/sitemap v0.0.6 // indirect
 	github.com/kataras/tunnel v0.0.4 // indirect
-	github.com/klauspost/compress v1.18.3 // indirect
+	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
