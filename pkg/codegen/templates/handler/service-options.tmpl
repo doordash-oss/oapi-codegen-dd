@@ -40,6 +40,8 @@ type {{$op.ID | ucFirst}}ServiceRequestOptions struct {
     {{ end -}}
     // RawRequest provides access to the underlying HTTP request for custom content type handling.
     RawRequest *http.Request
+
+    {{- template "service-request-options-extra-fields" (dict "Op" $op) }}
 }
 
 {{ if not $skipValidation }}
@@ -98,3 +100,7 @@ func (o *{{$op.ID | ucFirst}}ServiceRequestOptions) Validate() error {
 {{ end }}
 
 {{ end }}
+
+{{/* Override this template to add custom fields to ServiceRequestOptions.
+     Receives: .Op (operation with .ID, .PathParams, .Query, .Body, .Header, etc.) */}}
+{{- define "service-request-options-extra-fields" -}}{{- end -}}
