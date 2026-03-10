@@ -400,6 +400,8 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         // text/plain body with non-string schema - skip body parsing
         {{- end }}
     {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
+        // Limit request body size to prevent memory exhaustion (gosec G120)
+        r.Body = http.MaxBytesReader(w, r.Body, {{ $multipartMaxMemory }} << 20)
         if err := r.ParseMultipartForm({{ $multipartMaxMemory }} << 20); err != nil {
             {{- if $hasTypedError }}
             a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))

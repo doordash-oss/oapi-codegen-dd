@@ -62,6 +62,10 @@ func (c *Client) GetUser(ctx context.Context, options *GetUserRequestOptions, re
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUserResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -96,6 +100,10 @@ func (c *Client) GetPost(ctx context.Context, options *GetPostRequestOptions, re
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetPostResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -129,6 +137,10 @@ func (c *Client) ListComments(ctx context.Context, reqEditors ...runtime.Request
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(ListCommentsResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -164,6 +176,10 @@ func (c *Client) CreateEvent(ctx context.Context, options *CreateEventRequestOpt
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(CreateEventResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

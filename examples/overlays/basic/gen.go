@@ -61,6 +61,10 @@ func (c *Client) GetUsers(ctx context.Context, reqEditors ...runtime.RequestEdit
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUsersResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -97,6 +101,10 @@ func (c *Client) CreateUser(ctx context.Context, options *CreateUserRequestOptio
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(CreateUserResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

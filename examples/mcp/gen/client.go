@@ -70,6 +70,10 @@ func (c *Client) HealthCheck(ctx context.Context, reqEditors ...runtime.RequestE
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(HealthCheckResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -105,6 +109,10 @@ func (c *Client) ListUsers(ctx context.Context, options *ListUsersRequestOptions
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(ListUsersResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -138,11 +146,13 @@ func (c *Client) CreateUser(ctx context.Context, options *CreateUserRequestOptio
 		bodyBytes := resp.Content
 		if resp.StatusCode != 201 {
 			target := new(CreateUserErrorResponse)
-			err = json.Unmarshal(bodyBytes, target)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding response: %w", err)
+			// Handle empty error response body gracefully - skip unmarshal if no content
+			if len(bodyBytes) > 0 {
+				if err = json.Unmarshal(bodyBytes, target); err != nil {
+					return nil, fmt.Errorf("error decoding response: %w", err)
+				}
 			}
-
+			// Return error with (possibly empty) target
 			if errTarget, ok := any(*target).(error); ok {
 				return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
 			}
@@ -150,6 +160,10 @@ func (c *Client) CreateUser(ctx context.Context, options *CreateUserRequestOptio
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(CreateUserResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -182,11 +196,13 @@ func (c *Client) GetUser(ctx context.Context, options *GetUserRequestOptions, re
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
 			target := new(GetUserErrorResponse)
-			err = json.Unmarshal(bodyBytes, target)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding response: %w", err)
+			// Handle empty error response body gracefully - skip unmarshal if no content
+			if len(bodyBytes) > 0 {
+				if err = json.Unmarshal(bodyBytes, target); err != nil {
+					return nil, fmt.Errorf("error decoding response: %w", err)
+				}
 			}
-
+			// Return error with (possibly empty) target
 			if errTarget, ok := any(*target).(error); ok {
 				return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
 			}
@@ -194,6 +210,10 @@ func (c *Client) GetUser(ctx context.Context, options *GetUserRequestOptions, re
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUserResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -257,6 +277,10 @@ func (c *Client) GetMetrics(ctx context.Context, reqEditors ...runtime.RequestEd
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetMetricsResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

@@ -51,11 +51,13 @@ func (c *Client) GetFiles(ctx context.Context, reqEditors ...runtime.RequestEdit
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
 			target := new(GetFilesErrorResponse)
-			err = json.Unmarshal(bodyBytes, target)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding response: %w", err)
+			// Handle empty error response body gracefully - skip unmarshal if no content
+			if len(bodyBytes) > 0 {
+				if err = json.Unmarshal(bodyBytes, target); err != nil {
+					return nil, fmt.Errorf("error decoding response: %w", err)
+				}
 			}
-
+			// Return error with (possibly empty) target
 			if errTarget, ok := any(*target).(error); ok {
 				return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
 			}
@@ -63,6 +65,10 @@ func (c *Client) GetFiles(ctx context.Context, reqEditors ...runtime.RequestEdit
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetFilesResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

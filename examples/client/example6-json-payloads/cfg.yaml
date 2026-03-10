@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: example6
+output:
+  use-single-file: false
+error-mapping:
+  UpdateUserErrorResponse: message
+generate:
+  client: true
+  omit-description: true
+  always-prefix-enum-values: true
