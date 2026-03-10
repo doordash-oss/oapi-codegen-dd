@@ -60,6 +60,10 @@ func (c *Client) GetCharge(ctx context.Context, options *GetChargeRequestOptions
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetChargeResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

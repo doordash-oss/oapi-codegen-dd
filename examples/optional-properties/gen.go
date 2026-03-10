@@ -58,6 +58,10 @@ func (c *Client) PostPayments(ctx context.Context, options *PostPaymentsRequestO
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(PostPaymentsResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

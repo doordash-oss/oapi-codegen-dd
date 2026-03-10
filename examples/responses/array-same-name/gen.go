@@ -54,6 +54,10 @@ func (c *Client) GetBusinessGroups(ctx context.Context, reqEditors ...runtime.Re
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetBusinessGroupsResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

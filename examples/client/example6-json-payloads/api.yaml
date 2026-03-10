@@ -1,0 +1,49 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Generate models
+paths:
+  /users:
+    put:
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        202:
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    User:
+      type: object
+      description: "User type description"
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - "individual"
+            - "company"
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string

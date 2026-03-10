@@ -54,6 +54,10 @@ func (c *Client) GetTest(ctx context.Context, reqEditors ...runtime.RequestEdito
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetTestResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

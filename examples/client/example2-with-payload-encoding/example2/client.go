@@ -62,6 +62,10 @@ func (c *Client) CreateOrder(ctx context.Context, options *CreateOrderRequestOpt
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(CreateOrderResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

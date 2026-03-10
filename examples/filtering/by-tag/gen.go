@@ -56,6 +56,10 @@ func (c *Client) GetPurchases(ctx context.Context, reqEditors ...runtime.Request
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetPurchasesResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -89,6 +93,10 @@ func (c *Client) GetPurchase(ctx context.Context, reqEditors ...runtime.RequestE
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetPurchaseResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err

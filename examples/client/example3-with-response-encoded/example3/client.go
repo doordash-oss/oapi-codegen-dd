@@ -61,6 +61,10 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 		target := new(GetUserSingleResponse)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -96,6 +100,10 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 		target := new(GetUserUnion1Response)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -131,6 +139,10 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 		target := new(GetUserUnion2Response)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
@@ -166,6 +178,10 @@ func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.Reques
 		target := new(GetUserUnion3Response)
 
 		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
 			err = fmt.Errorf("error decoding response: %w", err)
 			return nil, err
