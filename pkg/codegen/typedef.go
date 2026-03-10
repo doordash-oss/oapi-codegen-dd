@@ -118,7 +118,7 @@ func (t TypeDefinition) GetErrorConstructor(errTypes map[string]string, typeSche
 	}
 
 	// Build nested struct literal from inside out
-	// Start with "message" and wrap with struct literals going outward
+	// Start with the function parameter "message" and wrap with struct literals going outward
 	innerExpr := "message"
 
 	// Process fields in reverse order to build from inside out
@@ -150,9 +150,13 @@ func (t TypeDefinition) GetErrorConstructor(errTypes map[string]string, typeSche
 				// Last field is a nullable primitive - use runtime.Ptr
 				innerExpr = fmt.Sprintf("runtime.Ptr(%s)", innerExpr)
 			}
+		} else if nextFieldName != "" {
+			// Non-nullable, non-array struct field - wrap with struct literal
+			innerExpr = fmt.Sprintf("%s{%s: %s}", f.goType, nextFieldName, innerExpr)
 		}
-		// For non-pointer, non-array fields, we don't wrap - the field assignment
-		// happens at the parent level
+		// For the last field (no nextFieldName), it's either:
+		// - A nullable primitive already wrapped with runtime.Ptr() above
+		// - A non-nullable primitive that stays as "message"
 	}
 
 	return fmt.Sprintf("func New%s(message string) %s {\n\treturn %s{%s: %s}\n}",

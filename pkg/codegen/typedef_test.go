@@ -509,6 +509,56 @@ func TestTypeDefinition_GetErrorConstructor(t *testing.T) {
 }`
 		assert.Equal(t, expected, res)
 	})
+
+	t.Run("nested property with non-nullable struct", func(t *testing.T) {
+		// Define the referenced type with nullable string
+		apiErrorsType := TypeDefinition{
+			Name: "APIErrors",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "Message",
+						JsonFieldName: "message",
+						Schema: GoSchema{
+							GoType: "string",
+						},
+						Constraints: Constraints{
+							Nullable: boolPtr(true),
+						},
+					},
+				},
+			},
+		}
+
+		// Define the main type that references APIErrors (non-nullable)
+		typ := TypeDefinition{
+			Name: "Error",
+			Schema: GoSchema{
+				Properties: []Property{
+					{
+						GoName:        "ErrorData",
+						JsonFieldName: "error",
+						Schema: GoSchema{
+							GoType: "APIErrors",
+						},
+						Constraints: Constraints{
+							Nullable: nil, // non-nullable
+						},
+					},
+				},
+			},
+		}
+
+		typeSchemaMap := map[string]GoSchema{
+			"Error":     typ.Schema,
+			"APIErrors": apiErrorsType.Schema,
+		}
+		res := typ.GetErrorConstructor(map[string]string{"Error": "error.message"}, typeSchemaMap)
+		expected := `func NewError(message string) Error {
+	return Error{ErrorData: APIErrors{Message: runtime.Ptr(message)}}
+}`
+		assert.Equal(t, expected, res)
+	})
 }
 
 func boolPtr(b bool) *bool {
