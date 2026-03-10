@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: gen
+generate:
+  client: true
+error-mapping:
+  Error: error.message
