@@ -5,6 +5,7 @@ package testcase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -160,6 +161,9 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -225,6 +229,9 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -275,6 +282,9 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -312,7 +322,7 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	// Limit request body size to prevent memory exhaustion (gosec G120)
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	if err := r.ParseMultipartForm(32 << 20); err != nil { // #nosec G120 -- body is bounded by MaxBytesReader above
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "ImportUsers",
@@ -336,6 +346,9 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ImportUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -379,6 +392,9 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -422,6 +438,9 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -459,7 +478,11 @@ func (a *HTTPAdapter) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUserAvatar(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*GetUserAvatarErrorResponse); ok {
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
+		var errResp *GetUserAvatarErrorResponse
+		if errors.As(err, &errResp) {
 			code = 404
 		}
 		a.errHandler.HandleError(w, r, code, err)
@@ -512,6 +535,9 @@ func (a *HTTPAdapter) UploadUserAvatar(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.UploadUserAvatar(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -574,6 +600,9 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 	resp, err := a.svc.SubmitContactForm(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -625,6 +654,9 @@ func (a *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateNote(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -665,6 +697,9 @@ func (a *HTTPAdapter) ProcessXMLData(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ProcessXMLData(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -701,6 +736,9 @@ func (a *HTTPAdapter) ExportData(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ExportData(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -774,6 +812,9 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetOAuthToken(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -820,6 +861,9 @@ func (a *HTTPAdapter) GetItemsByType(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetItemsByType(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -866,6 +910,9 @@ func (a *HTTPAdapter) Search(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.Search(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -901,6 +948,9 @@ func (a *HTTPAdapter) GetStatus(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetStatus(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -941,6 +991,9 @@ func (a *HTTPAdapter) UploadImage(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.UploadImage(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -1034,6 +1087,9 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListProducts(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -1136,6 +1192,9 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetCategory(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -1193,6 +1252,9 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetItemsByStatus(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -1238,6 +1300,9 @@ func (a *HTTPAdapter) GetUserPost(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUserPost(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -1288,6 +1353,9 @@ func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateOrder(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -1338,6 +1406,9 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateCompany(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
