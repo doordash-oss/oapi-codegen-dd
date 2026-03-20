@@ -82,9 +82,15 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
 {{- $op := .Op -}}
 if err != nil {
     code := http.StatusInternalServerError
+    {{- if $op.Response.Success }}
+    if resp != nil && resp.Status != 0 {
+        code = resp.Status
+    }
+    {{- end }}
     {{- if $op.Response.Error }}
         {{- if not (or $op.Response.Error.Schema.DefineViaAlias $op.Response.Error.Schema.IsAnyType) }}
-            if _, ok := err.(*{{ $op.Response.Error.ResponseName }}); ok {
+            var errResp *{{ $op.Response.Error.ResponseName }}
+            if errors.As(err, &errResp) {
                 code = {{ $op.Response.Error.StatusCode }}
             }
         {{- end }}
@@ -402,7 +408,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     {{- else if hasPrefix $op.Body.ContentType "multipart/" }}
         // Limit request body size to prevent memory exhaustion (gosec G120)
         r.Body = http.MaxBytesReader(w, r.Body, {{ $multipartMaxMemory }} << 20)
-        if err := r.ParseMultipartForm({{ $multipartMaxMemory }} << 20); err != nil {
+        if err := r.ParseMultipartForm({{ $multipartMaxMemory }} << 20); err != nil { // #nosec G120 -- body is bounded by MaxBytesReader above
             {{- if $hasTypedError }}
             a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
             {{- else }}
