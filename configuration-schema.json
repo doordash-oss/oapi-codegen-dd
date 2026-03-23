@@ -63,6 +63,10 @@
       "type": "object",
       "description": "UserContext is the map of user-provided context values to be used in templates user overrides.",
       "additionalProperties": true
+    },
+    "base-path": {
+      "type": "string",
+      "description": "BasePath is the directory used to resolve relative $ref file references. When set, external file references like './common.yaml#/...' will be resolved relative to this directory. Typically set to the directory containing the spec file. When using the CLI, this is auto-detected from the spec file path."
     }
   },
   "required": [],

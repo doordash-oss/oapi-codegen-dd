@@ -47,6 +47,11 @@ type Configuration struct {
 
 	UserTemplates map[string]string `yaml:"user-templates,omitempty"`
 	UserContext   map[string]any    `yaml:"user-context,omitempty"`
+
+	// BasePath is the directory used to resolve relative $ref file references.
+	// When set, external file references like './common.yaml#/...' will be resolved
+	// relative to this directory. Typically set to the directory containing the spec file.
+	BasePath string `yaml:"base-path,omitempty"`
 }
 
 // Merge combines two configurations, with the receiver (o) taking priority.
@@ -235,6 +240,11 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 	// Overwrite UserContext
 	if len(other.UserContext) > 0 {
 		o.UserContext = other.UserContext
+	}
+
+	// Overwrite BasePath
+	if other.BasePath != "" {
+		o.BasePath = other.BasePath
 	}
 
 	return o

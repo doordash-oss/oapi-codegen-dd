@@ -1,0 +1,26 @@
+openapi: "3.0.0"
+info:
+  title: API
+  version: 1.0.0
+paths:
+  /users/{id}:
+    get:
+      operationId: GetUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  address:
+                    $ref: "./external-ref-common.yaml#/components/schemas/Address"

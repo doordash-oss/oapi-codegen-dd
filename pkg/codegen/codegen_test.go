@@ -14,6 +14,7 @@ import (
 	"embed"
 	"go/format"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -488,4 +489,69 @@ func TestRawContentTypesGenerateByteSlice(t *testing.T) {
 	// Verify that the code compiles
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestExternalFileRefResolution(t *testing.T) {
+	testdataDir, err := filepath.Abs("testdata")
+	require.NoError(t, err)
+
+	specPath := filepath.Join(testdataDir, "external-ref-api.yaml")
+	contents, err := os.ReadFile(specPath)
+	require.NoError(t, err)
+
+	t.Run("fails without BasePath", func(t *testing.T) {
+		cfg := NewDefaultConfiguration()
+		cfg.BasePath = ""
+
+		_, err := CreateDocument(contents, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not exist in the specification")
+	})
+
+	t.Run("succeeds with BasePath", func(t *testing.T) {
+		cfg := NewDefaultConfiguration()
+		cfg.BasePath = testdataDir
+
+		doc, err := CreateDocument(contents, cfg)
+		require.NoError(t, err)
+
+		model, errs := doc.BuildV3Model()
+		require.Empty(t, errs)
+
+		getUserResp := model.Model.Paths.PathItems.GetOrZero("/users/{id}").Get.Responses.Codes.GetOrZero("200")
+		require.NotNil(t, getUserResp)
+
+		jsonContent := getUserResp.Content.GetOrZero("application/json")
+		require.NotNil(t, jsonContent)
+
+		schema := jsonContent.Schema.Schema()
+		require.NotNil(t, schema)
+
+		addressProp := schema.Properties.GetOrZero("address")
+		require.NotNil(t, addressProp)
+
+		resolvedSchema := addressProp.Schema()
+		require.NotNil(t, resolvedSchema)
+		assert.True(t, resolvedSchema.Properties.Len() > 0, "Address schema should have properties after ref resolution")
+
+		streetProp := resolvedSchema.Properties.GetOrZero("street")
+		assert.NotNil(t, streetProp, "Address should have a 'street' property")
+
+		cityProp := resolvedSchema.Properties.GetOrZero("city")
+		assert.NotNil(t, cityProp, "Address should have a 'city' property")
+	})
+
+	t.Run("end-to-end code generation with external refs", func(t *testing.T) {
+		cfg := NewDefaultConfiguration()
+		cfg.BasePath = testdataDir
+
+		code, err := Generate(contents, cfg)
+		require.NoError(t, err)
+		assert.NotEmpty(t, code)
+
+		combined := code.GetCombined()
+		assert.Contains(t, combined, "Address")
+		assert.Contains(t, combined, "Street")
+		assert.Contains(t, combined, "City")
+	})
 }

@@ -63,6 +63,30 @@ overlay:
 
 See [Overlays](overlays.md) for detailed documentation and examples.
 
+### External File References
+
+#### `base-path`
+**Type:** `string` | **Default:** auto-detected from spec file path
+
+Directory used to resolve relative `$ref` file references. When using the CLI with a local spec file, this is automatically set to the spec file's parent directory. Set this explicitly when using the library programmatically or when the spec references files relative to a different directory.
+
+```yaml
+base-path: ./specs
+```
+
+This enables splitting large specs across multiple files:
+
+```yaml
+# specs/api.yaml
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        address:
+          $ref: './common.yaml#/components/schemas/Address'
+```
+
 ### Output Settings
 
 #### `output.use-single-file`
