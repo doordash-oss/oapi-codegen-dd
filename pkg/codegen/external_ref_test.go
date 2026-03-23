@@ -33,7 +33,8 @@ func TestExternalFileRefResolution(t *testing.T) {
 
 		_, err := CreateDocument(contents, cfg)
 		// Without BasePath, external refs cannot be resolved
-		assert.Error(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not exist in the specification")
 	})
 
 	t.Run("succeeds with BasePath", func(t *testing.T) {
@@ -83,5 +84,28 @@ func TestExternalFileRefResolution(t *testing.T) {
 		assert.Contains(t, combined, "Address")
 		assert.Contains(t, combined, "Street")
 		assert.Contains(t, combined, "City")
+	})
+}
+
+func TestBasePathOverwriteWith(t *testing.T) {
+	t.Run("overwrites empty BasePath", func(t *testing.T) {
+		base := Configuration{}
+		other := Configuration{BasePath: "/some/path"}
+		result := base.OverwriteWith(other)
+		assert.Equal(t, "/some/path", result.BasePath)
+	})
+
+	t.Run("overwrites existing BasePath", func(t *testing.T) {
+		base := Configuration{BasePath: "/old/path"}
+		other := Configuration{BasePath: "/new/path"}
+		result := base.OverwriteWith(other)
+		assert.Equal(t, "/new/path", result.BasePath)
+	})
+
+	t.Run("does not overwrite when other is empty", func(t *testing.T) {
+		base := Configuration{BasePath: "/keep/this"}
+		other := Configuration{}
+		result := base.OverwriteWith(other)
+		assert.Equal(t, "/keep/this", result.BasePath)
 	})
 }

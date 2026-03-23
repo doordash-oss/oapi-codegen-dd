@@ -77,9 +77,10 @@ func main() {
 	// Set BasePath from spec file path for resolving external $ref references
 	if cfg.BasePath == "" && !strings.HasPrefix(specPath, "http://") && !strings.HasPrefix(specPath, "https://") {
 		absPath, err := filepath.Abs(specPath)
-		if err == nil {
-			cfg.BasePath = filepath.Dir(absPath)
+		if err != nil {
+			errExit("Error resolving spec file path: %v", err)
 		}
+		cfg.BasePath = filepath.Dir(absPath)
 	}
 
 	cfg = cfg.WithDefaults()

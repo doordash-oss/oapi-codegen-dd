@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -57,13 +58,22 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 }
 
 // LoadDocumentFromContents creates a libopenapi Document from raw bytes.
-// If basePath is non-empty, it is used to resolve relative $ref file references.
-func LoadDocumentFromContents(contents []byte, basePath string) (libopenapi.Document, error) {
+// An optional basePath can be provided to resolve relative $ref file references.
+// If provided, basePath should be an absolute path to the directory containing the spec file.
+func LoadDocumentFromContents(contents []byte, basePath ...string) (libopenapi.Document, error) {
 	docConfig := &datamodel.DocumentConfiguration{
 		SkipCircularReferenceCheck: true,
 	}
-	if basePath != "" {
-		docConfig.BasePath = basePath
+	if len(basePath) > 0 && basePath[0] != "" {
+		bp := basePath[0]
+		if !filepath.IsAbs(bp) {
+			var err error
+			bp, err = filepath.Abs(bp)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving base path %q: %w", basePath[0], err)
+			}
+		}
+		docConfig.BasePath = bp
 		docConfig.AllowFileReferences = true
 	}
 	doc, err := libopenapi.NewDocumentWithConfiguration(contents, docConfig)

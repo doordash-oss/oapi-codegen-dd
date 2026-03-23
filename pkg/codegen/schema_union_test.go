@@ -25,7 +25,7 @@ func loadUnionDocument(t *testing.T) v3.Document {
 	content, err := os.ReadFile("testdata/unions.yml")
 	require.NoError(t, err)
 
-	srcDoc, err := LoadDocumentFromContents(content, "")
+	srcDoc, err := LoadDocumentFromContents(content)
 	require.NoError(t, err)
 
 	v3Model, err := srcDoc.BuildV3Model()
@@ -141,7 +141,7 @@ paths:
                 discriminator:
                   propertyName: type
 `
-		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent), "")
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
 		require.NoError(t, err)
 
 		v3Model, err := srcDoc.BuildV3Model()
@@ -187,7 +187,7 @@ paths:
                       name:
                         type: string
 `
-		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent), "")
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
 		require.NoError(t, err)
 
 		v3Model, err := srcDoc.BuildV3Model()
@@ -229,7 +229,7 @@ paths:
                       type:
                         type: string
 `
-		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent), "")
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
 		require.NoError(t, err)
 
 		v3Model, err := srcDoc.BuildV3Model()
@@ -294,7 +294,7 @@ components:
         title:
           type: string
 `
-		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent), "")
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
 		require.NoError(t, err)
 
 		v3Model, err := srcDoc.BuildV3Model()
@@ -358,7 +358,7 @@ components:
         name:
           type: string
 `
-		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent), "")
+		srcDoc, err := LoadDocumentFromContents([]byte(yamlContent))
 		require.NoError(t, err)
 
 		v3Model, err := srcDoc.BuildV3Model()

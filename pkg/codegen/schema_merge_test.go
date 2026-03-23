@@ -607,7 +607,7 @@ func TestCircularAllOfWithDiscriminatedUnion(t *testing.T) {
 func TestIsDiscriminatedUnionWithChild(t *testing.T) {
 	loadDoc := func(t *testing.T, contents []byte) *libopenapi.DocumentModel[v3.Document] {
 		t.Helper()
-		srcDoc, err := LoadDocumentFromContents(contents, "")
+		srcDoc, err := LoadDocumentFromContents(contents)
 		require.NoError(t, err)
 		v3Model, err := srcDoc.BuildV3Model()
 		require.NoError(t, err)
