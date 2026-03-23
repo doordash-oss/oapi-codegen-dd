@@ -1,0 +1,14 @@
+openapi: "3.0.0"
+info:
+  title: Common Schemas
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string

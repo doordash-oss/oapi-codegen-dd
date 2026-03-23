@@ -21,7 +21,7 @@ import (
 )
 
 func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document, error) {
-	doc, err := LoadDocumentFromContents(docContents)
+	doc, err := LoadDocumentFromContents(docContents, cfg.BasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +56,15 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 	return doc, nil
 }
 
-func LoadDocumentFromContents(contents []byte) (libopenapi.Document, error) {
+// LoadDocumentFromContents creates a libopenapi Document from raw bytes.
+// If basePath is non-empty, it is used to resolve relative $ref file references.
+func LoadDocumentFromContents(contents []byte, basePath string) (libopenapi.Document, error) {
 	docConfig := &datamodel.DocumentConfiguration{
 		SkipCircularReferenceCheck: true,
+	}
+	if basePath != "" {
+		docConfig.BasePath = basePath
+		docConfig.AllowFileReferences = true
 	}
 	doc, err := libopenapi.NewDocumentWithConfiguration(contents, docConfig)
 	if err != nil {

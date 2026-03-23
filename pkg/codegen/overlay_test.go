@@ -84,7 +84,7 @@ func TestLoadOverlayFromURL_InvalidURL(t *testing.T) {
 }
 
 func TestApplyOverlays_EmptySources(t *testing.T) {
-	doc, err := LoadDocumentFromContents([]byte(readTestdata(t, "overlay-base.yml")))
+	doc, err := LoadDocumentFromContents([]byte(readTestdata(t, "overlay-base.yml")), "")
 	require.NoError(t, err)
 
 	result, err := applyOverlays(doc, []string{})
@@ -93,7 +93,7 @@ func TestApplyOverlays_EmptySources(t *testing.T) {
 }
 
 func TestApplyOverlays_InvalidOverlayContent(t *testing.T) {
-	doc, err := LoadDocumentFromContents([]byte(readTestdata(t, "overlay-base.yml")))
+	doc, err := LoadDocumentFromContents([]byte(readTestdata(t, "overlay-base.yml")), "")
 	require.NoError(t, err)
 
 	// Create a temp file with invalid overlay content
@@ -109,7 +109,7 @@ func TestApplyOverlays_InvalidOverlayContent(t *testing.T) {
 }
 
 func TestApplyOverlays_SingleSource(t *testing.T) {
-	doc, err := LoadDocumentFromContents([]byte(readTestdata(t, "overlay-base.yml")))
+	doc, err := LoadDocumentFromContents([]byte(readTestdata(t, "overlay-base.yml")), "")
 	require.NoError(t, err)
 
 	result, err := applyOverlays(doc, []string{"testdata/overlay-add-extensions.yml"})

@@ -22,7 +22,7 @@ func TestFindReferences(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, _ := doc.BuildV3Model()
@@ -35,7 +35,7 @@ func TestFindReferences(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, _ := doc.BuildV3Model()
@@ -61,7 +61,7 @@ func TestFindReferences(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, _ := doc.BuildV3Model()
@@ -87,7 +87,7 @@ func TestFilterOnlyCat(t *testing.T) {
 	contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
 	assert.NoError(t, err)
 
-	doc, err := LoadDocumentFromContents(contents)
+	doc, err := LoadDocumentFromContents(contents, "")
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -128,7 +128,7 @@ func TestFilterOnlyDog(t *testing.T) {
 	contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
 	assert.NoError(t, err)
 
-	doc, err := LoadDocumentFromContents(contents)
+	doc, err := LoadDocumentFromContents(contents, "")
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -171,7 +171,7 @@ func TestPruningUnusedComponents(t *testing.T) {
 	contents, err := os.ReadFile("testdata/prune-all-components.yml")
 	assert.NoError(t, err)
 
-	doc, err := LoadDocumentFromContents(contents)
+	doc, err := LoadDocumentFromContents(contents, "")
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -204,7 +204,7 @@ func TestPruneParameterSchemaRefs(t *testing.T) {
 	contents, err := os.ReadFile("testdata/prune-component-params.yml")
 	assert.NoError(t, err)
 
-	doc, err := LoadDocumentFromContents(contents)
+	doc, err := LoadDocumentFromContents(contents, "")
 	assert.NoError(t, err)
 
 	model, _ := doc.BuildV3Model()
@@ -233,7 +233,7 @@ func TestPruneInlineParameterSchemaRefs(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-param-schema-refs.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, err := doc.BuildV3Model()
@@ -286,7 +286,7 @@ func TestPruneComponentSchemaRefs(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-component-schema-refs.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, err := doc.BuildV3Model()
@@ -333,7 +333,7 @@ func TestPruneComponentRequestBodyRefs(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-component-requestbody-refs.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, err := doc.BuildV3Model()
@@ -386,7 +386,7 @@ func TestPruneDefaultResponseHeaders(t *testing.T) {
 		contents, err := os.ReadFile("testdata/prune-default-response-headers.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, err := doc.BuildV3Model()
@@ -434,7 +434,7 @@ func TestPruneExamples(t *testing.T) {
 		contents, err := os.ReadFile("testdata/with-examples.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, err := doc.BuildV3Model()
@@ -476,7 +476,7 @@ func TestPruneExamples(t *testing.T) {
 		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
 		assert.NoError(t, err)
 
-		doc, err := LoadDocumentFromContents(contents)
+		doc, err := LoadDocumentFromContents(contents, "")
 		assert.NoError(t, err)
 
 		model, err := doc.BuildV3Model()
