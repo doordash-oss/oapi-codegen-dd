@@ -43,6 +43,7 @@ on the real value-add for your organization.
 - **Flexible filtering** - Include/exclude by paths, tags, operation IDs, schema properties, or extensions
 - **Transitive pruning** - Automatically remove schemas that are only referenced by filtered-out properties
 - **[OpenAPI Overlays](https://doordash-oss.github.io/oapi-codegen-dd/overlays/)** - Modify specs without editing originals (add extensions, remove paths)
+- **External file `$ref` resolution** - Split specs across multiple files with relative `$ref` references (auto-detected from spec path, or set `base-path` in config)
 
 ### Programmatic Access
 - **Runtime package** - Public API for working with generated types
