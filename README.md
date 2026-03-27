@@ -67,7 +67,7 @@ This project is a fork of [oapi-codegen](https://github.com/oapi-codegen/oapi-co
 
 ### Compatibility
 
-Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/cubahno/specs):
+Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/mockzilla/specs):
 
 | Version | Passed | Failed | Pass Rate |
 |---------|--------|--------|-----------|
