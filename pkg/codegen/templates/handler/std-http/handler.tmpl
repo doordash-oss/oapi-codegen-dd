@@ -26,6 +26,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []func(http.Handler) http.Handler
     errHandler  OapiErrorHandler
+    bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -40,6 +41,14 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
+    }
+}
+
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.bodyDecoder = fn
     }
 }
 {{end}}
@@ -60,6 +69,9 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *http.Serv
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.bodyDecoder != nil {
+        adapter.bodyDecoder = cfg.bodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
         mux.HandleFunc("{{ $op.Method }} {{template "router-path" $op.Path}}", applyMiddleware(http.HandlerFunc(adapter.{{ $op.ID | ucFirst }}), cfg.middlewares...))
     {{- end }}

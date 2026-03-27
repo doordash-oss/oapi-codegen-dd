@@ -27,6 +27,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []iris.Handler
     errHandler  OapiErrorHandler
+    bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -41,6 +42,14 @@ func WithMiddleware(mw iris.Handler) RouterOption {
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
+    }
+}
+
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.bodyDecoder = fn
     }
 }
 {{end}}
@@ -64,6 +73,9 @@ func NewRouter(app *iris.Application, svc {{ $serviceName }}Interface, opts ...R
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.bodyDecoder != nil {
+        adapter.bodyDecoder = cfg.bodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
         app.Handle("{{ $op.Method | caps }}", "{{template "router-path" $op.Path}}", func(ctx iris.Context) {
             {{- if $op.PathParams }}
@@ -93,6 +105,9 @@ func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handler
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.bodyDecoder != nil {
+        adapter.bodyDecoder = cfg.bodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
     mux.HandleFunc("{{ $op.Method | caps }} {{ escapeGoString $op.Path }}", adapter.{{ $op.ID | ucFirst }})
     {{- end }}

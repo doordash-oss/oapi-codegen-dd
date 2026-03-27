@@ -27,6 +27,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []gin.HandlerFunc
     errHandler  OapiErrorHandler
+    bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -41,6 +42,14 @@ func WithMiddleware(mw gin.HandlerFunc) RouterOption {
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
+    }
+}
+
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.bodyDecoder = fn
     }
 }
 {{end}}
@@ -64,6 +73,9 @@ func NewRouter(r *gin.Engine, svc {{ $serviceName }}Interface, opts ...RouterOpt
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.bodyDecoder != nil {
+        adapter.bodyDecoder = cfg.bodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
         r.{{ $op.Method | caps }}("{{template "router-path" $op.Path}}", func(c *gin.Context) {
             {{- if $op.PathParams }}

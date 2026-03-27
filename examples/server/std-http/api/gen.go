@@ -102,8 +102,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc         ServiceInterface
+	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -112,7 +113,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, bodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -221,7 +222,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.bodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, 400, NewCreateUserErrorResponse(err.Error()))
 		return
 	}
@@ -357,6 +358,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	middlewares []func(http.Handler) http.Handler
 	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -374,6 +376,14 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.bodyDecoder = fn
+	}
+}
+
 // NewRouter creates a new http.ServeMux with the given service implementation.
 func NewRouter(svc ServiceInterface, opts ...RouterOption) *http.ServeMux {
 	cfg := &routerConfig{}
@@ -384,6 +394,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		adapter.bodyDecoder = cfg.bodyDecoder
+	}
 	mux.HandleFunc("GET /health", applyMiddleware(http.HandlerFunc(adapter.HealthCheck), cfg.middlewares...))
 	mux.HandleFunc("GET /users", applyMiddleware(http.HandlerFunc(adapter.ListUsers), cfg.middlewares...))
 	mux.HandleFunc("POST /users", applyMiddleware(http.HandlerFunc(adapter.CreateUser), cfg.middlewares...))

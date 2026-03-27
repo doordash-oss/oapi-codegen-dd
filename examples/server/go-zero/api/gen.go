@@ -105,8 +105,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc         ServiceInterface
+	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -115,7 +116,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, bodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -224,7 +225,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.bodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, 400, NewCreateUserErrorResponse(err.Error()))
 		return
 	}
@@ -360,6 +361,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	middlewares []rest.Middleware
 	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -377,6 +379,14 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.bodyDecoder = fn
+	}
+}
+
 // RegisterRoutes registers all routes with the given go-zero server.
 func RegisterRoutes(server *rest.Server, svc ServiceInterface, opts ...RouterOption) {
 	cfg := &routerConfig{}
@@ -385,6 +395,9 @@ func RegisterRoutes(server *rest.Server, svc ServiceInterface, opts ...RouterOpt
 	}
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		adapter.bodyDecoder = cfg.bodyDecoder
+	}
 
 	routes := []rest.Route{
 		{
@@ -433,6 +446,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) http.Handler {
 	r := router.NewRouter()
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		adapter.bodyDecoder = cfg.bodyDecoder
+	}
 	_ = r.Handle("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
 	_ = r.Handle("GET", "/users", http.HandlerFunc(adapter.ListUsers))
 	_ = r.Handle("POST", "/users", http.HandlerFunc(adapter.CreateUser))

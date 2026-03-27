@@ -103,8 +103,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc         ServiceInterface
+	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -113,7 +114,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, bodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -222,7 +223,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.bodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
@@ -358,6 +359,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	middlewares []fiber.Handler
 	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -372,6 +374,14 @@ func WithMiddleware(mw fiber.Handler) RouterOption {
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.errHandler = h
+	}
+}
+
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.bodyDecoder = fn
 	}
 }
 
@@ -401,6 +411,9 @@ func NewRouter(app *fiber.App, svc ServiceInterface, opts ...RouterOption) {
 	}
 
 	httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		httpAdapter.bodyDecoder = cfg.bodyDecoder
+	}
 	app.Get("/health", adaptor.HTTPHandlerFunc(httpAdapter.HealthCheck))
 	app.Get("/users", adaptor.HTTPHandlerFunc(httpAdapter.ListUsers))
 	app.Post("/users", adaptor.HTTPHandlerFunc(httpAdapter.CreateUser))

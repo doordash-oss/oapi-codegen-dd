@@ -140,8 +140,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc         ServiceInterface
+	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -150,7 +151,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, bodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -268,7 +269,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.bodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
@@ -1339,7 +1340,7 @@ func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateOrderBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.bodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateOrder",
@@ -1392,7 +1393,7 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateCompanyBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.bodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateCompany",
@@ -1442,6 +1443,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	middlewares []ghttp.HandlerFunc
 	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -1459,6 +1461,14 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.bodyDecoder = fn
+	}
+}
+
 // NewRouter registers routes on the given GoFrame server with the service implementation.
 func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 	cfg := &routerConfig{}
@@ -1472,6 +1482,9 @@ func NewRouter(s *ghttp.Server, svc ServiceInterface, opts ...RouterOption) {
 	}
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		adapter.bodyDecoder = cfg.bodyDecoder
+	}
 	s.BindHandler("GET:/health", func(r *ghttp.Request) {
 		adapter.HealthCheck(r.Response.Writer, r.Request)
 	})
@@ -1572,6 +1585,9 @@ func Handler(svc ServiceInterface, opts ...RouterOption) http.Handler {
 	mux := http.NewServeMux()
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		adapter.bodyDecoder = cfg.bodyDecoder
+	}
 	mux.HandleFunc("GET /health", adapter.HealthCheck)
 	mux.HandleFunc("GET /users", adapter.ListUsers)
 	mux.HandleFunc("POST /users", adapter.CreateUser)

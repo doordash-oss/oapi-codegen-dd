@@ -4,6 +4,7 @@ package models
 import (
 	"net/http"
 
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -13,6 +14,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	middlewares []func(http.Handler) http.Handler
 	errHandler  OapiErrorHandler
+	bodyDecoder runtime.BodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -30,6 +32,14 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
+// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.bodyDecoder = fn
+	}
+}
+
 // NewRouter creates a new chi.Router with the given service implementation.
 func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 	cfg := &routerConfig{}
@@ -43,6 +53,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 	}
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.bodyDecoder != nil {
+		adapter.bodyDecoder = cfg.bodyDecoder
+	}
 	r.Method("GET", "/health", http.HandlerFunc(adapter.HealthCheck))
 	r.Method("GET", "/users", http.HandlerFunc(adapter.ListUsers))
 	r.Method("POST", "/users", http.HandlerFunc(adapter.CreateUser))
