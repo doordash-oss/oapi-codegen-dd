@@ -28,7 +28,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []fiber.Handler
     errHandler  OapiErrorHandler
-    bodyDecoder runtime.BodyDecoderFunc
+    jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -46,11 +46,11 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
     }
 }
 
-// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
 // If not set, runtime.DecodeJSONBody is used.
-func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
     return func(cfg *routerConfig) {
-        cfg.bodyDecoder = fn
+        cfg.jsonBodyDecoder = fn
     }
 }
 
@@ -87,8 +87,8 @@ func NewRouter(app *fiber.App, svc {{ $serviceName }}Interface, opts ...RouterOp
     {{- if $operations }}
 
     httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
-    if cfg.bodyDecoder != nil {
-        httpAdapter.bodyDecoder = cfg.bodyDecoder
+    if cfg.jsonBodyDecoder != nil {
+        httpAdapter.jsonBodyDecoder = cfg.jsonBodyDecoder
     }
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}

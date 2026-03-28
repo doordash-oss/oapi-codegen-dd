@@ -31,7 +31,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []app.HandlerFunc
     errHandler  OapiErrorHandler
-    bodyDecoder runtime.BodyDecoderFunc
+    jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -49,11 +49,11 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
     }
 }
 
-// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
 // If not set, runtime.DecodeJSONBody is used.
-func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
     return func(cfg *routerConfig) {
-        cfg.bodyDecoder = fn
+        cfg.jsonBodyDecoder = fn
     }
 }
 {{end}}
@@ -77,8 +77,8 @@ func NewRouter(h *server.Hertz, svc {{ $serviceName }}Interface, opts ...RouterO
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
-    if cfg.bodyDecoder != nil {
-        adapter.bodyDecoder = cfg.bodyDecoder
+    if cfg.jsonBodyDecoder != nil {
+        adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
     }
     {{- range $operations }}{{ $op := . }}
         h.Handle("{{ $op.Method | caps }}", "{{template "router-path" $op.Path}}", func(ctx context.Context, c *app.RequestContext) {
@@ -115,8 +115,8 @@ func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) http.Handler
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
-    if cfg.bodyDecoder != nil {
-        adapter.bodyDecoder = cfg.bodyDecoder
+    if cfg.jsonBodyDecoder != nil {
+        adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
     }
     {{- range $operations }}{{ $op := . }}
         mux.HandleFunc("{{ $op.Method | caps }} {{ $op.Path }}", adapter.{{ $op.ID | ucFirst }})

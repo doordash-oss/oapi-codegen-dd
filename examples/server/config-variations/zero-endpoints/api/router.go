@@ -12,9 +12,9 @@ import (
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []func(http.Handler) http.Handler
-	errHandler  OapiErrorHandler
-	bodyDecoder runtime.BodyDecoderFunc
+	middlewares     []func(http.Handler) http.Handler
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -32,11 +32,11 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
-// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
 // If not set, runtime.DecodeJSONBody is used.
-func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
 	return func(cfg *routerConfig) {
-		cfg.bodyDecoder = fn
+		cfg.jsonBodyDecoder = fn
 	}
 }
 

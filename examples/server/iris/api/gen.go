@@ -102,9 +102,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc         ServiceInterface
-	errHandler  OapiErrorHandler
-	bodyDecoder runtime.BodyDecoderFunc
+	svc             ServiceInterface
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -113,7 +113,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler, bodyDecoder: runtime.DecodeJSONBody}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, jsonBodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -222,7 +222,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := a.bodyDecoder(r.Body, &body); err != nil {
+	if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
@@ -356,9 +356,9 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []iris.Handler
-	errHandler  OapiErrorHandler
-	bodyDecoder runtime.BodyDecoderFunc
+	middlewares     []iris.Handler
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -376,11 +376,11 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
-// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
 // If not set, runtime.DecodeJSONBody is used.
-func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
 	return func(cfg *routerConfig) {
-		cfg.bodyDecoder = fn
+		cfg.jsonBodyDecoder = fn
 	}
 }
 
@@ -397,8 +397,8 @@ func NewRouter(app *iris.Application, svc ServiceInterface, opts ...RouterOption
 	}
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-	if cfg.bodyDecoder != nil {
-		adapter.bodyDecoder = cfg.bodyDecoder
+	if cfg.jsonBodyDecoder != nil {
+		adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
 	}
 	app.Handle("GET", "/health", func(ctx iris.Context) {
 		adapter.HealthCheck(ctx.ResponseWriter(), ctx.Request())
@@ -432,8 +432,8 @@ func Handler(svc ServiceInterface, opts ...RouterOption) http.Handler {
 	mux := http.NewServeMux()
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
-	if cfg.bodyDecoder != nil {
-		adapter.bodyDecoder = cfg.bodyDecoder
+	if cfg.jsonBodyDecoder != nil {
+		adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
 	}
 	mux.HandleFunc("GET /health", adapter.HealthCheck)
 	mux.HandleFunc("GET /users", adapter.ListUsers)

@@ -28,7 +28,7 @@ beecontext "github.com/beego/beego/v2/server/web/context"{{end}}
 type routerConfig struct {
     middlewares []beego.MiddleWare
     errHandler  OapiErrorHandler
-    bodyDecoder runtime.BodyDecoderFunc
+    jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -46,11 +46,11 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
     }
 }
 
-// WithBodyDecoder sets a custom function for decoding JSON request bodies.
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
 // If not set, runtime.DecodeJSONBody is used.
-func WithBodyDecoder(fn runtime.BodyDecoderFunc) RouterOption {
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
     return func(cfg *routerConfig) {
-        cfg.bodyDecoder = fn
+        cfg.jsonBodyDecoder = fn
     }
 }
 
@@ -81,8 +81,8 @@ func RegisterRoutes(router *beego.ControllerRegister, svc {{ $serviceName }}Inte
     {{- if $operations }}
 
     httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
-    if cfg.bodyDecoder != nil {
-        httpAdapter.bodyDecoder = cfg.bodyDecoder
+    if cfg.jsonBodyDecoder != nil {
+        httpAdapter.jsonBodyDecoder = cfg.jsonBodyDecoder
     }
     {{- range $operations }}{{ $op := . }}
         router.{{ $op.Method | lower | ucFirst }}("{{template "router-path" $op.Path}}", beegoHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ if $op.PathParams }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}{{ end }}))

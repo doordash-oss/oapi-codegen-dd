@@ -460,11 +460,11 @@ func TestGetItemsByStatus_TypeAndRatingPathParams(t *testing.T) {
 	}
 }
 
-func TestWithBodyDecoder(t *testing.T) {
+func TestWithJSONBodyDecoder(t *testing.T) {
 	t.Run("custom decoder is called for JSON body", func(t *testing.T) {
 		var called bool
 		mux := stdhttpapi.NewRouter(stdhttpapi.NewService(),
-			stdhttpapi.WithBodyDecoder(func(body io.Reader, target any) error {
+			stdhttpapi.WithJSONBodyDecoder(func(body io.Reader, target any) error {
 				called = true
 				return runtime.DecodeJSONBody(body, target)
 			}),
@@ -483,7 +483,7 @@ func TestWithBodyDecoder(t *testing.T) {
 
 	t.Run("custom decoder can transform the body", func(t *testing.T) {
 		mux := stdhttpapi.NewRouter(stdhttpapi.NewService(),
-			stdhttpapi.WithBodyDecoder(func(body io.Reader, target any) error {
+			stdhttpapi.WithJSONBodyDecoder(func(body io.Reader, target any) error {
 				data, err := io.ReadAll(body)
 				if err != nil {
 					return err
