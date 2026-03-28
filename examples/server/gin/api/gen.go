@@ -102,8 +102,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc             ServiceInterface
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -112,7 +113,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, jsonBodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -221,7 +222,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
@@ -355,8 +356,9 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []gin.HandlerFunc
-	errHandler  OapiErrorHandler
+	middlewares     []gin.HandlerFunc
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -374,6 +376,14 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.jsonBodyDecoder = fn
+	}
+}
+
 // NewRouter registers routes on the given Gin engine with the service implementation.
 func NewRouter(r *gin.Engine, svc ServiceInterface, opts ...RouterOption) {
 	cfg := &routerConfig{}
@@ -387,6 +397,9 @@ func NewRouter(r *gin.Engine, svc ServiceInterface, opts ...RouterOption) {
 	}
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.jsonBodyDecoder != nil {
+		adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
+	}
 	r.GET("/health", func(c *gin.Context) {
 		adapter.HealthCheck(c.Writer, c.Request)
 	})

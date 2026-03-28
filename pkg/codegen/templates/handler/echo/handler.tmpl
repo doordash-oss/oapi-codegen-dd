@@ -27,6 +27,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []echo.MiddlewareFunc
     errHandler  OapiErrorHandler
+    jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -41,6 +42,14 @@ func WithMiddleware(mw echo.MiddlewareFunc) RouterOption {
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
+    }
+}
+
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.jsonBodyDecoder = fn
     }
 }
 {{end}}
@@ -64,6 +73,9 @@ func NewRouter(e *echo.Echo, svc {{ $serviceName }}Interface, opts ...RouterOpti
     {{- if $operations }}
 
     adapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.jsonBodyDecoder != nil {
+        adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
         e.{{ $op.Method | caps }}("{{template "router-path" $op.Path}}", func(c echo.Context) error {
             {{- if $op.PathParams }}

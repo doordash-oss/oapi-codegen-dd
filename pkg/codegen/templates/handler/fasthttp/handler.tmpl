@@ -29,6 +29,7 @@ limitations under the License.
 type routerConfig struct {
     middlewares []func(fasthttp.RequestHandler) fasthttp.RequestHandler
     errHandler  OapiErrorHandler
+    jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -43,6 +44,14 @@ func WithMiddleware(mw func(fasthttp.RequestHandler) fasthttp.RequestHandler) Ro
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
     return func(cfg *routerConfig) {
         cfg.errHandler = h
+    }
+}
+
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
+    return func(cfg *routerConfig) {
+        cfg.jsonBodyDecoder = fn
     }
 }
 
@@ -79,6 +88,9 @@ func NewRouter(svc {{ $serviceName }}Interface, opts ...RouterOption) *router.Ro
     {{- if $operations }}
 
     httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.jsonBodyDecoder != nil {
+        httpAdapter.jsonBodyDecoder = cfg.jsonBodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
         r.{{ $op.Method }}("{{template "router-path" $op.Path}}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))
@@ -118,6 +130,9 @@ func Handler(svc {{ $serviceName }}Interface, opts ...RouterOption) fasthttp.Req
     {{- if $operations }}
 
     httpAdapter := NewHTTPAdapter(svc, cfg.errHandler)
+    if cfg.jsonBodyDecoder != nil {
+        httpAdapter.jsonBodyDecoder = cfg.jsonBodyDecoder
+    }
     {{- range $operations }}{{ $op := . }}
         {{- if $op.PathParams }}
         r.{{ $op.Method }}("{{ $op.Path }}", fasthttpHandler(httpAdapter.{{ $op.ID | ucFirst }}{{ range $op.PathParams.Schema.Properties }}, "{{ .JsonFieldName }}"{{ end }}))

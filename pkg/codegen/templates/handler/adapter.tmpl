@@ -39,6 +39,7 @@ type {{ $serviceName }}Interface interface {
 type HTTPAdapter struct {
     svc {{ $serviceName }}Interface
     errHandler OapiErrorHandler
+    jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -47,7 +48,7 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
     if errHandler == nil {
         errHandler = &OapiDefaultErrorHandler{}
     }
-    return &HTTPAdapter{svc: svc, errHandler: errHandler}
+    return &HTTPAdapter{svc: svc, errHandler: errHandler, jsonBodyDecoder: runtime.DecodeJSONBody}
 }
 
 {{define "handle-validation-error"}}
@@ -331,7 +332,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     defer r.Body.Close()
     {{- if or (eq $op.Body.ContentType "application/json") (hasSuffix $op.Body.ContentType "+json") }}
     var body {{ $op.Body.Name }}
-    if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+    if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
         {{- if $hasTypedError }}
         a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
         {{- else }}
