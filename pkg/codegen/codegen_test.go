@@ -555,3 +555,73 @@ func TestExternalFileRefResolution(t *testing.T) {
 		assert.Contains(t, combined, "City")
 	})
 }
+
+func TestCollectWebhookDefinitions(t *testing.T) {
+	t.Run("nil webhooks returns nothing", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
+		typeDefs, schemas, err := collectWebhookDefinitions(&model.Model, opts)
+		require.NoError(t, err)
+		assert.Empty(t, typeDefs)
+		assert.Empty(t, schemas)
+	})
+
+	t.Run("ref webhooks produce alias types", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
+		typeDefs, schemas, err := collectWebhookDefinitions(&model.Model, opts)
+		require.NoError(t, err)
+
+		assert.NotEmpty(t, typeDefs)
+		assert.NotEmpty(t, schemas)
+
+		// All types should be tagged as webhook
+		for _, td := range typeDefs {
+			assert.Equal(t, SpecLocationWebhook, td.SpecLocation, "type %s should have webhook SpecLocation", td.Name)
+		}
+
+		// Should have body and response aliases
+		names := make(map[string]bool)
+		for _, td := range typeDefs {
+			names[td.Name] = true
+		}
+		assert.True(t, names["PaymentCreatedBody"], "should have PaymentCreatedBody")
+		assert.True(t, names["PaymentCreatedResponse"], "should have PaymentCreatedResponse")
+	})
+
+	t.Run("inline webhook body produces struct type", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/filter-webhooks.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
+		typeDefs, _, err := collectWebhookDefinitions(&model.Model, opts)
+		require.NoError(t, err)
+
+		// All types should be tagged as webhook
+		for _, td := range typeDefs {
+			assert.Equal(t, SpecLocationWebhook, td.SpecLocation, "type %s should have webhook SpecLocation", td.Name)
+		}
+	})
+}
