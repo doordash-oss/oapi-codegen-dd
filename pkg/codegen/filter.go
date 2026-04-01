@@ -63,59 +63,91 @@ func filterOperations(model *v3high.Document, cfg FilterConfig) bool {
 			continue
 		}
 
-		for method, op := range pathItem.GetOperations().FromOldest() {
-			remove := false
+		removed = filterPathItemOperations(pathItem, cfg, removed)
+	}
 
-			// Tags
+	// Filter webhooks
+	if model.Webhooks != nil {
+		webhooks := map[string]*v3high.PathItem{}
+		for name, pathItem := range model.Webhooks.FromOldest() {
+			webhooks[name] = pathItem
+		}
+
+		for name, pathItem := range webhooks {
+			if len(cfg.Include.Webhooks) > 0 && !slices.Contains(cfg.Include.Webhooks, name) {
+				model.Webhooks.Delete(name)
+				removed = true
+				continue
+			}
+
+			if len(cfg.Exclude.Webhooks) > 0 && slices.Contains(cfg.Exclude.Webhooks, name) {
+				model.Webhooks.Delete(name)
+				removed = true
+				continue
+			}
+
+			removed = filterPathItemOperations(pathItem, cfg, removed)
+		}
+	}
+
+	return removed
+}
+
+// filterPathItemOperations filters operations within a PathItem by tags and operation IDs.
+// Returns the updated removed flag.
+func filterPathItemOperations(pathItem *v3high.PathItem, cfg FilterConfig, removed bool) bool {
+	for method, op := range pathItem.GetOperations().FromOldest() {
+		remove := false
+
+		// Tags
+		for _, tag := range op.Tags {
+			if slices.Contains(cfg.Exclude.Tags, tag) {
+				remove = true
+				break
+			}
+		}
+
+		if !remove && len(cfg.Include.Tags) > 0 {
+			// Only include if it matches Include.Tags
+			includeMatch := false
 			for _, tag := range op.Tags {
-				if slices.Contains(cfg.Exclude.Tags, tag) {
-					remove = true
+				if slices.Contains(cfg.Include.Tags, tag) {
+					includeMatch = true
 					break
 				}
 			}
-
-			if !remove && len(cfg.Include.Tags) > 0 {
-				// Only include if it matches Include.Tags
-				includeMatch := false
-				for _, tag := range op.Tags {
-					if slices.Contains(cfg.Include.Tags, tag) {
-						includeMatch = true
-						break
-					}
-				}
-				if !includeMatch {
-					remove = true
-				}
-			}
-
-			// OperationIDs
-			if len(cfg.Exclude.OperationIDs) > 0 && slices.Contains(cfg.Exclude.OperationIDs, op.OperationId) {
+			if !includeMatch {
 				remove = true
 			}
-			if len(cfg.Include.OperationIDs) > 0 && !slices.Contains(cfg.Include.OperationIDs, op.OperationId) {
-				remove = true
-			}
+		}
 
-			if remove {
-				removed = true
-				switch strings.ToLower(method) {
-				case "get":
-					pathItem.Get = nil
-				case "post":
-					pathItem.Post = nil
-				case "put":
-					pathItem.Put = nil
-				case "delete":
-					pathItem.Delete = nil
-				case "patch":
-					pathItem.Patch = nil
-				case "head":
-					pathItem.Head = nil
-				case "options":
-					pathItem.Options = nil
-				case "trace":
-					pathItem.Trace = nil
-				}
+		// OperationIDs
+		if len(cfg.Exclude.OperationIDs) > 0 && slices.Contains(cfg.Exclude.OperationIDs, op.OperationId) {
+			remove = true
+		}
+		if len(cfg.Include.OperationIDs) > 0 && !slices.Contains(cfg.Include.OperationIDs, op.OperationId) {
+			remove = true
+		}
+
+		if remove {
+			removed = true
+			switch strings.ToLower(method) {
+			case "get":
+				pathItem.Get = nil
+			case "post":
+				pathItem.Post = nil
+			case "put":
+				pathItem.Put = nil
+			case "delete":
+				pathItem.Delete = nil
+			case "patch":
+				pathItem.Patch = nil
+			case "head":
+				pathItem.Head = nil
+			case "options":
+				pathItem.Options = nil
+			case "trace":
+				pathItem.Trace = nil
 			}
 		}
 	}

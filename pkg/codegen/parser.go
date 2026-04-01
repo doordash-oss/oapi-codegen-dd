@@ -681,6 +681,8 @@ func getSpecLocationOutName(specLocation SpecLocation) string {
 		return "types"
 	case SpecLocationUnion:
 		return "unions"
+	case SpecLocationWebhook:
+		return "webhooks"
 	default:
 		return string(specLocation)
 	}

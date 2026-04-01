@@ -427,6 +427,25 @@ filter:
       - deleteUser
 ```
 
+### Filter by Webhooks
+
+Filter webhook entries by name. This is useful for OpenAPI 3.1 specs that define [webhooks](https://spec.openapis.org/oas/v3.1.0#fixed-fields) - 
+schemas referenced by included webhooks are preserved during pruning.
+
+```yaml
+filter:
+  include:
+    webhooks:
+      - order.created
+      - payment.completed
+  exclude:
+    webhooks:
+      - internal.debug
+```
+
+Webhook operations also respect tag and operation ID filters - if a webhook's operation doesn't match the tag/operation ID filter, 
+it will be removed just like path operations.
+
 ### Filter by Schema Properties
 
 Filter which properties are included in generated types. This triggers **transitive pruning** - schemas that are only referenced by filtered-out properties will also be pruned.

@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: gen
+output:
+  use-single-file: false
+filter:
+  exclude:
+    webhooks:
+      - internal.debug

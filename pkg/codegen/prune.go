@@ -22,8 +22,7 @@ import (
 
 func pruneSchema(model *v3high.Document) error {
 	// Aggressively remove everything we don't generate code for
-	slog.Debug("Pruning: removing webhooks, security schemes, callbacks, component examples, links")
-	model.Webhooks = nil
+	slog.Debug("Pruning: removing security schemes, callbacks, component examples, links")
 	if model.Components != nil {
 		// Set to nil - we don't generate code for these
 		model.Components.SecuritySchemes = nil
@@ -121,38 +120,17 @@ func removeOrphanedComponents(model *v3high.Document, refs map[string]bool) int 
 func findOperationRefs(model *v3high.Document) map[string]bool {
 	refSet := make(map[string]bool)
 
-	if model.Paths == nil || model.Paths.PathItems == nil {
-		return refSet
+	if model.Paths != nil && model.Paths.PathItems != nil {
+		// Walk all operations and collect refs
+		for _, pathItem := range model.Paths.PathItems.FromOldest() {
+			collectPathItemRefs(pathItem, refSet, model)
+		}
 	}
 
-	// Walk all operations and collect refs
-	for _, pathItem := range model.Paths.PathItems.FromOldest() {
-		// Collect path-level parameters
-		for _, param := range pathItem.Parameters {
-			collectRefFromProxy(param, refSet, model)
-		}
-
-		// Collect operation-level refs
-		for _, op := range pathItem.GetOperations().FromOldest() {
-			// Request body
-			if op.RequestBody != nil {
-				collectRefFromProxy(op.RequestBody, refSet, model)
-			}
-
-			// Parameters
-			for _, param := range op.Parameters {
-				collectRefFromProxy(param, refSet, model)
-			}
-
-			// Responses
-			if op.Responses != nil {
-				if op.Responses.Default != nil {
-					collectRefFromProxy(op.Responses.Default, refSet, model)
-				}
-				for _, resp := range op.Responses.Codes.FromOldest() {
-					collectRefFromProxy(resp, refSet, model)
-				}
-			}
+	// Walk webhook path items and collect refs (structurally identical to paths)
+	if model.Webhooks != nil {
+		for _, pathItem := range model.Webhooks.FromOldest() {
+			collectPathItemRefs(pathItem, refSet, model)
 		}
 	}
 
@@ -213,6 +191,37 @@ func findOperationRefs(model *v3high.Document) map[string]bool {
 
 	slog.Debug("All collected refs", "count", len(refSet))
 	return refSet
+}
+
+// collectPathItemRefs collects all refs from a PathItem's parameters and operations.
+func collectPathItemRefs(pathItem *v3high.PathItem, refSet map[string]bool, model *v3high.Document) {
+	// Collect path-level parameters
+	for _, param := range pathItem.Parameters {
+		collectRefFromProxy(param, refSet, model)
+	}
+
+	// Collect operation-level refs
+	for _, op := range pathItem.GetOperations().FromOldest() {
+		// Request body
+		if op.RequestBody != nil {
+			collectRefFromProxy(op.RequestBody, refSet, model)
+		}
+
+		// Parameters
+		for _, param := range op.Parameters {
+			collectRefFromProxy(param, refSet, model)
+		}
+
+		// Responses
+		if op.Responses != nil {
+			if op.Responses.Default != nil {
+				collectRefFromProxy(op.Responses.Default, refSet, model)
+			}
+			for _, resp := range op.Responses.Codes.FromOldest() {
+				collectRefFromProxy(resp, refSet, model)
+			}
+		}
+	}
 }
 
 // addParentSchemaRef adds the parent schema reference if the given ref is a property reference

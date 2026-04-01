@@ -271,6 +271,7 @@ type FilterParamsConfig struct {
 	Paths            []string            `yaml:"paths"`
 	Tags             []string            `yaml:"tags"`
 	OperationIDs     []string            `yaml:"operation-ids"`
+	Webhooks         []string            `yaml:"webhooks"`
 	SchemaProperties map[string][]string `yaml:"schema-properties"`
 	Extensions       []string            `yaml:"extensions"`
 }
@@ -280,6 +281,7 @@ func (o FilterParamsConfig) IsEmpty() bool {
 	return len(o.Paths) == 0 &&
 		len(o.Tags) == 0 &&
 		len(o.OperationIDs) == 0 &&
+		len(o.Webhooks) == 0 &&
 		len(o.SchemaProperties) == 0 &&
 		len(o.Extensions) == 0
 }
