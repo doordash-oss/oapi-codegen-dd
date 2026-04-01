@@ -40,7 +40,7 @@ on the real value-add for your organization.
 
 ### Configuration & Filtering
 - **YAML-based configuration** with JSON schema validation
-- **Flexible filtering** - Include/exclude by paths, tags, operation IDs, schema properties, or extensions
+- **Flexible filtering** - Include/exclude by paths, tags, operation IDs, webhooks, schema properties, or extensions
 - **Transitive pruning** - Automatically remove schemas that are only referenced by filtered-out properties
 - **[OpenAPI Overlays](https://doordash-oss.github.io/oapi-codegen-dd/overlays/)** - Modify specs without editing originals (add extensions, remove paths)
 - **External file `$ref` resolution** - Split specs across multiple files with relative `$ref` references (auto-detected from spec path, or set `base-path` in config)
@@ -85,7 +85,8 @@ Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/mockzilla
 | **Name Conflicts** | Manual fix required | Automatic resolution |
 | **Validation** | None | `Validate()` methods |
 | **Server Scaffold** | Interface only, manual boilerplate | Full typed solution (service, middleware, main.go) |
-| **Filtering** | Tags, operation IDs | + Paths, extensions, schema properties |
+| **Webhooks** | Not supported | Full type generation with filtering |
+| **Filtering** | Tags, operation IDs | + Paths, webhooks, extensions, schema properties |
 | **Overlays** | Single | Multiple, applied in order |
 | **Output** | Single file | Single or multiple files |
 | **Templates** | Monolithic | Composable with `{{define}}` blocks |

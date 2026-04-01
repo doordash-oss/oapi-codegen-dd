@@ -139,11 +139,11 @@
       "properties": {
         "include": {
           "$ref": "#/definitions/FilterParamsConfig",
-          "description": "Paths, tags, operation IDs, and schema properties to include."
+          "description": "Paths, tags, operation IDs, webhooks, and schema properties to include."
         },
         "exclude": {
           "$ref": "#/definitions/FilterParamsConfig",
-          "description": "Paths, tags, operation IDs, and schema properties to exclude."
+          "description": "Paths, tags, operation IDs, webhooks, and schema properties to exclude."
         }
       },
       "required": []
@@ -172,6 +172,13 @@
             "type": "string"
           },
           "description": "List of operation IDs to include or exclude."
+        },
+        "webhooks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of webhook names to include or exclude."
         },
         "schema-properties": {
           "type": "object",
