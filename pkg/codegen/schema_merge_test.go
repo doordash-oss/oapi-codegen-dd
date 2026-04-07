@@ -118,6 +118,87 @@ func TestMergeOpenapiSchemas(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, code)
 	})
+
+	t.Run("allOf with sibling properties preserves all fields", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/allof-with-sibling-properties.yml")
+		require.NoError(t, err)
+
+		opts := Configuration{
+			PackageName: "testpkg",
+			Output: &Output{
+				UseSingleFile: true,
+			},
+		}
+
+		code, err := Generate(contents, opts)
+		require.NoError(t, err)
+		combined := code.GetCombined()
+
+		// --- Case 1: allOf with sibling properties ---
+		// ChatPrompt should be a struct with both its own 'prompt' field AND BasePrompt fields
+		assert.Contains(t, combined, "type ChatPrompt struct")
+		assert.NotContains(t, combined, "type ChatPrompt = BasePrompt",
+			"ChatPrompt should be a struct, not a type alias")
+
+		// TextPrompt should also be a struct with both its own 'prompt' field AND BasePrompt fields
+		assert.Contains(t, combined, "type TextPrompt struct")
+		assert.NotContains(t, combined, "type TextPrompt = BasePrompt",
+			"TextPrompt should be a struct, not a type alias")
+
+		// The oneOf inline structs should also include the sibling properties from
+		// ChatPrompt/TextPrompt (the 'prompt' field) alongside the BasePrompt fields.
+		// This verifies that transitive allOf merging preserves sibling properties.
+		assert.Contains(t, combined, "type Prompt_OneOf_0 struct",
+			"Prompt_OneOf_0 should be generated")
+		assert.Contains(t, combined, "type Prompt_OneOf_1 struct",
+			"Prompt_OneOf_1 should be generated")
+
+		// Prompt_OneOf_0 (chat variant) should have Prompt as []string
+		assert.Contains(t, combined, `Prompt  []string`,
+			"Prompt_OneOf_0 should have Prompt []string from ChatPrompt")
+		// Prompt_OneOf_1 (text variant) should have Prompt as string
+		assert.Contains(t, combined, `Prompt  string`,
+			"Prompt_OneOf_1 should have Prompt string from TextPrompt")
+
+		// --- Case 2: oneOf with sibling properties ---
+		// Event has its own 'timestamp' property alongside a oneOf.
+		// The timestamp must not be silently dropped.
+		assert.Contains(t, combined, "type Event struct",
+			"Event should be a struct")
+		assert.Contains(t, combined, `Timestamp`,
+			"Event should have its own Timestamp field")
+
+		// --- Case 3: allOf with format annotation on parent ---
+		// Customer has format: "customer_v1" alongside allOf + properties.
+		// The format must not cause a merge conflict during transitive flattening.
+		assert.Contains(t, combined, "type Customer struct",
+			"Customer should be a struct")
+		assert.Contains(t, combined, `Name`,
+			"Customer should have its own Name field")
+		assert.Contains(t, combined, `Email`,
+			"Customer should have Email from CustomerBase via allOf")
+
+		// --- Case 4: allOf only, no sibling properties (regression guard) ---
+		// SimpleAlias has allOf with a single $ref and no own properties.
+		// It should still collapse to an alias, not be broken by the fix.
+		assert.Contains(t, combined, "type SimpleAlias = BasePrompt",
+			"SimpleAlias should remain a type alias when there are no sibling properties")
+		assert.NotContains(t, combined, "type SimpleAlias struct",
+			"SimpleAlias should not become a struct")
+
+		// --- Case 5: properties only, no allOf (regression guard) ---
+		assert.Contains(t, combined, "type PlainObject struct",
+			"PlainObject should be a normal struct")
+		assert.Contains(t, combined, `ID`,
+			"PlainObject should have its ID field")
+
+		// --- Case 6: anyOf with sibling properties ---
+		// AppConfig has its own 'appName' alongside an anyOf.
+		assert.Contains(t, combined, "type AppConfig struct",
+			"AppConfig should be a struct")
+		assert.Contains(t, combined, `AppName`,
+			"AppConfig should have its own AppName field")
+	})
 }
 
 func TestSingleElementUnionOptimization(t *testing.T) {

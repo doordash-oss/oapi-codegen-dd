@@ -67,8 +67,13 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 	)
 
 	if hasAllOf {
+		// When the schema has its own properties alongside allOf, the allOf must
+		// be fully resolved (not collapsed to a type alias) so its properties can
+		// be merged with the sibling properties in enhanceSchema.
+		hasSiblingProperties := schema.Properties != nil && schema.Properties.Len() > 0
+
 		var err error
-		allOfSchema, err = mergeAllOfSchemas(schema.AllOf, options)
+		allOfSchema, err = mergeAllOfSchemas(schema.AllOf, options, hasSiblingProperties)
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error merging allOf: %w", err)
 		}
@@ -195,9 +200,11 @@ func isMetadataOnlySchema(schema *base.Schema) bool {
 	return true
 }
 
-// mergeAllOfSchemas merges all the fields in the schemas supplied into one giant schema.
-// The idea is that we merge all fields into one schema.
-func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchema, error) {
+// mergeAllOfSchemas merges all allOf elements into a single GoSchema.
+// When hasSiblingProperties is true, the parent schema has its own properties
+// alongside allOf, so the single-ref alias optimization is skipped to ensure
+// the ref's properties are resolved and can be merged with the siblings.
+func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions, hasSiblingProperties bool) (GoSchema, error) {
 	if len(allOf) == 0 {
 		return GoSchema{}, nil
 	}
@@ -290,8 +297,9 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 		}
 
 		// If we have exactly one $ref and the rest are metadata-only schemas,
-		// use the reference directly
-		if refCount == 1 && refCount+metadataOnlyCount == len(filteredAllOf) {
+		// use the reference directly. Skip this optimization when the parent
+		// schema has sibling properties that need the ref's fields resolved.
+		if !hasSiblingProperties && refSchema != nil && refCount == 1 && refCount+metadataOnlyCount == len(filteredAllOf) {
 			return GenerateGoSchema(refSchema, options.WithReference(refSchema.GetReference()))
 		}
 
@@ -446,6 +454,46 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions) (GoSchem
 	return out, nil
 }
 
+// flattenAllOf transitively resolves a schema's allOf while preserving the
+// schema's own structural fields (properties, required, extensions, nullable,
+// additionalProperties). Returns s unchanged when it has no allOf.
+func flattenAllOf(s *base.Schema) *base.Schema {
+	if s == nil || s.AllOf == nil {
+		return s
+	}
+	merged, err := mergeAllOf(s.AllOf)
+	if err != nil {
+		// Fall back to original schema on merge errors
+		return s
+	}
+
+	// Build a schema with only the structural fields from s that should be
+	// preserved alongside allOf. Annotation fields like format, description,
+	// and title are intentionally excluded to avoid merge conflicts with the
+	// allOf elements.
+	ownFields := &base.Schema{
+		Type:                 s.Type,
+		Properties:           s.Properties,
+		Required:             s.Required,
+		Extensions:           s.Extensions,
+		Nullable:             s.Nullable,
+		AdditionalProperties: s.AdditionalProperties,
+		ReadOnly:             s.ReadOnly,
+		WriteOnly:            s.WriteOnly,
+		Enum:                 s.Enum,
+		Default:              s.Default,
+	}
+
+	result, err := mergeOpenapiSchemas(merged, ownFields)
+	if err != nil {
+		// If own fields conflict with the allOf result (e.g., incompatible
+		// types), fall back to the allOf-only merge to avoid breaking
+		// generation for otherwise valid specs.
+		return s
+	}
+	return result
+}
+
 func mergeAllOf(allOf []*base.SchemaProxy) (*base.Schema, error) {
 	var schema *base.Schema
 	for _, schemaRef := range allOf {
@@ -494,22 +542,13 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	result.OneOf = append(s1.OneOf, s2.OneOf...)
 
 	// We are going to make AllOf transitive, so that merging an AllOf that
-	// contains AllOf's will result in a flat object.
-	if s1.AllOf != nil {
-		merged, err := mergeAllOf(s1.AllOf)
-		if err != nil {
-			return nil, ErrTransitiveMergingAllOfSchema1
-		}
-		s1 = merged
-	}
-
-	if s2.AllOf != nil {
-		merged, err := mergeAllOf(s2.AllOf)
-		if err != nil {
-			return nil, ErrTransitiveMergingAllOfSchema2
-		}
-		s2 = merged
-	}
+	// contains AllOf's will result in a flat object. When a schema has sibling
+	// structural fields alongside allOf (properties, required, extensions,
+	// additionalProperties, nullable), merge them into the allOf result so
+	// they are not lost. Annotation-only fields (format, description, title)
+	// are not merged because they can conflict with the allOf elements.
+	s1 = flattenAllOf(s1)
+	s2 = flattenAllOf(s2)
 
 	result.AllOf = append(s1.AllOf, s2.AllOf...)
 	result.Type = t1
