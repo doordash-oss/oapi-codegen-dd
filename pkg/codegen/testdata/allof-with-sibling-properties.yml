@@ -1,0 +1,209 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: allOf with sibling properties
+  description: Tests that properties defined alongside allOf are not dropped
+paths:
+  /prompts:
+    get:
+      operationId: getPrompt
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prompt'
+  /events:
+    get:
+      operationId: getEvent
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+  /configs:
+    get:
+      operationId: getConfig
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppConfig'
+  /customers:
+    get:
+      operationId: getCustomer
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+  /aliases:
+    get:
+      operationId: getAlias
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleAlias'
+  /objects:
+    get:
+      operationId: getObject
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlainObject'
+components:
+  schemas:
+    # --- Case 1: allOf with sibling properties (original bug) ---
+    BasePrompt:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+      required:
+        - name
+        - version
+
+    ChatPrompt:
+      type: object
+      properties:
+        prompt:
+          type: array
+          items:
+            type: string
+      required:
+        - prompt
+      allOf:
+        - $ref: '#/components/schemas/BasePrompt'
+
+    TextPrompt:
+      type: object
+      properties:
+        prompt:
+          type: string
+      required:
+        - prompt
+      allOf:
+        - $ref: '#/components/schemas/BasePrompt'
+
+    Prompt:
+      oneOf:
+        - type: object
+          allOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - chat
+            - $ref: '#/components/schemas/ChatPrompt'
+          required:
+            - type
+        - type: object
+          allOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - text
+            - $ref: '#/components/schemas/TextPrompt'
+          required:
+            - type
+
+    # --- Case 2: oneOf with sibling properties ---
+    Event:
+      type: object
+      properties:
+        timestamp:
+          type: string
+      required:
+        - timestamp
+      oneOf:
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - click
+            x:
+              type: integer
+            y:
+              type: integer
+          required:
+            - kind
+        - type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - keypress
+            key:
+              type: string
+          required:
+            - kind
+
+    # --- Case 3: allOf with format annotation on parent (PayPal-style) ---
+    # The parent has format + allOf. The format must not cause a merge
+    # conflict during transitive allOf flattening.
+    CustomerBase:
+      type: object
+      properties:
+        email:
+          type: string
+
+    Customer:
+      type: object
+      format: "customer_v1"
+      properties:
+        name:
+          type: string
+      allOf:
+        - $ref: '#/components/schemas/CustomerBase'
+
+    # --- Case 4: allOf only, no sibling properties (regression guard) ---
+    # Should still collapse to alias or simple struct - not broken by the fix.
+    SimpleAlias:
+      allOf:
+        - $ref: '#/components/schemas/BasePrompt'
+
+    # --- Case 5: properties only, no allOf (regression guard) ---
+    PlainObject:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+
+    # --- Case 6: anyOf with sibling properties ---
+    AppConfig:
+      type: object
+      properties:
+        appName:
+          type: string
+      required:
+        - appName
+      anyOf:
+        - type: object
+          properties:
+            theme:
+              type: string
+        - type: object
+          properties:
+            locale:
+              type: string
