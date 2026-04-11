@@ -153,8 +153,9 @@ func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 
 	nullable := !required || hasNilType || deref(schema.Nullable)
 
-	if required && isBoolean {
-		// otherwise validation will always fail with `false` value.
+	if required && (isBoolean || isInt || isFloat) {
+		// otherwise validation will always fail with zero value.
+		// The validator library treats zero as "not set" for required numeric/boolean fields.
 		required = false
 		nullable = hasNilType
 	}

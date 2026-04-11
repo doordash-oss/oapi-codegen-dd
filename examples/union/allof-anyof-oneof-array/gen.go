@@ -39,7 +39,7 @@ func (c CreateUserBody) Validate() error {
 }
 
 type CreateUserBody_User struct {
-	ID    int      `json:"id" validate:"required,gte=1,lte=999999"`
+	ID    int      `json:"id" validate:"gte=1,lte=999999"`
 	Score *float32 `json:"score,omitempty" validate:"omitempty,gte=0,lte=100"`
 }
 
@@ -68,7 +68,7 @@ func (c CreateUserBody_Pages) Validate() error {
 }
 
 type CreateUserBody_Pages_Item struct {
-	Limit                      int                         `json:"limit" validate:"required,gte=1,lte=1000"`
+	Limit                      int                         `json:"limit" validate:"gte=1,lte=1000"`
 	Tag1                       *string                     `json:"tag1,omitempty" validate:"omitempty,max=50"`
 	Tag2                       *string                     `json:"tag2,omitempty" validate:"omitempty,max=100,min=1"`
 	CreateUserBody_Pages_AnyOf *CreateUserBody_Pages_AnyOf `json:"-"`
@@ -77,7 +77,7 @@ type CreateUserBody_Pages_Item struct {
 
 func (c CreateUserBody_Pages_Item) Validate() error {
 	var errors runtime.ValidationErrors
-	if err := typesValidator.Var(c.Limit, "required,gte=1,lte=1000"); err != nil {
+	if err := typesValidator.Var(c.Limit, "gte=1,lte=1000"); err != nil {
 		errors = errors.Append("Limit", err)
 	}
 	if c.Tag1 != nil {
@@ -177,7 +177,7 @@ func (c *CreateUserBody_Pages_Item) UnmarshalJSON(data []byte) error {
 }
 
 type CreateUserBody_Pages_AnyOf_0 struct {
-	Offset int `json:"offset" validate:"required,gte=0"`
+	Offset int `json:"offset" validate:"gte=0"`
 }
 
 func (c CreateUserBody_Pages_AnyOf_0) Validate() error {
@@ -193,8 +193,8 @@ func (c CreateUserBody_Pages_AnyOf_1) Validate() error {
 }
 
 type CreateUserBody_Pages_OneOf_0 struct {
-	First  int `json:"first" validate:"required,gte=1"`
-	Second int `json:"second" validate:"required,gte=1"`
+	First  int `json:"first" validate:"gte=1"`
+	Second int `json:"second" validate:"gte=1"`
 }
 
 func (c CreateUserBody_Pages_OneOf_0) Validate() error {
@@ -202,7 +202,7 @@ func (c CreateUserBody_Pages_OneOf_0) Validate() error {
 }
 
 type CreateUserBody_Pages_OneOf_1 struct {
-	Last int `json:"last" validate:"required,gte=1"`
+	Last int `json:"last" validate:"gte=1"`
 }
 
 func (c CreateUserBody_Pages_OneOf_1) Validate() error {

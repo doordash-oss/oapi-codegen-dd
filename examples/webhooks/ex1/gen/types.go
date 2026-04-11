@@ -13,7 +13,7 @@ type PaymentEvent struct {
 	ID uuid.UUID `json:"id" validate:"required"`
 
 	// Amount Amount in minor units (e.g. cents)
-	Amount   int            `json:"amount" validate:"required"`
+	Amount   int            `json:"amount"`
 	Currency string         `json:"currency" validate:"required,max=3,min=3"`
 	Metadata *EventMetadata `json:"metadata,omitempty"`
 }
@@ -24,9 +24,6 @@ func (p PaymentEvent) Validate() error {
 		if err := v.Validate(); err != nil {
 			errors = errors.Append("ID", err)
 		}
-	}
-	if err := typesValidator.Var(p.Amount, "required"); err != nil {
-		errors = errors.Append("Amount", err)
 	}
 	if err := typesValidator.Var(p.Currency, "required,max=3,min=3"); err != nil {
 		errors = errors.Append("Currency", err)

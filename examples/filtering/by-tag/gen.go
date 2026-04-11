@@ -118,11 +118,7 @@ type GetPurchasesResponse []Purchase
 type GetPurchaseResponse = Purchase
 
 type Purchase struct {
-	ID int `json:"id" validate:"required"`
-}
-
-func (p Purchase) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(p))
+	ID int `json:"id"`
 }
 
 var typesValidator *validator.Validate

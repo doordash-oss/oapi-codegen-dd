@@ -39,14 +39,60 @@ func TestNewConstraints(t *testing.T) {
 			required:   true,
 		})
 
+		// required is dropped for integer types because the validator library
+		// treats zero as "not set", which would reject valid zero values.
 		assert.Equal(t, Constraints{
-			Required: ptr(true),
-			Min:      &minValue,
-			Max:      &maxValue,
+			Min: &minValue,
+			Max: &maxValue,
 			ValidationTags: []string{
-				"required",
 				"gte=10",
 				"lt=99",
+			},
+		}, res)
+	})
+
+	t.Run("required integer with minimum=0 should not have required tag", func(t *testing.T) {
+		minValue := float64(0)
+		schema := &base.Schema{
+			Type:    []string{"integer"},
+			Format:  "int32",
+			Minimum: &minValue,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{
+			hasNilType: false,
+			required:   true,
+		})
+
+		// required is dropped for integer types because the validator library
+		// treats zero as "not set", which would reject valid zero values.
+		assert.Equal(t, Constraints{
+			Min: &minValue,
+			ValidationTags: []string{
+				"gte=0",
+			},
+		}, res)
+	})
+
+	t.Run("required number should not have required tag", func(t *testing.T) {
+		minValue := float64(0)
+		schema := &base.Schema{
+			Type:    []string{"number"},
+			Format:  "float",
+			Minimum: &minValue,
+		}
+
+		res := newConstraints(schema, ConstraintsContext{
+			hasNilType: false,
+			required:   true,
+		})
+
+		// required is dropped for number types because the validator library
+		// treats zero as "not set", which would reject valid zero values.
+		assert.Equal(t, Constraints{
+			Min: &minValue,
+			ValidationTags: []string{
+				"gte=0",
 			},
 		}, res)
 	})

@@ -97,8 +97,8 @@ func (t TestObject) Validate() error {
 }
 
 type TestObjectRequired struct {
-	Status   StatusCode `json:"status" validate:"required"`
-	Priority Priority   `json:"priority" validate:"required"`
+	Status   StatusCode `json:"status"`
+	Priority Priority   `json:"priority"`
 	Color    Color      `json:"color" validate:"required"`
 }
 
