@@ -76,14 +76,14 @@ func TestResponseValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "invalid - missing required MsnFloat",
+			name: "valid - MsnFloat zero value is allowed (numerics can't be required)",
 			resp: Response{
 				MsnReqWithConstraints:    "valid",
 				MsnReqWithoutConstraints: "anything",
 				MsnBool:                  true,
 				UserRequired:             User{},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "valid - MsnBool false is allowed (booleans can't be required)",
@@ -97,7 +97,7 @@ func TestResponseValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid - MsnFloat with zero value fails required check",
+			name: "valid - MsnFloat with zero value is allowed",
 			resp: Response{
 				MsnReqWithConstraints:    "valid",
 				MsnReqWithoutConstraints: "anything",
@@ -105,7 +105,7 @@ func TestResponseValidation(t *testing.T) {
 				MsnBool:                  true,
 				UserRequired:             User{},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "valid - UserRequired with empty struct",
@@ -203,7 +203,7 @@ func TestResponseValidation_MultipleErrors(t *testing.T) {
 		MsnReqWithConstraints:    "12",                                   // Too short (min=4)
 		MsnReqWithoutConstraints: "",                                     // Missing required
 		Msn3:                     runtime.Ptr(200),                       // Too large (max=100)
-		MsnFloat:                 0,                                      // Missing required (zero value)
+		MsnFloat:                 0,
 		UserRequired:             User{},
 	}
 
@@ -218,7 +218,7 @@ func TestResponseValidation_MultipleErrors(t *testing.T) {
 		t.Fatalf("Expected runtime.ValidationErrors, got %T", err)
 	}
 
-	// Should have multiple errors (at least 4: Msn1, MsnReqWithConstraints, MsnReqWithoutConstraints, Msn3, MsnFloat)
+	// Should have multiple errors (at least 4: Msn1, MsnReqWithConstraints, MsnReqWithoutConstraints, Msn3)
 	if len(validationErrors) < 4 {
 		t.Errorf("Expected at least 4 validation errors, got %d: %v", len(validationErrors), validationErrors)
 	}
