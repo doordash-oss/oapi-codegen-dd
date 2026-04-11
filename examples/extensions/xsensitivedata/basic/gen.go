@@ -12,7 +12,7 @@ import (
 type GetUsersResponse []User
 
 type User struct {
-	ID         int64   `json:"id" validate:"required"`
+	ID         int64   `json:"id"`
 	Username   string  `json:"username" validate:"required"`
 	Email      *string `json:"email,omitempty" sensitive:""`
 	Ssn        *string `json:"ssn,omitempty" sensitive:""`

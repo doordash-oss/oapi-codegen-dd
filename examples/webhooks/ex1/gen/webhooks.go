@@ -12,5 +12,5 @@ type OrderShippedResponse = WebhookAck
 
 type InventoryLowBody struct {
 	Sku       string `json:"sku" validate:"required"`
-	Remaining int    `json:"remaining" validate:"required"`
+	Remaining int    `json:"remaining"`
 }

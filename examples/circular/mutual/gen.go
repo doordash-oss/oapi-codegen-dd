@@ -150,7 +150,7 @@ type File struct {
 	Links    *File_Links  `json:"links,omitempty"`
 	Object   FileObject   `json:"object" validate:"required"`
 	Purpose  FilePurpose  `json:"purpose" validate:"required"`
-	Size     int          `json:"size" validate:"required"`
+	Size     int          `json:"size"`
 	Title    *string      `json:"title,omitempty" validate:"omitempty,max=5000"`
 }
 
@@ -187,9 +187,6 @@ func (f File) Validate() error {
 		if err := v.Validate(); err != nil {
 			errors = errors.Append("Purpose", err)
 		}
-	}
-	if err := typesValidator.Var(f.Size, "required"); err != nil {
-		errors = errors.Append("Size", err)
 	}
 	if f.Title != nil {
 		if err := typesValidator.Var(f.Title, "omitempty,max=5000"); err != nil {
@@ -286,7 +283,7 @@ func (f File_Links) Validate() error {
 }
 
 type FileLink struct {
-	Created  int               `json:"created" validate:"required"`
+	Created  int               `json:"created"`
 	File     FileLink_File     `json:"file"`
 	ID       string            `json:"id" validate:"required,max=5000"`
 	Livemode *bool             `json:"livemode,omitempty"`
@@ -297,9 +294,6 @@ type FileLink struct {
 
 func (f FileLink) Validate() error {
 	var errors runtime.ValidationErrors
-	if err := typesValidator.Var(f.Created, "required"); err != nil {
-		errors = errors.Append("Created", err)
-	}
 	if v, ok := any(f.File).(runtime.Validator); ok {
 		if err := v.Validate(); err != nil {
 			errors = errors.Append("File", err)
