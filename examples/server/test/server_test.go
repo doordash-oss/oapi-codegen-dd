@@ -13,6 +13,7 @@ import (
 	"github.com/beego/beego/v2/server/web"
 	beegoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/beego/testcase"
 	chiapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/chi/testcase"
+	echov5api "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo-v5/testcase"
 	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo/testcase"
 	fasthttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fasthttp/testcase"
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
@@ -29,6 +30,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	iris "github.com/kataras/iris/v12"
 	"github.com/labstack/echo/v4"
+	echov5 "github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/valyala/fasthttp"
@@ -132,6 +134,11 @@ func testServers() []serverTestCase {
 		{"echo", httpHandler{func() http.Handler {
 			e := echo.New()
 			echoapi.NewRouter(e, echoapi.NewService())
+			return e
+		}()}},
+		{"echo-v5", httpHandler{func() http.Handler {
+			e := echov5.New()
+			echov5api.NewRouter(e, echov5api.NewService())
 			return e
 		}()}},
 		{"gin", httpHandler{func() http.Handler {

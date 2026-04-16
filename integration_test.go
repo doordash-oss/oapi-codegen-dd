@@ -88,6 +88,7 @@ var allFrameworks = []codegen.HandlerKind{
 	codegen.HandlerKindBeego,
 	codegen.HandlerKindChi,
 	codegen.HandlerKindEcho,
+	codegen.HandlerKindEchoV5,
 	codegen.HandlerKindFastHTTP,
 	codegen.HandlerKindFiber,
 	codegen.HandlerKindGin,
@@ -722,6 +723,11 @@ func routerInitTest(fw codegen.HandlerKind) string {
 	case codegen.HandlerKindEcho:
 		return `package integration
 import ("testing"; "github.com/labstack/echo/v4")
+func TestRouterInit(t *testing.T) { NewRouter(echo.New(), nil) }
+`
+	case codegen.HandlerKindEchoV5:
+		return `package integration
+import ("testing"; "github.com/labstack/echo/v5")
 func TestRouterInit(t *testing.T) { NewRouter(echo.New(), nil) }
 `
 	case codegen.HandlerKindFiber:
