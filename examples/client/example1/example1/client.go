@@ -56,7 +56,14 @@ func (c *Client) GetClient(ctx context.Context, options *GetClientRequestOptions
 			// Handle empty error response body gracefully - skip unmarshal if no content
 			if len(bodyBytes) > 0 {
 				if err = json.Unmarshal(bodyBytes, target); err != nil {
-					return nil, fmt.Errorf("error decoding response: %w", err)
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "GetClientErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
 				}
 			}
 			// Return error with (possibly empty) target
@@ -72,8 +79,14 @@ func (c *Client) GetClient(ctx context.Context, options *GetClientRequestOptions
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetClientResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -106,7 +119,14 @@ func (c *Client) UpdateClient(ctx context.Context, options *UpdateClientRequestO
 			// Handle empty error response body gracefully - skip unmarshal if no content
 			if len(bodyBytes) > 0 {
 				if err = json.Unmarshal(bodyBytes, target); err != nil {
-					return nil, fmt.Errorf("error decoding response: %w", err)
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "UpdateClientErrorResponseJSON",
+						Body:          bodyBytes,
+						Err:           err,
+					}
 				}
 			}
 			// Return error with (possibly empty) target

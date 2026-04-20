@@ -67,8 +67,14 @@ func (c *Client) GetUser(ctx context.Context, options *GetUserRequestOptions, re
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetUserResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -105,8 +111,14 @@ func (c *Client) GetPost(ctx context.Context, options *GetPostRequestOptions, re
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetPostResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -142,8 +154,14 @@ func (c *Client) ListComments(ctx context.Context, reqEditors ...runtime.Request
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "ListCommentsResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -181,8 +199,14 @@ func (c *Client) CreateEvent(ctx context.Context, options *CreateEventRequestOpt
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "CreateEventResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
