@@ -66,8 +66,14 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetUserSingleResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -105,8 +111,14 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetUserUnion1Response",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -144,8 +156,14 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetUserUnion2Response",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -183,8 +201,14 @@ func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.Reques
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetUserUnion3Response",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}

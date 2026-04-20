@@ -55,7 +55,14 @@ func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingReques
 			// Handle empty error response body gracefully - skip unmarshal if no content
 			if len(bodyBytes) > 0 {
 				if err = json.Unmarshal(bodyBytes, target); err != nil {
-					return nil, fmt.Errorf("error decoding response: %w", err)
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "CreateBookingErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
 				}
 			}
 			// Return error with (possibly empty) target
@@ -71,8 +78,14 @@ func (c *Client) CreateBooking(ctx context.Context, options *CreateBookingReques
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "CreateBookingResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
