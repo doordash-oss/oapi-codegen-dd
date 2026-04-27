@@ -780,3 +780,71 @@ components:
 		assert.False(t, result)
 	})
 }
+
+func TestIfThenElse(t *testing.T) {
+	contents, err := os.ReadFile("testdata/if-then-else.yml")
+	require.NoError(t, err)
+
+	opts := Configuration{
+		PackageName: "testpkg",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	code, err := Generate(contents, opts)
+	require.NoError(t, err)
+	combined := code.GetCombined()
+
+	t.Run("basic if/then/else generates union with named variants", func(t *testing.T) {
+		// BasicIfThenElse should have its own properties plus a union wrapper
+		assert.Contains(t, combined, "type BasicIfThenElse struct")
+		assert.Contains(t, combined, "Kind")
+
+		// Union wrapper type with named variants (_Then/_Else, not _0/_1)
+		assert.Contains(t, combined, "BasicIfThenElse_IfThenElse")
+		assert.Contains(t, combined, "type BasicIfThenElse_Then struct")
+		assert.Contains(t, combined, "type BasicIfThenElse_Else struct")
+		assert.Contains(t, combined, "Conditional[BasicIfThenElse_Then, BasicIfThenElse_Else]")
+
+		// Properties from then branch
+		assert.Contains(t, combined, "FieldA")
+		assert.Contains(t, combined, "ValueA")
+
+		// Properties from else branch
+		assert.Contains(t, combined, "FieldB")
+		assert.Contains(t, combined, "ValueB")
+	})
+
+	t.Run("then only flat merges", func(t *testing.T) {
+		// ThenOnly should have properties from both the base schema and the then branch
+		assert.Contains(t, combined, "type ThenOnly struct")
+		assert.Contains(t, combined, "Enabled")
+
+		// With a single branch, the then properties should be merged into the parent,
+		// so we should see Config and Timeout as fields
+		assert.Contains(t, combined, "Config")
+		assert.Contains(t, combined, "Timeout")
+	})
+
+	t.Run("if/then/else inside allOf", func(t *testing.T) {
+		// InsideAllOf should inherit from BaseResource and handle the conditional
+		assert.Contains(t, combined, "InsideAllOf")
+		assert.Contains(t, combined, "Category")
+	})
+
+	t.Run("nested if/then/else", func(t *testing.T) {
+		// Nested should handle the outer if/then/else
+		assert.Contains(t, combined, "Nested")
+		assert.Contains(t, combined, "Level")
+	})
+
+	t.Run("validation only if/then does not break generation", func(t *testing.T) {
+		// ValidationOnly should generate without errors even when then only adds required.
+		// Since the then branch only adds "required" with no new properties or type,
+		// it resolves as an empty/zero schema and is effectively a no-op for code
+		// generation. The parent properties (mode, requiredInStrict) are still present
+		// but the then branch contributes no structural types.
+		assert.Contains(t, combined, "ValidationOnly")
+	})
+}

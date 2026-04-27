@@ -1,0 +1,147 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: If-Then-Else Test
+paths:
+  /resources:
+    get:
+      operationId: listResources
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  basic:
+                    $ref: '#/components/schemas/BasicIfThenElse'
+                  thenOnly:
+                    $ref: '#/components/schemas/ThenOnly'
+                  insideAllOf:
+                    $ref: '#/components/schemas/InsideAllOf'
+                  nested:
+                    $ref: '#/components/schemas/Nested'
+                  validationOnly:
+                    $ref: '#/components/schemas/ValidationOnly'
+components:
+  schemas:
+    # Case 1: Basic if/then/else with both branches having different properties
+    BasicIfThenElse:
+      type: object
+      properties:
+        kind:
+          type: string
+      if:
+        properties:
+          kind:
+            const: "typeA"
+      then:
+        type: object
+        properties:
+          fieldA:
+            type: string
+          valueA:
+            type: integer
+      else:
+        type: object
+        properties:
+          fieldB:
+            type: boolean
+          valueB:
+            type: number
+
+    # Case 2: if/then only (no else) - should flat merge into parent
+    ThenOnly:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      if:
+        properties:
+          enabled:
+            const: true
+      then:
+        type: object
+        properties:
+          config:
+            type: string
+          timeout:
+            type: integer
+
+    # Case 3: if/then/else inside allOf
+    BaseResource:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    InsideAllOf:
+      allOf:
+        - $ref: '#/components/schemas/BaseResource'
+        - type: object
+          properties:
+            category:
+              type: string
+          if:
+            properties:
+              category:
+                const: "special"
+          then:
+            type: object
+            properties:
+              specialField:
+                type: string
+          else:
+            type: object
+            properties:
+              normalField:
+                type: integer
+
+    # Case 4: Nested if/then/else
+    Nested:
+      type: object
+      properties:
+        level:
+          type: string
+      if:
+        properties:
+          level:
+            const: "outer"
+      then:
+        type: object
+        properties:
+          outerField:
+            type: string
+        if:
+          properties:
+            outerField:
+              const: "nested"
+        then:
+          type: object
+          properties:
+            nestedField:
+              type: integer
+      else:
+        type: object
+        properties:
+          fallbackField:
+            type: boolean
+
+    # Case 5: if/then/else that only adds required (validation only, no new properties)
+    ValidationOnly:
+      type: object
+      properties:
+        mode:
+          type: string
+        requiredInStrict:
+          type: string
+      if:
+        properties:
+          mode:
+            const: "strict"
+      then:
+        required:
+          - requiredInStrict
