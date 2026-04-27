@@ -52,6 +52,10 @@ type GoSchema struct {
 	// True if this schema is a struct wrapper around a union (embedded Either or union field)
 	IsUnionWrapper bool
 
+	// True if this union was generated from an if/then/else schema.
+	// Uses runtime.Conditional instead of runtime.Either.
+	IsConditional bool
+
 	DefineViaAlias   bool
 	IsPrimitiveAlias bool
 	OpenAPISchema    *base.Schema
@@ -260,7 +264,9 @@ func (s GoSchema) createGoStruct(fields []string) string {
 		)
 	}
 
-	if len(s.UnionElements) == 2 {
+	if len(s.UnionElements) == 2 && s.IsConditional {
+		objectParts = append(objectParts, fmt.Sprintf("runtime.Conditional[%s, %s]", s.UnionElements[0], s.UnionElements[1]))
+	} else if len(s.UnionElements) == 2 {
 		objectParts = append(objectParts, fmt.Sprintf("runtime.Either[%s, %s]", s.UnionElements[0], s.UnionElements[1]))
 	} else if len(s.UnionElements) > 0 {
 		objectParts = append(objectParts, "union json.RawMessage")

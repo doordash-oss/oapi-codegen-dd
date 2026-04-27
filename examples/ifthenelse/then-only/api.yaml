@@ -1,0 +1,35 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: if/then only (no else)
+  description: Single branch flat merges into parent
+paths:
+  /configs:
+    get:
+      operationId: listConfigs
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+
+components:
+  schemas:
+    Config:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      if:
+        properties:
+          enabled:
+            const: true
+      then:
+        type: object
+        properties:
+          timeout:
+            type: integer
+          retries:
+            type: integer

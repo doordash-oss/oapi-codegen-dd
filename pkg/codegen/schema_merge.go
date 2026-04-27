@@ -30,8 +30,9 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 	hasAllOf := len(schema.AllOf) > 0
 	hasAnyOf := len(schema.AnyOf) > 0
 	hasOneOf := len(schema.OneOf) > 0
+	hasIfThenElse := schema.Then != nil || schema.Else != nil
 
-	if !hasAllOf && !hasAnyOf && !hasOneOf {
+	if !hasAllOf && !hasAnyOf && !hasOneOf && !hasIfThenElse {
 		return GoSchema{}, nil
 	}
 
@@ -162,6 +163,106 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 		})
 	}
 
+	if hasIfThenElse {
+		// The if schema is a validation concern and does not contribute
+		// structural properties. We process then/else as union variants
+		// with named path segments so the generated types are called
+		// _Then/_Else instead of opaque _0/_1.
+		type branchDef struct {
+			name  string
+			proxy *base.SchemaProxy
+		}
+		var branchList []branchDef
+		if schema.Then != nil {
+			branchList = append(branchList, branchDef{"then", schema.Then})
+		}
+		if schema.Else != nil {
+			branchList = append(branchList, branchDef{"else", schema.Else})
+		}
+
+		// Single branch (only then or only else): flat merge into parent
+		// via single-element generateUnion optimization.
+		if len(branchList) == 1 {
+			branch := branchList[0]
+			branchPath := append(path, branch.name)
+			branchSchema, err := generateUnion(
+				[]*base.SchemaProxy{branch.proxy}, nil, options.WithPath(branchPath),
+			)
+			if err != nil {
+				return GoSchema{}, fmt.Errorf("error resolving if/%s: %w", branch.name, err)
+			}
+			if !hasAllOf && !hasAnyOf && !hasOneOf {
+				return branchSchema, nil
+			}
+			out.Properties = append(out.Properties, branchSchema.Properties...)
+			additionalTypes = append(additionalTypes, branchSchema.AdditionalTypes...)
+		} else {
+			// Both branches: resolve each independently with its own named
+			// path, then assemble a union wrapper. This gives types like
+			// Resource_Then and Resource_Else instead of _0 and _1.
+			var ifThenElseSchema GoSchema
+			for _, branch := range branchList {
+				branchPath := append(path, branch.name)
+				ref := branch.proxy.GoLow().GetReference()
+				resolved, err := GenerateGoSchema(branch.proxy, options.WithReference(ref).WithPath(branchPath))
+				if err != nil {
+					return GoSchema{}, fmt.Errorf("error resolving if/%s: %w", branch.name, err)
+				}
+
+				typeName := resolved.GoType
+				// For non-primitive inline types, register a named type definition
+				if ref == "" && !isPrimitiveType(typeName) {
+					elementName := pathToTypeName(branchPath)
+					td := TypeDefinition{
+						Schema:         resolved,
+						Name:           elementName,
+						SpecLocation:   SpecLocationUnion,
+						JsonName:       "-",
+						NeedsMarshaler: needsMarshaler(resolved),
+					}
+					options.typeTracker.register(td, "")
+					ifThenElseSchema.AdditionalTypes = append(ifThenElseSchema.AdditionalTypes, td)
+					ifThenElseSchema.AdditionalTypes = append(ifThenElseSchema.AdditionalTypes, resolved.AdditionalTypes...)
+					typeName = elementName
+				} else if ref != "" && !isPrimitiveType(typeName) {
+					ifThenElseSchema.AdditionalTypes = append(ifThenElseSchema.AdditionalTypes, resolved.AdditionalTypes...)
+				}
+
+				if typeName != "struct{}" {
+					ifThenElseSchema.UnionElements = append(ifThenElseSchema.UnionElements, UnionElement{
+						TypeName: typeName,
+						Schema:   resolved,
+					})
+				}
+			}
+
+			ifThenElseSchema.IsConditional = true
+			ifThenElseFields := genFieldsFromProperties(ifThenElseSchema.Properties, options)
+			ifThenElseSchema.GoType = ifThenElseSchema.createGoStruct(ifThenElseFields)
+			ifThenElseSchema.IsUnionWrapper = len(ifThenElseSchema.UnionElements) > 0
+
+			ifThenElsePath := append(path, "ifThenElse")
+			ifThenElseName := pathToTypeName(ifThenElsePath)
+			td := TypeDefinition{
+				Name:             ifThenElseName,
+				Schema:           ifThenElseSchema,
+				SpecLocation:     SpecLocationUnion,
+				JsonName:         "-",
+				NeedsMarshaler:   needsMarshaler(ifThenElseSchema),
+				HasSensitiveData: hasSensitiveData(ifThenElseSchema),
+			}
+			additionalTypes = append(additionalTypes, td)
+			additionalTypes = append(additionalTypes, ifThenElseSchema.AdditionalTypes...)
+			options.typeTracker.register(td, "")
+
+			out.Properties = append(out.Properties, Property{
+				GoName:      ifThenElseName,
+				Schema:      GoSchema{RefType: ifThenElseName},
+				Constraints: Constraints{Nullable: ptr(true)},
+			})
+		}
+	}
+
 	fields := genFieldsFromProperties(out.Properties, options)
 	out.GoType = out.createGoStruct(fields)
 	out.AdditionalTypes = append(out.AdditionalTypes, additionalTypes...)
@@ -193,6 +294,9 @@ func isMetadataOnlySchema(schema *base.Schema) bool {
 		return false
 	}
 	if schema.Not != nil {
+		return false
+	}
+	if schema.Then != nil || schema.Else != nil {
 		return false
 	}
 

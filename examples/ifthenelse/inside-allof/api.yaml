@@ -1,0 +1,48 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: if/then/else inside allOf
+  description: Conditional branches nested inside an allOf composition
+paths:
+  /resources:
+    get:
+      operationId: listResources
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecialResource'
+
+components:
+  schemas:
+    BaseResource:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    SpecialResource:
+      allOf:
+        - $ref: '#/components/schemas/BaseResource'
+        - type: object
+          properties:
+            category:
+              type: string
+          if:
+            properties:
+              category:
+                const: "premium"
+          then:
+            type: object
+            properties:
+              premiumFeature:
+                type: string
+          else:
+            type: object
+            properties:
+              standardLimit:
+                type: integer
