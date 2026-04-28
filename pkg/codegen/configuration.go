@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -170,6 +171,9 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			if other.Generate.AlwaysPrefixEnumValues {
 				o.Generate.AlwaysPrefixEnumValues = other.Generate.AlwaysPrefixEnumValues
 			}
+			if len(other.Generate.AdditionalTags) > 0 {
+				o.Generate.AdditionalTags = other.Generate.AdditionalTags
+			}
 			// Overwrite Validation options
 			if other.Generate.Validation.Skip {
 				o.Generate.Validation.Skip = other.Generate.Validation.Skip
@@ -312,8 +316,23 @@ type GenerateOptions struct {
 	// AlwaysPrefixEnumValues specifies whether to always prefix enum values with the schema name. Defaults to true.
 	AlwaysPrefixEnumValues bool `yaml:"always-prefix-enum-values"`
 
+	// AdditionalTags specifies additional struct tags to emit on generated fields,
+	// mirroring the json tag value. For example, ["yaml"] emits yaml:"field_name,omitempty"
+	// alongside the json tag. Per-property x-oapi-codegen-extra-tags take priority.
+	AdditionalTags []string `yaml:"additional-tags"`
+
 	// Validation specifies options for Validate() method generation.
 	Validation ValidationOptions `yaml:"validation"`
+}
+
+// Validate returns an error if any generate options are invalid.
+func (o GenerateOptions) Validate() error {
+	for _, tag := range o.AdditionalTags {
+		if tag == "" || strings.ContainsAny(tag, " \t\"'`:") {
+			return fmt.Errorf("%w: %q", ErrInvalidAdditionalTag, tag)
+		}
+	}
+	return nil
 }
 
 type ValidationOptions struct {

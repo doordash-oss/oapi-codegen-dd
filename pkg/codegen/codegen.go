@@ -94,10 +94,15 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		return nil, nil
 	}
 
+	if err := cfg.Generate.Validate(); err != nil {
+		return nil, err
+	}
+
 	parseOptions := ParseOptions{
 		OmitDescription:        cfg.Generate.OmitDescription,
 		DefaultIntType:         cfg.Generate.DefaultIntType,
 		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
+		AdditionalTags:         cfg.Generate.AdditionalTags,
 		SkipValidation:         cfg.Generate.Validation.Skip,
 		ErrorMapping:           cfg.ErrorMapping,
 		typeTracker:            newTypeTracker(),

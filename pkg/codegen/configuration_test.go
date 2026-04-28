@@ -353,3 +353,35 @@ func TestBasePathOverwriteWith(t *testing.T) {
 		assert.Equal(t, "/keep/this", result.BasePath)
 	})
 }
+
+func TestGenerateOptions_Validate(t *testing.T) {
+	t.Run("valid tags", func(t *testing.T) {
+		o := GenerateOptions{AdditionalTags: []string{"yaml", "toml", "mapstructure"}}
+		assert.NoError(t, o.Validate())
+	})
+
+	t.Run("empty tag name", func(t *testing.T) {
+		o := GenerateOptions{AdditionalTags: []string{""}}
+		assert.ErrorIs(t, o.Validate(), ErrInvalidAdditionalTag)
+	})
+
+	t.Run("tag with space", func(t *testing.T) {
+		o := GenerateOptions{AdditionalTags: []string{"my tag"}}
+		assert.ErrorIs(t, o.Validate(), ErrInvalidAdditionalTag)
+	})
+
+	t.Run("tag with colon", func(t *testing.T) {
+		o := GenerateOptions{AdditionalTags: []string{"bad:tag"}}
+		assert.ErrorIs(t, o.Validate(), ErrInvalidAdditionalTag)
+	})
+
+	t.Run("tag with quote", func(t *testing.T) {
+		o := GenerateOptions{AdditionalTags: []string{`bad"tag`}}
+		assert.ErrorIs(t, o.Validate(), ErrInvalidAdditionalTag)
+	})
+
+	t.Run("nil tags is valid", func(t *testing.T) {
+		o := GenerateOptions{}
+		assert.NoError(t, o.Validate())
+	})
+}
