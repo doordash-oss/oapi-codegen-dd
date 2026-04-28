@@ -308,6 +308,13 @@ func genFieldsFromProperties(props []Property, options ParseOptions) []string {
 			}
 		}
 
+		// Emit additional tags (mirrors json tag value, but doesn't overwrite extra-tags)
+		for _, tag := range options.AdditionalTags {
+			if _, exists := fieldTags[tag]; !exists {
+				fieldTags[tag] = fieldTags["json"]
+			}
+		}
+
 		// Support x-sensitive-data - add a simple marker tag
 		// The actual masking is handled via custom MarshalJSON generation
 		if _, ok := p.Extensions[extSensitiveData]; ok {

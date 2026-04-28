@@ -126,6 +126,13 @@
             "type": "boolean",
             "description": "AlwaysPrefixEnumValues specifies whether to always prefix enum values with the schema name. Defaults to true."
         },
+        "additional-tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional struct tags to emit on generated fields, mirroring the json tag value. For example, [\"yaml\"] emits yaml:\"field_name,omitempty\" alongside the json tag. Useful when structs are decoded by libraries that don't read json tags (e.g. go.yaml.in/yaml/v4). Per-property x-oapi-codegen-extra-tags take priority over these global tags."
+        },
         "validation": {
           "$ref": "#/definitions/ValidationOptions",
           "description": "Validation specifies options for Validate() method generation."

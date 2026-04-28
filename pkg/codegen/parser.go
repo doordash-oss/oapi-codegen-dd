@@ -67,6 +67,7 @@ type ParseOptions struct {
 	OmitDescription        bool
 	DefaultIntType         string
 	AlwaysPrefixEnumValues bool
+	AdditionalTags         []string
 	SkipValidation         bool
 
 	// ErrorMapping maps response type names to the field that should be used

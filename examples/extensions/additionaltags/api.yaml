@@ -1,0 +1,26 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: additional-tags
+components:
+  schemas:
+    Issue:
+      type: object
+      required:
+        - id
+        - closed_at
+      properties:
+        id:
+          type: integer
+        closed_at:
+          type: string
+          format: date-time
+        label_name:
+          type: string
+        extra_override:
+          type: string
+          x-oapi-codegen-extra-tags:
+            yaml: custom_override
+        ignored_field:
+          type: string
+          x-go-json-ignore: true
