@@ -162,6 +162,9 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			if other.Generate.Client {
 				o.Generate.Client = other.Generate.Client
 			}
+			if other.Generate.ClientWithResponse {
+				o.Generate.ClientWithResponse = other.Generate.ClientWithResponse
+			}
 			if other.Generate.OmitDescription {
 				o.Generate.OmitDescription = other.Generate.OmitDescription
 			}
@@ -291,8 +294,38 @@ func (o FilterParamsConfig) IsEmpty() bool {
 }
 
 type GenerateOptions struct {
-	// Client specifies whether to generate a client. Defaults to false.
+	// Client specifies whether to generate the classic client - one method
+	// per operation that returns the picked 2xx body type directly (e.g.
+	// `func (c *Client) UploadDocument(...) (*DocumentStored, error)`).
+	// Use this when callers only need the response body and the operation
+	// has a single documented success status. Headers and non-picked 2xx
+	// bodies are not exposed by this style; for that, use
+	// ClientWithResponse instead, or both together.
+	//
+	// Combinations with ClientWithResponse:
+	//   - client: true, client-with-response: false → classic only
+	//   - client: false, client-with-response: true → envelope only
+	//   - client: true, client-with-response: true  → both styles, combined
+	//                                                 into a single ClientInterface
+	//
+	// Defaults to false.
 	Client bool `yaml:"client"`
+
+	// ClientWithResponse specifies whether to generate `<Op>WithResponse`
+	// sibling functions that return a typed envelope: one `JSON<status>`
+	// field per documented response, one `Headers<status>` typed struct per
+	// status that declares headers, plus `HTTPResponse *http.Response` for
+	// raw access (undocumented headers, status string, etc.). Use this when
+	// an operation has multiple 2xx statuses with different bodies (e.g.
+	// 201 sync + 202 queued), or when callers need typed access to headers
+	// like Location or Retry-After.
+	//
+	// Additive to Client: when both flags are true, the generated
+	// ClientInterface lists both `<Op>` and `<Op>WithResponse` methods so a
+	// single mock or test double covers both shapes.
+	//
+	// Defaults to false.
+	ClientWithResponse bool `yaml:"client-with-response"`
 
 	// Models specifies whether to generate model types. Defaults to true.
 	// Set to false when models are generated in a separate package.

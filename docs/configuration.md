@@ -140,7 +140,9 @@ output:
 #### `generate.client`
 **Type:** `boolean` | **Default:** `false`
 
-Generate HTTP client code for calling the API.
+Generate the classic HTTP client: one method per operation that returns the picked 2xx body type directly (e.g. `func (c *Client) UploadDocument(...) (*DocumentStored, error)`).
+
+Use this when callers only need the response body and the operation has a single documented success status. Headers and non-picked 2xx bodies are not exposed by this style; for those, use [`generate.client-with-response`](#generateclient-with-response) instead, or both together.
 
 ```yaml
 generate:
@@ -148,6 +150,32 @@ generate:
 ```
 
 See [examples/client/example1/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/client/example1/cfg.yaml){:target="_blank"} for a complete example.
+
+#### `generate.client-with-response`
+**Type:** `boolean` | **Default:** `false`
+
+Generate `<Op>WithResponse` sibling functions that return a typed envelope: one `JSON<status>` (or `Text<status>` / `HTML<status>` / etc.) field per documented response, one `Headers<status>` typed struct per status that declares headers, plus `HTTPResponse *http.Response` for raw access (undocumented headers, raw body bytes, status string, etc.).
+
+Use this when an operation has multiple 2xx statuses with different bodies (e.g. 201 sync + 202 queued), or when callers need typed access to response headers like `Location` or `Retry-After`.
+
+Additive to [`generate.client`](#generateclient). When both flags are true, the generated `ClientInterface` lists every classic method alongside its `WithResponse` sibling so a single mock or test double covers both shapes.
+
+```yaml
+generate:
+  client: true
+  client-with-response: true
+```
+
+The four valid combinations:
+
+| `client` | `client-with-response` | Output |
+|----------|------------------------|--------|
+| `false` | `false` | No client (types/server only) |
+| `true`  | `false` | Classic client only |
+| `false` | `true`  | Envelope client only |
+| `true`  | `true`  | Both styles, combined into one `ClientInterface` |
+
+See [examples/responses/multiple/client-with-response/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-with-response/cfg.yaml){:target="_blank"} for envelope-only and [examples/responses/multiple/client-combined/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-combined/cfg.yaml){:target="_blank"} for the combined case.
 
 #### `generate.omit-description`
 **Type:** `boolean` | **Default:** `false`

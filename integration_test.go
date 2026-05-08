@@ -356,7 +356,8 @@ func TestIntegration(t *testing.T) {
 			cfg := codegen.Configuration{
 				PackageName: "integration",
 				Generate: &codegen.GenerateOptions{
-					Client: true,
+					Client:             true,
+					ClientWithResponse: true,
 					Validation: codegen.ValidationOptions{
 						Response: true,
 					},

@@ -427,7 +427,7 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 				// 1. RefType affects TypeDecl() which would change the type name used in struct fields
 				// 2. Component references already have their own type definitions with Validate() methods
 				// 3. The validation will be delegated via the type assertion in Property.needsCustomValidation()
-				// Include Constraints so that consumers (like connexions) can access min/max values
+				// Include Constraints so that consumers (like Mockzilla) can access min/max values
 				// for data generation even when using component references.
 				constraints := newConstraints(schema, ConstraintsContext{
 					hasNilType:   slices.Contains(schema.Type, "null"),

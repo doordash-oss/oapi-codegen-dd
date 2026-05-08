@@ -366,6 +366,124 @@ func TestOperationResponseAliasReusesSameType(t *testing.T) {
 	require.NoError(t, err, "Generated code should compile without syntax errors")
 }
 
+func TestAssignWithResponseTypeNames(t *testing.T) {
+	t.Run("empty operations slice is a no-op", func(t *testing.T) {
+		tracker := newTypeTracker()
+		var ops []OperationDefinition
+		assignWithResponseTypeNames(ops, tracker)
+		assert.Empty(t, ops)
+	})
+
+	t.Run("operation without response headers gets WithResponseTypeName but no HeaderTypeNames", func(t *testing.T) {
+		tracker := newTypeTracker()
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{
+					{StatusCode: 201, IsSuccess: true},
+				},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.Equal(t, "UploadDocumentResp", ops[0].WithResponseTypeName)
+		assert.Nil(t, ops[0].HeaderTypeNames)
+	})
+
+	t.Run("headers on success and error both get header type names", func(t *testing.T) {
+		tracker := newTypeTracker()
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{
+					{StatusCode: 201, IsSuccess: true, Headers: map[string]GoSchema{
+						"Location": {GoType: "string"},
+					}},
+					// no headers on this one
+					{StatusCode: 202, IsSuccess: true},
+				},
+				Errors: []*ResponseContentDefinition{
+					{StatusCode: 422, Headers: map[string]GoSchema{
+						"Retry-After": {GoType: "string"},
+					}},
+				},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		require.NotNil(t, ops[0].HeaderTypeNames)
+		assert.Equal(t, "UploadDocumentResp201Headers", ops[0].HeaderTypeNames[201])
+		_, has202 := ops[0].HeaderTypeNames[202]
+		assert.False(t, has202, "202 has no spec headers, so no Headers202 type should be reserved")
+		assert.Equal(t, "UploadDocumentResp422Headers", ops[0].HeaderTypeNames[422])
+	})
+
+	t.Run("colliding wrapper name is disambiguated against existing tracker entries", func(t *testing.T) {
+		tracker := newTypeTracker()
+		// Simulate a user-declared schema that collides with the natural wrapper
+		// name we'd otherwise generate.
+		tracker.registerName("UploadDocumentResp")
+
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{{StatusCode: 201, IsSuccess: true}},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.NotEqual(t, "UploadDocumentResp", ops[0].WithResponseTypeName,
+			"wrapper name must avoid the existing schema; got the colliding name back")
+		assert.NotEmpty(t, ops[0].WithResponseTypeName)
+	})
+
+	t.Run("colliding header name is disambiguated", func(t *testing.T) {
+		tracker := newTypeTracker()
+		tracker.registerName("UploadDocumentResp201Headers")
+
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{
+					{StatusCode: 201, IsSuccess: true, Headers: map[string]GoSchema{
+						"Location": {GoType: "string"},
+					}},
+				},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.NotEqual(t, "UploadDocumentResp201Headers", ops[0].HeaderTypeNames[201],
+			"header name must avoid the existing schema; got the colliding name back")
+		assert.NotEmpty(t, ops[0].HeaderTypeNames[201])
+	})
+
+	t.Run("two operations get independent names registered with the tracker", func(t *testing.T) {
+		tracker := newTypeTracker()
+		ops := []OperationDefinition{
+			{ID: "uploadDocument", Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{{StatusCode: 201, IsSuccess: true}},
+			}},
+			{ID: "deleteDocument", Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{{StatusCode: 204, IsSuccess: true}},
+			}},
+		}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.Equal(t, "UploadDocumentResp", ops[0].WithResponseTypeName)
+		assert.Equal(t, "DeleteDocumentResp", ops[1].WithResponseTypeName)
+		// Both names must be present in the tracker so subsequent unique-name
+		// resolution doesn't reuse them.
+		assert.True(t, tracker.Exists("UploadDocumentResp"))
+		assert.True(t, tracker.Exists("DeleteDocumentResp"))
+	})
+}
+
 func TestOverlayAppliesExtensions(t *testing.T) {
 	cfg := Configuration{
 		PackageName: "api",

@@ -13,6 +13,7 @@ package codegen
 import (
 	"fmt"
 	"iter"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,16 @@ type ResponseDefinition struct {
 	Success           *ResponseContentDefinition
 	Error             *ResponseContentDefinition
 	All               map[int]*ResponseContentDefinition
+
+	// Successes lists every 2xx response in ascending status order. Drives
+	// `client-with-response` envelope generation, which needs a deterministic
+	// per-status iteration.
+	Successes []*ResponseContentDefinition
+
+	// Errors lists every non-2xx response in ascending status order. Same
+	// motivation as Successes - the envelope populates `JSON4xx`/`JSON5xx`
+	// fields per documented status.
+	Errors []*ResponseContentDefinition
 }
 
 // ResponseContentDefinition describes Operation response.
@@ -74,11 +85,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 		all[successCode] = successDefinition
 
+		successes, errs := partitionResponses(all)
 		return &ResponseDefinition{
 			SuccessStatusCode: successCode,
 			Success:           successDefinition,
 			Error:             nil,
 			All:               all,
+			Successes:         successes,
+			Errors:            errs,
 		}, nil, nil
 	}
 
@@ -490,14 +504,40 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 	}
 
+	successes, errs := partitionResponses(all)
 	res := &ResponseDefinition{
 		SuccessStatusCode: successCode,
 		Success:           all[successCode],
 		Error:             all[fstErrorCode],
 		All:               all,
+		Successes:         successes,
+		Errors:            errs,
 	}
 
 	return res, typeDefinitions, nil
+}
+
+// partitionResponses splits an `all` map of every documented response into
+// (successes, errors) slices, each ascending by status code. Used to populate
+// ResponseDefinition.Successes / .Errors so templates can iterate
+// deterministically.
+func partitionResponses(all map[int]*ResponseContentDefinition) (successes, errors []*ResponseContentDefinition) {
+	statuses := make([]int, 0, len(all))
+	for s := range all {
+		statuses = append(statuses, s)
+	}
+
+	sort.Ints(statuses)
+
+	for _, s := range statuses {
+		r := all[s]
+		if r.IsSuccess {
+			successes = append(successes, r)
+		} else {
+			errors = append(errors, r)
+		}
+	}
+	return successes, errors
 }
 
 func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], operationID string, options ParseOptions) (map[string]GoSchema, error) {

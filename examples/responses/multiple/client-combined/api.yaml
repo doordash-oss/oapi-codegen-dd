@@ -1,0 +1,95 @@
+openapi: 3.0.3
+info:
+  title: Document Upload API
+  version: 1.0.0
+
+paths:
+  /documents:
+    post:
+      operationId: uploadDocument
+      summary: Upload a document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+      responses:
+        '201':
+          description: Document stored synchronously
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStored'
+        '202':
+          description: Document queued for async processing
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentQueued'
+        '422':
+          description: Invalid document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '503':
+          description: Service unavailable. Plain-text human-readable reason.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    UploadRequest:
+      type: object
+      required: [filename, content]
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+          format: byte
+    DocumentStored:
+      type: object
+      required: [id, url]
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+    DocumentQueued:
+      type: object
+      required: [job_id, estimated_completion_seconds]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        estimated_completion_seconds:
+          type: integer
+    ValidationError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

@@ -47,6 +47,9 @@ type {{$clientName}}Interface interface {
     {{- range $operations }}{{$op := .}}
         {{if not $config.Generate.OmitDescription}}{{ toGoComment $op.Summary $op.ID}}{{end}}
         {{$op.ID}}(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...runtime.RequestEditorFn) (*{{ $op.Response.Success.ResponseName }}, error)
+        {{- if $config.Generate.ClientWithResponse }}
+        {{$op.ID}}WithResponse(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{end}}, reqEditors ...runtime.RequestEditorFn) (*{{$op.WithResponseTypeName}}, error)
+        {{- end }}
     {{ end }}
 }
 
