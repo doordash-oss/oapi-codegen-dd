@@ -369,6 +369,36 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 	}, nil
 }
 
+// assignWithResponseTypeNames pre-computes the envelope wrapper name and the
+// per-status header struct names for each operation, registering them on the
+// TypeTracker so collisions with user-declared schemas are resolved before the
+// templates run. Mutates the operations slice in place.
+func assignWithResponseTypeNames(operations []OperationDefinition, tracker *TypeTracker) {
+	for i := range operations {
+		op := &operations[i]
+		baseName := UppercaseFirstCharacter(op.ID) + "Resp"
+		op.WithResponseTypeName = tracker.generateUniqueName(baseName)
+		tracker.registerName(op.WithResponseTypeName)
+
+		statusesWithHeaders := func(rcds []*ResponseContentDefinition) {
+			for _, rcd := range rcds {
+				if len(rcd.Headers) == 0 {
+					continue
+				}
+				if op.HeaderTypeNames == nil {
+					op.HeaderTypeNames = make(map[int]string)
+				}
+				header := op.WithResponseTypeName + fmt.Sprintf("%dHeaders", rcd.StatusCode)
+				header = tracker.generateUniqueName(header)
+				tracker.registerName(header)
+				op.HeaderTypeNames[rcd.StatusCode] = header
+			}
+		}
+		statusesWithHeaders(op.Response.Successes)
+		statusesWithHeaders(op.Response.Errors)
+	}
+}
+
 // resolveRequestOptionsCollisions checks if any operation's RequestOptions type name
 // would collide with existing component schemas, and renames the operation ID if needed.
 // It also checks for ServiceRequestOptions collisions (used by handler generation).

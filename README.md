@@ -23,6 +23,7 @@ on the real value-add for your organization.
 
 ### Client Generation
 - **HTTP client generation** - Generate type-safe HTTP clients with customizable timeout and request editors
+- **Envelope `WithResponse` clients** - Opt-in `<Op>WithResponse` siblings that return a typed envelope with per-status bodies, typed headers, and the raw `*http.Response` - useful for operations that legitimately return multiple 2xx statuses or need typed access to response headers
 - **Custom client types** - Wrap generated clients with your own types for additional functionality
 - **Error mapping** - Map response types to implement the `error` interface automatically
 

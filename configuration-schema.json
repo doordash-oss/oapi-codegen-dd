@@ -100,7 +100,11 @@
       "properties": {
         "client": {
           "type": "boolean",
-          "description": "Client specifies whether to generate a client. Defaults to false."
+          "description": "Generate the classic client: one method per operation returning the picked 2xx body directly (e.g. UploadDocument(...) (*DocumentStored, error)). Use this when callers only need the response body and the operation has a single documented success status; headers and non-picked 2xx bodies are not exposed. Combine with client-with-response when an operation has multiple 2xx statuses or callers need typed headers - both flags can be true and the generated ClientInterface will list both styles. Defaults to false."
+        },
+        "client-with-response": {
+          "type": "boolean",
+          "description": "Generate <Op>WithResponse sibling functions that return a typed envelope: one JSON<status> field per documented response, one Headers<status> typed struct per status that declares headers, plus HTTPResponse *http.Response for raw access. Use when an operation has multiple 2xx statuses with different bodies (e.g. 201 sync + 202 queued) or when callers need typed access to headers like Location or Retry-After. Additive to client: when both are true the combined ClientInterface lists both styles. Defaults to false."
         },
         "models": {
           "type": "boolean",

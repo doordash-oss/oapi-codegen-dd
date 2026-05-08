@@ -45,6 +45,17 @@ type OperationDefinition struct {
 
 	// MCP contains x-mcp extension configuration for MCP tool generation
 	MCP *MCPExtension
+
+	// WithResponseTypeName is the name of the envelope wrapper struct emitted
+	// when generate.client-with-response is true (e.g. "UploadDocumentResp").
+	// Empty when the feature is disabled.
+	WithResponseTypeName string
+
+	// HeaderTypeNames maps each documented status code to the name of the
+	// per-status typed header struct emitted alongside the envelope (e.g.
+	// 201 -> "UploadDocumentResp201Headers"). Only populated for statuses
+	// that declare at least one header in the spec.
+	HeaderTypeNames map[int]string
 }
 
 // RequiresParamObject indicates If we have parameters other than path parameters, they're bundled into an
