@@ -232,7 +232,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 				pathParamsDef *TypeDefinition
 			)
 
-			operationID, err := createOperationID(method, path, operation.OperationId)
+			operationID, err := CreateOperationID(method, path, operation.OperationId)
 			if err != nil {
 				return nil, fmt.Errorf("error creating operation ID: %w", err)
 			}
@@ -586,7 +586,7 @@ func collectWebhookDefinitions(model *v3high.Document, options ParseOptions) ([]
 
 	for webhookName, pathItem := range model.Webhooks.FromOldest() {
 		for method, operation := range pathItem.GetOperations().FromOldest() {
-			operationID, err := createOperationID(method, "/webhooks/"+webhookName, operation.OperationId)
+			operationID, err := CreateOperationID(method, "/webhooks/"+webhookName, operation.OperationId)
 			if err != nil {
 				return nil, nil, fmt.Errorf("error creating webhook operation ID: %w", err)
 			}
