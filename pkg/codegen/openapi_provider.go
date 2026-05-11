@@ -39,15 +39,12 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 		return nil, fmt.Errorf("error building model: %w", err)
 	}
 
-	var filtered bool
-	model, filtered, err := filterOutDocument(doc, cfg.Filter)
+	model, _, err := filterOutDocument(doc, cfg.Filter)
 	if err != nil {
 		return nil, fmt.Errorf("error filtering document: %w", err)
 	}
 
-	// If we filtered anything, we must prune to remove dangling references
-	// Otherwise, only prune if SkipPrune is false
-	if filtered || !cfg.SkipPrune {
+	if !cfg.SkipPrune {
 		if err = pruneSchema(model); err != nil {
 			return nil, fmt.Errorf("error pruning schema: %w", err)
 		}
