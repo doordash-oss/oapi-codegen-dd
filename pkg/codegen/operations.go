@@ -101,10 +101,10 @@ func filterParameterDefinitionByType(params []ParameterDefinition, in string) []
 	return out
 }
 
-// createOperationID generates a unique operation ID based on the HTTP method and path.
+// CreateOperationID generates a unique operation ID based on the HTTP method and path.
 // If the initial value is provided, it will be used.
 // The resulting operation ID is a camel-cased string.
-func createOperationID(method, path, initial string) (string, error) {
+func CreateOperationID(method, path, initial string) (string, error) {
 	if initial != "" {
 		return typeNamePrefix(initial) + nameNormalizer(initial), nil
 	}
