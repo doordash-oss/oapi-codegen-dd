@@ -63,7 +63,7 @@ func filterOperations(model *v3high.Document, cfg FilterConfig) bool {
 			continue
 		}
 
-		removed = filterPathItemOperations(pathItem, cfg, removed)
+		removed = filterPathItemOperations(path, pathItem, cfg, removed)
 	}
 
 	// Filter webhooks
@@ -86,7 +86,10 @@ func filterOperations(model *v3high.Document, cfg FilterConfig) bool {
 				continue
 			}
 
-			removed = filterPathItemOperations(pathItem, cfg, removed)
+			// Mirror codegen.go's webhook operation ID synthesis so the
+			// filter sees the same canonical IDs the rest of the pipeline
+			// emits for webhook operations.
+			removed = filterPathItemOperations("/webhooks/"+name, pathItem, cfg, removed)
 		}
 	}
 
@@ -94,8 +97,9 @@ func filterOperations(model *v3high.Document, cfg FilterConfig) bool {
 }
 
 // filterPathItemOperations filters operations within a PathItem by tags and operation IDs.
-// Returns the updated removed flag.
-func filterPathItemOperations(pathItem *v3high.PathItem, cfg FilterConfig, removed bool) bool {
+// The path is needed to canonicalize operation IDs via CreateOperationID so
+// filters work for specs that omit `operationId`. Returns the updated removed flag.
+func filterPathItemOperations(path string, pathItem *v3high.PathItem, cfg FilterConfig, removed bool) bool {
 	for method, op := range pathItem.GetOperations().FromOldest() {
 		remove := false
 
@@ -121,12 +125,23 @@ func filterPathItemOperations(pathItem *v3high.PathItem, cfg FilterConfig, remov
 			}
 		}
 
-		// OperationIDs
-		if len(cfg.Exclude.OperationIDs) > 0 && slices.Contains(cfg.Exclude.OperationIDs, op.OperationId) {
-			remove = true
-		}
-		if len(cfg.Include.OperationIDs) > 0 && !slices.Contains(cfg.Include.OperationIDs, op.OperationId) {
-			remove = true
+		// OperationIDs: compare against the literal operationId when the
+		// spec declares one (preserves existing behavior). For specs that
+		// omit `operationId`, fall back to the synthesized ID so the
+		// filter matches what downstream code uses (see codegen.go's
+		// CreateOperationID calls). Without this fallback, filters
+		// against operationId-less specs would silently match nothing.
+		if len(cfg.Exclude.OperationIDs) > 0 || len(cfg.Include.OperationIDs) > 0 {
+			opID := op.OperationId
+			if opID == "" {
+				opID, _ = CreateOperationID(method, path, "")
+			}
+			if len(cfg.Exclude.OperationIDs) > 0 && slices.Contains(cfg.Exclude.OperationIDs, opID) {
+				remove = true
+			}
+			if len(cfg.Include.OperationIDs) > 0 && !slices.Contains(cfg.Include.OperationIDs, opID) {
+				remove = true
+			}
 		}
 
 		if remove {
