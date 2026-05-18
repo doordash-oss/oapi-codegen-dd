@@ -713,7 +713,16 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	// Required. We merge these.
 	result.Required = append(s1.Required, s2.Required...)
 
-	// We merge all properties
+	// We merge all properties. When both schemas declare a property with
+	// the same name, the typed declaration wins over an untyped one
+	// (which usually only carries annotations like example or
+	// description). Without this, the later schema silently overwrote
+	// the earlier one and any type/enum/constraint it carried was lost.
+	//
+	// We deliberately pick one of the original SchemaProxies rather
+	// than fabricating a merged proxy via CreateSchemaProxy: downstream
+	// code reads GoLow().GetReference() to attribute properties back to
+	// the spec, and a synthetic proxy has no low-level backing.
 	for k, v := range s1.Properties.FromOldest() {
 		if result.Properties == nil {
 			result.Properties = orderedmap.New[string, *base.SchemaProxy]()
@@ -721,9 +730,18 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 		result.Properties.Set(k, v)
 	}
 	for k, v := range s2.Properties.FromOldest() {
-		// TODO: detect conflicts
 		if result.Properties == nil {
 			result.Properties = orderedmap.New[string, *base.SchemaProxy]()
+		}
+
+		if existing, exists := result.Properties.Get(k); exists {
+			if len(getSchemaType(existing.Schema())) == 0 && len(getSchemaType(v.Schema())) > 0 {
+				result.Properties.Set(k, v)
+			}
+			// Otherwise the existing (s1's) property keeps its place;
+			// either it already has a type and we don't want to drop it,
+			// or neither side has a type and the choice is moot.
+			continue
 		}
 		result.Properties.Set(k, v)
 	}

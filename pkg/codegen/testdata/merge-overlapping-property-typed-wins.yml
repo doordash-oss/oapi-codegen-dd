@@ -1,0 +1,34 @@
+openapi: 3.0.0
+info:
+  title: Overlapping property in allOf preserves the typed declaration
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceCancellation'
+components:
+  schemas:
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum:
+            - open
+            - paid
+            - cancelled
+    InvoiceCancellation:
+      allOf:
+        - $ref: '#/components/schemas/Invoice'
+        - type: object
+          properties:
+            status:
+              example: cancelled
