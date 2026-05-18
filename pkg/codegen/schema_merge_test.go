@@ -119,6 +119,35 @@ func TestMergeOpenapiSchemas(t *testing.T) {
 		assert.NotEmpty(t, code)
 	})
 
+	t.Run("overlapping property keeps typed declaration", func(t *testing.T) {
+		// When two allOf branches declare the same property and only
+		// one of them gives it a type (the other only attaches an
+		// annotation such as `example`), the typed declaration must
+		// survive the merge. Previously the second branch silently
+		// overwrote the first, turning a `status: string` into an
+		// empty struct.
+		contents, err := os.ReadFile("testdata/merge-overlapping-property-typed-wins.yml")
+		require.NoError(t, err)
+
+		opts := Configuration{
+			PackageName: "testpkg",
+			Output: &Output{
+				UseSingleFile: true,
+			},
+		}
+
+		code, err := Generate(contents, opts)
+		require.NoError(t, err)
+		combined := code.GetCombined()
+
+		assert.Contains(t, combined, "type InvoiceCancellation struct",
+			"InvoiceCancellation should be a struct")
+		assert.Regexp(t, `(?m)Status\s+\*?string`, combined,
+			"Status should keep the string type from the referenced Invoice schema, not collapse to an empty struct from the annotation-only override")
+		assert.NotRegexp(t, `(?m)Status\s+\*?struct\{\}`, combined,
+			"Status must not be generated as struct{}; that would mean the annotation-only override dropped the typed declaration")
+	})
+
 	t.Run("allOf with sibling properties preserves all fields", func(t *testing.T) {
 		contents, err := os.ReadFile("testdata/allof-with-sibling-properties.yml")
 		require.NoError(t, err)

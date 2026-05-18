@@ -713,7 +713,18 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	// Required. We merge these.
 	result.Required = append(s1.Required, s2.Required...)
 
-	// We merge all properties
+	// We merge all properties. When both schemas declare a property
+	// with the same name, an annotation-only override (carrying only
+	// fields like `example` or `description`) must not overwrite a
+	// sibling that actually shapes the Go type. Otherwise we keep the
+	// previous "s2 wins" behavior, since both sides genuinely shape
+	// the type and the second declaration is the more specific one in
+	// an allOf chain.
+	//
+	// We deliberately pick one of the original SchemaProxies rather
+	// than fabricating a merged proxy via CreateSchemaProxy: downstream
+	// code reads GoLow().GetReference() to attribute properties back to
+	// the spec, and a synthetic proxy has no low-level backing.
 	for k, v := range s1.Properties.FromOldest() {
 		if result.Properties == nil {
 			result.Properties = orderedmap.New[string, *base.SchemaProxy]()
@@ -721,9 +732,14 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 		result.Properties.Set(k, v)
 	}
 	for k, v := range s2.Properties.FromOldest() {
-		// TODO: detect conflicts
 		if result.Properties == nil {
 			result.Properties = orderedmap.New[string, *base.SchemaProxy]()
+		}
+
+		if existing, exists := result.Properties.Get(k); exists {
+			if isAnnotationOnlySchema(v.Schema()) && !isAnnotationOnlySchema(existing.Schema()) {
+				continue
+			}
 		}
 		result.Properties.Set(k, v)
 	}
@@ -789,6 +805,45 @@ func getSchemaType(schema *base.Schema) []string {
 	}
 
 	return nil
+}
+
+// isAnnotationOnlySchema reports whether a schema has no fields that
+// influence the generated Go type. Schemas like `{ example: cancelled }`
+// or `{ description: "..." }` are annotation-only and must not be
+// allowed to overwrite a sibling declaration that actually carries a
+// type, enum, or sub-schema in an allOf merge.
+func isAnnotationOnlySchema(s *base.Schema) bool {
+	if s == nil {
+		return true
+	}
+	if len(s.Type) > 0 {
+		return false
+	}
+	if len(s.AllOf) > 0 || len(s.OneOf) > 0 || len(s.AnyOf) > 0 {
+		return false
+	}
+	if s.If != nil || s.Then != nil || s.Else != nil || s.Not != nil {
+		return false
+	}
+	if s.Properties != nil && s.Properties.Len() > 0 {
+		return false
+	}
+	if s.PatternProperties != nil && s.PatternProperties.Len() > 0 {
+		return false
+	}
+	if s.Items != nil {
+		return false
+	}
+	if len(s.Enum) > 0 {
+		return false
+	}
+	if s.AdditionalProperties != nil {
+		return false
+	}
+	if s.Const != nil {
+		return false
+	}
+	return true
 }
 
 // mergeNullable merges two nullable pointers using a union (more permissive) approach.
