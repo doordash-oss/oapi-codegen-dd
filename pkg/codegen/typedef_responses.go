@@ -517,12 +517,36 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		return nil, nil, nil
 	}
 
+	// Coerce raw content types (XML, CSV, */*, etc.) to []byte. Mirrors the
+	// per-status path; without it, a `default` response with a non-JSON
+	// content type would emit a typed Body that the handler template's
+	// "unknown content type" branch then tries to w.Write as []byte.
+	isRaw := isRawContentType(contentType)
+	if isRaw {
+		contentSchema = GoSchema{
+			GoType:         "[]byte",
+			DefineViaAlias: true,
+			Description:    contentSchema.Description,
+		}
+		refType = ""
+	}
+
 	if refType != "" {
 		contentSchema.RefType = refType
 	}
 	responseName := operationID + typeSuffix
 	if contentSchema.ArrayType != nil {
 		contentSchema, _ = replaceInlineTypes(contentSchema, options)
+	}
+	// When the default schema $refs a component (e.g. an error/event struct)
+	// AND the content type forces us to []byte, the operation-level alias
+	// name can collide with the component type. The component is already
+	// registered as a struct; registering a []byte alias under the same
+	// name silently drops it and the client template still ends up with
+	// `result := SomeStruct(bodyBytes)`. Disambiguate the alias name so
+	// both types co-exist.
+	if isRaw && options.typeTracker.Exists(responseName) {
+		responseName = options.typeTracker.generateUniqueName(responseName)
 	}
 	var typeDefinitions []TypeDefinition
 	td := TypeDefinition{
@@ -555,6 +579,7 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		ContentType:  contentType,
 		StatusCode:   status,
 		Headers:      headers,
+		IsRaw:        isRaw,
 	}
 	return rcd, typeDefinitions, nil
 }
@@ -597,12 +622,18 @@ func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], op
 }
 
 // isRawContentType returns true for content types that require manual marshaling
-// (XML, YAML, etc.) and should use []byte as the response type.
+// (XML, YAML, ndjson, etc.) and should use []byte as the response type.
+//
+// Note: only `application/json` and `*+json` are JSON-encodable as a single
+// object. ndjson/jsonl variants are recognized by `isMediaTypeJson` for
+// naming/tagging purposes, but they need raw byte framing on the wire, so
+// they fall through to []byte here.
 func isRawContentType(contentType string) bool {
 	return contentType != "" &&
 		contentType != "application/json" &&
 		!strings.HasPrefix(contentType, "application/json;") &&
-		!isMediaTypeJson(contentType) &&
+		!strings.HasSuffix(contentType, "+json") &&
+		!strings.Contains(contentType, "+json;") &&
 		contentType != "text/plain" &&
 		!strings.HasPrefix(contentType, "text/plain;") &&
 		contentType != "text/html" &&
