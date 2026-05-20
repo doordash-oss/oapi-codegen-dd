@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
@@ -80,9 +81,16 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 		}
 
 		// If the allOf resulted in a simple type (no properties), return it directly
-		// This handles cases like allOf with a description-only schema and a $ref
+		// This handles cases like allOf with a description-only schema and a $ref.
+		// Exception: when the parent schema declares its own object type, the
+		// outer type wins over a conflicting primitive from allOf (a malformed
+		// spec pattern: `type: object, nullable: true, allOf: [SomeEnum]`).
+		// Falling through lets createObjectSchema produce an object the
+		// validator accepts; the allOf becomes metadata-only.
 		if len(allOfSchema.Properties) == 0 && !hasAnyOf && !hasOneOf {
-			return allOfSchema, nil
+			if !parentTypeConflictsWithAllOf(schema, allOfSchema) {
+				return allOfSchema, nil
+			}
 		}
 
 		out.Properties = append(out.Properties, allOfSchema.Properties...)
@@ -302,6 +310,35 @@ func isMetadataOnlySchema(schema *base.Schema) bool {
 
 	// It only has metadata fields like description, title, examples, etc.
 	return true
+}
+
+// parentTypeConflictsWithAllOf reports whether the parent schema declares
+// `type: object` while the merged allOf result resolves to a non-object
+// primitive (e.g. an integer enum). In that case the allOf must not be
+// returned as the schema's effective type — the outer object wins. Only
+// the object/primitive direction is checked here; primitive-vs-primitive
+// mismatches are rejected by mergeOpenapiSchemas already.
+func parentTypeConflictsWithAllOf(parent *base.Schema, allOfSchema GoSchema) bool {
+	if parent == nil || !slices.Contains(parent.Type, "object") {
+		return false
+	}
+	if allOfSchema.GoType == "" {
+		return false
+	}
+	if strings.HasPrefix(allOfSchema.GoType, "map[") || strings.HasPrefix(allOfSchema.GoType, "[]") {
+		return false
+	}
+	if isPrimitiveType(allOfSchema.GoType) || len(allOfSchema.EnumValues) > 0 {
+		return true
+	}
+	if allOfSchema.OpenAPISchema != nil {
+		for _, t := range allOfSchema.OpenAPISchema.Type {
+			if t != "object" && t != "null" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // mergeAllOfSchemas merges all allOf elements into a single GoSchema.
@@ -558,23 +595,18 @@ func mergeAllOfSchemas(allOf []*base.SchemaProxy, options ParseOptions, hasSibli
 	return out, nil
 }
 
-// flattenAllOf transitively resolves a schema's allOf while preserving the
-// schema's own structural fields (properties, required, extensions, nullable,
-// additionalProperties). Returns s unchanged when it has no allOf.
+// flattenAllOf resolves s.AllOf and merges back the parent's structural
+// fields. Annotation fields (format, description, title) are excluded to
+// avoid merge conflicts with the allOf elements.
 func flattenAllOf(s *base.Schema) *base.Schema {
 	if s == nil || s.AllOf == nil {
 		return s
 	}
 	merged, err := mergeAllOf(s.AllOf)
 	if err != nil {
-		// Fall back to original schema on merge errors
 		return s
 	}
 
-	// Build a schema with only the structural fields from s that should be
-	// preserved alongside allOf. Annotation fields like format, description,
-	// and title are intentionally excluded to avoid merge conflicts with the
-	// allOf elements.
 	ownFields := &base.Schema{
 		Type:                 s.Type,
 		Properties:           s.Properties,
@@ -590,9 +622,6 @@ func flattenAllOf(s *base.Schema) *base.Schema {
 
 	result, err := mergeOpenapiSchemas(merged, ownFields)
 	if err != nil {
-		// If own fields conflict with the allOf result (e.g., incompatible
-		// types), fall back to the allOf-only merge to avoid breaking
-		// generation for otherwise valid specs.
 		return s
 	}
 	return result
@@ -617,6 +646,12 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 		// First schema, nothing to merge yet
 		return s2, nil
 	}
+
+	// Must flatten before the type-presence checks. A bare allOf wrapper
+	// has no own `type`; without flattening, the `len(t1) == 0` branch
+	// below would discard its contents and return s2 alone.
+	s1 = flattenAllOf(s1)
+	s2 = flattenAllOf(s2)
 
 	result := &base.Schema{}
 
@@ -651,9 +686,6 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	// additionalProperties, nullable), merge them into the allOf result so
 	// they are not lost. Annotation-only fields (format, description, title)
 	// are not merged because they can conflict with the allOf elements.
-	s1 = flattenAllOf(s1)
-	s2 = flattenAllOf(s2)
-
 	result.AllOf = append(s1.AllOf, s2.AllOf...)
 	result.Type = t1
 
@@ -700,31 +732,22 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	// This allows merging schemas where one specifies nullable and another doesn't
 	result.Nullable = mergeNullable(s1.Nullable, s2.Nullable)
 
-	if !ptrEqual(s1.ReadOnly, s2.ReadOnly) {
-		return nil, ErrMergingSchemasWithDifferentReadOnly
-	}
-	result.ReadOnly = s1.ReadOnly
-
-	if !ptrEqual(s1.WriteOnly, s2.WriteOnly) {
-		return nil, ErrMergingSchemasWithDifferentWriteOnly
-	}
-	result.WriteOnly = s1.WriteOnly
+	// ReadOnly/WriteOnly are annotations, not constraints — the validator
+	// doesn't enforce per-branch agreement. Take the union (true if any
+	// branch is true): if one branch marks the property response-only, the
+	// merged property is response-only.
+	result.ReadOnly = mergeBoolPtrOr(s1.ReadOnly, s2.ReadOnly)
+	result.WriteOnly = mergeBoolPtrOr(s1.WriteOnly, s2.WriteOnly)
 
 	// Required. We merge these.
 	result.Required = append(s1.Required, s2.Required...)
 
-	// We merge all properties. When both schemas declare a property
-	// with the same name, an annotation-only override (carrying only
-	// fields like `example` or `description`) must not overwrite a
-	// sibling that actually shapes the Go type. Otherwise we keep the
-	// previous "s2 wins" behavior, since both sides genuinely shape
-	// the type and the second declaration is the more specific one in
-	// an allOf chain.
-	//
-	// We deliberately pick one of the original SchemaProxies rather
-	// than fabricating a merged proxy via CreateSchemaProxy: downstream
-	// code reads GoLow().GetReference() to attribute properties back to
-	// the spec, and a synthetic proxy has no low-level backing.
+	// On property collision, an annotation-only override (just
+	// `example` or `description`) must not overwrite a sibling that
+	// shapes the Go type. Otherwise s2 wins, matching prior behavior.
+	// We keep the original SchemaProxy rather than fabricating one via
+	// CreateSchemaProxy: downstream reads GoLow().GetReference() to
+	// attribute properties back to the spec.
 	for k, v := range s1.Properties.FromOldest() {
 		if result.Properties == nil {
 			result.Properties = orderedmap.New[string, *base.SchemaProxy]()
@@ -740,9 +763,18 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 			if isAnnotationOnlySchema(v.Schema()) && !isAnnotationOnlySchema(existing.Schema()) {
 				continue
 			}
+			if merged, ok := mergePropertyProxies(existing, v); ok {
+				result.Properties.Set(k, merged)
+				continue
+			}
 		}
 		result.Properties.Set(k, v)
 	}
+
+	// Merge array Items. Without this, two array schemas with `items` on
+	// both sides produce a result with no Items, and downstream type
+	// inference falls back to string.
+	result.Items = mergeItems(s1.Items, s2.Items)
 
 	if isAdditionalPropertiesExplicitFalse(s1) || isAdditionalPropertiesExplicitFalse(s2) {
 		result.AdditionalProperties = &base.DynamicValue[*base.SchemaProxy, bool]{
@@ -778,6 +810,60 @@ func mergeOpenapiSchemas(s1, s2 *base.Schema) (*base.Schema, error) {
 	return result, nil
 }
 
+// mergePropertyProxies merges two colliding property schemas so that
+// constraints from either side (enum, pattern, format, etc.) survive
+// the allOf merge instead of being clobbered by the second declaration.
+// Reports ok=false if the merge isn't safe (e.g. incompatible types);
+// caller should fall back to s2-wins. Returned proxy is synthetic
+// (no GoLow().GetReference()), which is acceptable for property
+// collisions where the type itself stays inline.
+func mergePropertyProxies(a, b *base.SchemaProxy) (*base.SchemaProxy, bool) {
+	sa := a.Schema()
+	sb := b.Schema()
+	if sa == nil || sb == nil {
+		return nil, false
+	}
+
+	saCopy := *sa
+	sbCopy := *sb
+
+	// Propagate type when one side has it and the other doesn't, so the
+	// `len(tX) == 0` short-circuits in mergeOpenapiSchemas don't drop
+	// the typeless side's constraints (enum, pattern, ...) on the floor.
+	if len(saCopy.Type) > 0 && len(sbCopy.Type) == 0 {
+		sbCopy.Type = saCopy.Type
+	} else if len(sbCopy.Type) > 0 && len(saCopy.Type) == 0 {
+		saCopy.Type = sbCopy.Type
+	}
+
+	// Relax flags that mergeOpenapiSchemas rejects outright. Property
+	// overrides commonly omit readOnly/writeOnly/exclusive*; treating
+	// the mismatch as "inherit from the typed side" is safer than
+	// dropping the override entirely.
+	sbCopy.ReadOnly = saCopy.ReadOnly
+	sbCopy.WriteOnly = saCopy.WriteOnly
+	sbCopy.UniqueItems = saCopy.UniqueItems
+	sbCopy.ExclusiveMinimum = saCopy.ExclusiveMinimum
+	sbCopy.ExclusiveMaximum = saCopy.ExclusiveMaximum
+	if sbCopy.Format == "" {
+		sbCopy.Format = saCopy.Format
+	}
+
+	merged, err := mergeOpenapiSchemas(&saCopy, &sbCopy)
+	if err != nil || merged == nil {
+		return nil, false
+	}
+
+	if sa.Example != nil && merged.Example == nil {
+		merged.Example = sa.Example
+	}
+	if sb.Example != nil && merged.Example == nil {
+		merged.Example = sb.Example
+	}
+
+	return base.CreateSchemaProxy(merged), true
+}
+
 // isAdditionalPropertiesExplicitFalse determines whether an Schema is explicitly defined as `additionalProperties: false`
 func isAdditionalPropertiesExplicitFalse(s *base.Schema) bool {
 	if s.AdditionalProperties == nil {
@@ -807,11 +893,8 @@ func getSchemaType(schema *base.Schema) []string {
 	return nil
 }
 
-// isAnnotationOnlySchema reports whether a schema has no fields that
-// influence the generated Go type. Schemas like `{ example: cancelled }`
-// or `{ description: "..." }` are annotation-only and must not be
-// allowed to overwrite a sibling declaration that actually carries a
-// type, enum, or sub-schema in an allOf merge.
+// isAnnotationOnlySchema reports whether a schema only has metadata
+// (description, example) and no fields that shape the generated type.
 func isAnnotationOnlySchema(s *base.Schema) bool {
 	if s == nil {
 		return true
@@ -850,11 +933,62 @@ func isAnnotationOnlySchema(s *base.Schema) bool {
 // If either is true, the result is true. If both are false or nil, the result is nil.
 // This allows merging schemas where one specifies nullable and another doesn't.
 func mergeNullable(a, b *bool) *bool {
-	// If either is explicitly true, result is true
+	return mergeBoolPtrOr(a, b)
+}
+
+// mergeItems combines the array `items` constraint from two allOf branches.
+// In 3.1, `items` can be either a schema or `false` (forbidding items); if
+// either side forbids items, the merged result does too. For schema items,
+// the later branch wins, mirroring the property-override semantics in
+// `mergeOpenapiSchemas`: a later allOf branch specializes the items
+// declaration from an earlier branch. We don't attempt true element-wise
+// composition because one side can be a wrapper like `anyOf: [...]` with
+// no own type, which `mergeOpenapiSchemas` would short-circuit and drop.
+func mergeItems(a, b *base.DynamicValue[*base.SchemaProxy, bool]) *base.DynamicValue[*base.SchemaProxy, bool] {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	if !a.IsA() {
+		if !a.B {
+			return a
+		}
+		return b
+	}
+	if !b.IsA() {
+		if !b.B {
+			return b
+		}
+		return a
+	}
+
+	// Annotation-only override (no shape, just description/example) must
+	// not clobber a typed sibling - same rule as property collisions.
+	if a.A != nil && b.A != nil {
+		sa := a.A.Schema()
+		sb := b.A.Schema()
+		if sa != nil && sb != nil {
+			if isAnnotationOnlySchema(sb) && !isAnnotationOnlySchema(sa) {
+				return a
+			}
+			if isAnnotationOnlySchema(sa) && !isAnnotationOnlySchema(sb) {
+				return b
+			}
+		}
+	}
+	return b
+}
+
+// mergeBoolPtrOr returns the logical OR of two optional booleans, preserving
+// the "unset" state (nil) when both inputs are nil or false. Used to merge
+// annotation flags (Nullable, ReadOnly, WriteOnly) across allOf branches:
+// if any branch sets the flag, the merged result has it set.
+func mergeBoolPtrOr(a, b *bool) *bool {
 	if (a != nil && *a) || (b != nil && *b) {
 		return ptr(true)
 	}
-	// If both are nil or false, return nil (default behavior)
 	return nil
 }
 
@@ -875,14 +1009,24 @@ func isDiscriminatedUnionWithChild(schema *base.Schema, childRef string) bool {
 		return false
 	}
 
-	// Check if any oneOf element references the child
 	for _, element := range schema.OneOf {
 		if element.GetReference() == childRef {
 			return true
 		}
 	}
+	for _, element := range schema.AnyOf {
+		if element.GetReference() == childRef {
+			return true
+		}
+	}
 
-	// Also check the discriminator mapping
+	// Discriminator + mapping without oneOf/anyOf describes an
+	// inheritance base, not a union. The child's allOf inherits from
+	// the base and should NOT be filtered.
+	if len(schema.OneOf) == 0 && len(schema.AnyOf) == 0 {
+		return false
+	}
+
 	if schema.Discriminator.Mapping != nil {
 		for _, mappedRef := range schema.Discriminator.Mapping.FromOldest() {
 			if mappedRef == childRef {
