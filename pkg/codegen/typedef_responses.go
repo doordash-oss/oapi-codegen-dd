@@ -180,6 +180,10 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 					ResponseName: "struct{}",
 					StatusCode:   status,
 					Headers:      headers,
+					// Preserve the declared media type even when the schema
+					// is empty (e.g. `text/html: {}`); strict response
+					// validators rely on it.
+					ContentType: contentType,
 				}
 				all[status] = successDefinition
 			}
@@ -413,6 +417,25 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		all[status] = rcd
 	}
 
+	// When no explicit success is documented but `default` has content, treat
+	// `default` as the success at 200. OpenAPI validators interpret `default`
+	// as covering any unlisted status code (including 2xx), so the spec's
+	// schema is what they check against. Fabricating a 204 struct{} here
+	// would make mocks return content that doesn't satisfy the real schema.
+	defaultAsSuccess := false
+	if successCode == 0 && defaultResponse != nil && defaultResponse.Content != nil && defaultResponse.Content.First() != nil {
+		rcd, tds, err := buildDefaultResponseDefinition(operationID, defaultResponse, 200, true, options)
+		if err != nil {
+			return nil, nil, err
+		}
+		if rcd != nil {
+			successCode = 200
+			all[200] = rcd
+			typeDefinitions = append(typeDefinitions, tds...)
+			defaultAsSuccess = true
+		}
+	}
+
 	if successCode == 0 {
 		successCode = 204
 		successDefinition := &ResponseContentDefinition{
@@ -425,82 +448,15 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		all[successCode] = successDefinition
 	}
 
-	if errorCode == 0 && defaultResponse != nil {
-		errorCode = 500
-		fstErrorCode = 500
-		typeSuffix := "ErrorResponse"
-		content := defaultResponse.Content.First()
-
-		ref := ""
-		contentType := "application/json"
-		var (
-			contentSchema GoSchema
-			err           error
-			refType       string
-			contentVal    *v3high.MediaType
-		)
-
-		if content != nil {
-			contentType, contentVal = content.Key(), content.Value()
-			if contentVal.Schema != nil {
-				ref = contentVal.Schema.GetReference()
-
-				opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
-				contentSchema, err = GenerateGoSchema(contentVal.Schema, opts)
-				if err != nil {
-					return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
-				}
-			}
+	if errorCode == 0 && defaultResponse != nil && !defaultAsSuccess {
+		rcd, tds, err := buildDefaultResponseDefinition(operationID, defaultResponse, 500, false, options)
+		if err != nil {
+			return nil, nil, err
 		}
-
-		if ref != "" {
-			refType, err = refPathToGoType(ref)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error turning reference (%s) into a Go type: %w", ref, err)
-			}
-		}
-
-		if !contentSchema.IsZero() {
-			if refType != "" {
-				contentSchema.RefType = refType
-			}
-			responseName := operationID + typeSuffix
-			if contentSchema.ArrayType != nil {
-				contentSchema, _ = replaceInlineTypes(contentSchema, options)
-			}
-			td := TypeDefinition{
-				Name:           responseName,
-				Schema:         contentSchema,
-				SpecLocation:   SpecLocationResponse,
-				NeedsMarshaler: needsMarshaler(contentSchema),
-			}
-			options.typeTracker.register(td, "")
-			typeDefinitions = append(typeDefinitions, td)
-
-			// Filter out AdditionalTypes that already exist in the type tracker
-			for _, additionalType := range contentSchema.AdditionalTypes {
-				if _, exists := options.typeTracker.LookupByName(additionalType.Name); !exists {
-					typeDefinitions = append(typeDefinitions, additionalType)
-					options.typeTracker.register(additionalType, "")
-				}
-			}
-
-			errHeaders, err := generateResponseHeadersSchema(defaultResponse.Headers.FromOldest(), operationID, options)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error generating response headers schema: %w", err)
-			}
-
-			errorDefinition := &ResponseContentDefinition{
-				ResponseName: responseName,
-				IsSuccess:    false,
-				Description:  defaultResponse.Description,
-				Schema:       contentSchema,
-				Ref:          refType,
-				ContentType:  contentType,
-				StatusCode:   errorCode,
-				Headers:      errHeaders,
-			}
-			all[errorCode] = errorDefinition
+		if rcd != nil {
+			fstErrorCode = 500
+			all[500] = rcd
+			typeDefinitions = append(typeDefinitions, tds...)
 		}
 	}
 
@@ -515,6 +471,92 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	}
 
 	return res, typeDefinitions, nil
+}
+
+// buildDefaultResponseDefinition turns a `default` response into a
+// ResponseContentDefinition installed at the given status. Used both when no
+// explicit success is documented (install as 200 success) and when no
+// explicit error is documented (install as 500 error).
+func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.Response, status int, isSuccess bool, options ParseOptions) (*ResponseContentDefinition, []TypeDefinition, error) {
+	typeSuffix := "ErrorResponse"
+	if isSuccess {
+		typeSuffix = "Response"
+	}
+
+	content := defaultResponse.Content.First()
+	ref := ""
+	contentType := "application/json"
+	var (
+		contentSchema GoSchema
+		err           error
+		refType       string
+		contentVal    *v3high.MediaType
+	)
+
+	if content != nil {
+		contentType, contentVal = content.Key(), content.Value()
+		if contentVal.Schema != nil {
+			ref = contentVal.Schema.GetReference()
+
+			opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
+			contentSchema, err = GenerateGoSchema(contentVal.Schema, opts)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
+			}
+		}
+	}
+
+	if ref != "" {
+		refType, err = refPathToGoType(ref)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error turning reference (%s) into a Go type: %w", ref, err)
+		}
+	}
+
+	if contentSchema.IsZero() {
+		return nil, nil, nil
+	}
+
+	if refType != "" {
+		contentSchema.RefType = refType
+	}
+	responseName := operationID + typeSuffix
+	if contentSchema.ArrayType != nil {
+		contentSchema, _ = replaceInlineTypes(contentSchema, options)
+	}
+	var typeDefinitions []TypeDefinition
+	td := TypeDefinition{
+		Name:           responseName,
+		Schema:         contentSchema,
+		SpecLocation:   SpecLocationResponse,
+		NeedsMarshaler: needsMarshaler(contentSchema),
+	}
+	options.typeTracker.register(td, "")
+	typeDefinitions = append(typeDefinitions, td)
+
+	for _, additionalType := range contentSchema.AdditionalTypes {
+		if _, exists := options.typeTracker.LookupByName(additionalType.Name); !exists {
+			typeDefinitions = append(typeDefinitions, additionalType)
+			options.typeTracker.register(additionalType, "")
+		}
+	}
+
+	headers, err := generateResponseHeadersSchema(defaultResponse.Headers.FromOldest(), operationID, options)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating response headers schema: %w", err)
+	}
+
+	rcd := &ResponseContentDefinition{
+		ResponseName: responseName,
+		IsSuccess:    isSuccess,
+		Description:  defaultResponse.Description,
+		Schema:       contentSchema,
+		Ref:          refType,
+		ContentType:  contentType,
+		StatusCode:   status,
+		Headers:      headers,
+	}
+	return rcd, typeDefinitions, nil
 }
 
 // partitionResponses splits an `all` map of every documented response into

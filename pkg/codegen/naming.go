@@ -676,5 +676,15 @@ func isMediaTypeJson(mediaType string) bool {
 	if err != nil {
 		return false
 	}
-	return parsed == "application/json" || strings.HasSuffix(parsed, "+json")
+
+	if parsed == "application/json" || strings.HasSuffix(parsed, "+json") {
+		return true
+	}
+
+	switch parsed {
+	case "application/x-ndjson", "application/ndjson",
+		"application/jsonl", "application/x-jsonlines":
+		return true
+	}
+	return false
 }
