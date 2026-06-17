@@ -282,6 +282,9 @@ func (f File_Links) Validate() error {
 	if err := typesValidator.Var(f.URL, "required,max=5000"); err != nil {
 		errors = errors.Append("URL", err)
 	}
+	if err := runtime.ValidatePattern(f.URL, `^/v1/file_links`); err != nil {
+		errors = errors.Append("URL", err)
+	}
 	if len(errors) == 0 {
 		return nil
 	}

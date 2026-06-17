@@ -162,6 +162,14 @@ func (p Property) needsCustomValidation() bool {
 	return true
 }
 
+// needsPatternValidation reports whether this property carries an enforceable regex pattern
+// (resolved from its schema, including $ref targets).
+func (p Property) needsPatternValidation() bool {
+	return p.Constraints.hasPattern() &&
+		isPatternValidatable(p.Schema.TypeDecl()) &&
+		patternCompiles(*p.Constraints.Pattern)
+}
+
 func createPropertyGoFieldName(jsonName string, extensions map[string]any) string {
 	goFieldName := jsonName
 	if extension, ok := extensions[extGoName]; ok {

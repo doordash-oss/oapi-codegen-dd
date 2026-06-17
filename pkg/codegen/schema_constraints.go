@@ -105,6 +105,11 @@ func (c Constraints) Count() int {
 	return count
 }
 
+// hasPattern reports whether these constraints carry a non-empty regex pattern.
+func (c Constraints) hasPattern() bool {
+	return c.Pattern != nil && *c.Pattern != ""
+}
+
 func newConstraints(schema *base.Schema, opts ConstraintsContext) Constraints {
 	if schema == nil {
 		return Constraints{}
