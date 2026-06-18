@@ -145,6 +145,11 @@ func (s GoSchema) NeedsValidation() bool {
 		return true
 	}
 
+	// If it carries a regex pattern, it needs validation
+	if s.needsPatternValidation() {
+		return true
+	}
+
 	// If it has union elements, it needs validation
 	if len(s.UnionElements) > 0 {
 		return true
@@ -155,6 +160,10 @@ func (s GoSchema) NeedsValidation() bool {
 		for _, prop := range s.Properties {
 			// Property has validation tags
 			if len(prop.Constraints.ValidationTags) > 0 {
+				return true
+			}
+			// Property carries a regex pattern
+			if prop.needsPatternValidation() {
 				return true
 			}
 			// Property needs custom validation (RefType, struct, union, etc.)
@@ -214,6 +223,68 @@ func (s GoSchema) NeedsValidation() bool {
 
 	// Otherwise, it's likely a component reference that might have Validate()
 	return true
+}
+
+// ValidateDecl generates the body of the Validate() method for this schema.
+// It returns the Go code that should appear inside the Validate() method.
+// The alias parameter is the receiver variable name (e.g., "p" for "func (p Person) Validate()").
+// The validatorVar parameter is the name of the validator variable to use (e.g., "bodyTypesValidate").
+func (s GoSchema) ValidateDecl(alias string, validatorVar string) string {
+	return s.ValidateDeclWithOptions(alias, validatorVar, false)
+}
+
+// ValidateDeclWithOptions generates the body of the Validate() method for this schema with options.
+// The forceSimple parameter forces the use of simple validation (validate.Struct()) even for complex types.
+func (s GoSchema) ValidateDeclWithOptions(alias string, validatorVar string, forceSimple bool) string {
+	// If forceSimple is true, always use simple validation for structs
+	if forceSimple && isStructType(s) {
+		return generateSimpleStructValidation(s, alias, validatorVar)
+	}
+
+	// OPTIMIZATION: If this is a struct with no unions anywhere in its tree,
+	// AND no properties need custom validation (like RefTypes),
+	// we can use the simple validate.Struct() approach instead of custom validation.
+	// This is much cleaner and more efficient.
+	if canUseSimpleStructValidation(s) {
+		return generateSimpleStructValidation(s, alias, validatorVar)
+	}
+
+	// Handle array types
+	if isArrayType(s) {
+		return generateArrayValidation(s, alias, validatorVar)
+	}
+
+	// If this schema has a RefType set, it means it's a reference to another type
+	// In this case, we should delegate validation to the underlying type
+	if isRefTypeDelegation(s) {
+		return generateRefTypeDelegation(s, alias)
+	}
+
+	// If this schema has properties but GoType is a reference to another type
+	// (not a struct/map/slice), delegate to the underlying type
+	if isTypeAliasDelegation(s) {
+		return generateTypeAliasDelegation(s, alias)
+	}
+
+	// Handle map types (from additionalProperties)
+	if isMapType(s) && !hasCustomValidation(s) {
+		return generateMapValidation(s, alias, validatorVar)
+	}
+
+	// For other non-struct types (slices, primitives) without custom validation
+	if !hasCustomValidation(s) {
+		return generateNonStructValidation(s, alias, validatorVar)
+	}
+
+	// Generate custom validation for struct properties
+	return generateCustomPropertyValidation(s, alias, validatorVar)
+}
+
+// needsPatternValidation reports whether this schema carries an enforceable regex pattern.
+func (s GoSchema) needsPatternValidation() bool {
+	return s.Constraints.hasPattern() &&
+		isPatternValidatable(s.TypeDecl()) &&
+		patternCompiles(*s.Constraints.Pattern)
 }
 
 // ContainsUnions returns true if this schema or any of its nested schemas contain union types.
