@@ -1067,6 +1067,231 @@ func TestGoSchema_ValidateDecl_IntegerWithValidationTags(t *testing.T) {
 	assertCodeEqual(t, expected, result)
 }
 
+func TestGoSchema_ValidateDecl_StandalonePrimitiveWithPattern(t *testing.T) {
+	// A standalone string type carrying only a regex pattern.
+	schema := GoSchema{
+		GoType:      "string",
+		Constraints: Constraints{Pattern: ptr(`^[a-z]+$`)},
+	}
+
+	result := schema.ValidateDecl("s", "validate")
+	expected := "if err := runtime.ValidatePattern(s, `^[a-z]+$`); err != nil {\n" +
+		"    return err\n" +
+		"}\n" +
+		"return nil"
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_StructWithStringPatternProperty(t *testing.T) {
+	// Required string property with both a "required" tag and a regex pattern.
+	schema := GoSchema{
+		GoType: "struct { Code string }",
+		Properties: []Property{
+			{
+				GoName:        "Code",
+				JsonFieldName: "code",
+				Schema:        GoSchema{GoType: "string"},
+				Constraints: Constraints{
+					ValidationTags: []string{"required"},
+					Pattern:        ptr(`^[A-Z]{3}$`),
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("t", "typesValidator")
+	expected := "var errors runtime.ValidationErrors\n" +
+		"if err := typesValidator.Var(t.Code, \"required\"); err != nil {\n" +
+		"    errors = errors.Append(\"Code\", err)\n" +
+		"}\n" +
+		"if err := runtime.ValidatePattern(t.Code, `^[A-Z]{3}$`); err != nil {\n" +
+		"    errors = errors.Append(\"Code\", err)\n" +
+		"}\n" +
+		"if len(errors) == 0 {\n    return nil\n}\nreturn errors"
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_StructWithPointerStringPatternProperty(t *testing.T) {
+	// Optional (pointer) string property with tags and a pattern; both checks
+	// share a single nil-guard and the pattern is checked against the deref.
+	schema := GoSchema{
+		GoType: "struct { Slug *string }",
+		Properties: []Property{
+			{
+				GoName:        "Slug",
+				JsonFieldName: "slug",
+				Schema:        GoSchema{GoType: "string"},
+				Constraints: Constraints{
+					ValidationTags: []string{"omitempty", "min=2"},
+					Pattern:        ptr(`^[a-z-]+$`),
+					Nullable:       ptr(true),
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("t", "typesValidator")
+	expected := "var errors runtime.ValidationErrors\n" +
+		"if t.Slug != nil {\n" +
+		"    if err := typesValidator.Var(t.Slug, \"omitempty,min=2\"); err != nil {\n" +
+		"        errors = errors.Append(\"Slug\", err)\n" +
+		"    }\n" +
+		"}\n" +
+		"if err := runtime.ValidatePattern(t.Slug, `^[a-z-]+$`); err != nil {\n" +
+		"    errors = errors.Append(\"Slug\", err)\n" +
+		"}\n" +
+		"if len(errors) == 0 {\n    return nil\n}\nreturn errors"
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_StructWithNamedStringPatternProperty(t *testing.T) {
+	// Property referencing a named string type (e.g. a "type: string" component)
+	// with a pattern: the value is converted with string(...) before matching.
+	schema := GoSchema{
+		GoType: "struct { Ref *Sku }",
+		Properties: []Property{
+			{
+				GoName:        "Ref",
+				JsonFieldName: "ref",
+				// A $ref to a "type: string" component resolves to a named type
+				// that is flagged as a primitive alias, so the pattern is checked
+				// inline rather than via a delegated Validate() call.
+				Schema: GoSchema{GoType: "Sku", IsPrimitiveAlias: true},
+				Constraints: Constraints{
+					Pattern:  ptr(`^SKU-\d+$`),
+					Nullable: ptr(true),
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("t", "typesValidator")
+	expected := "var errors runtime.ValidationErrors\n" +
+		"if err := runtime.ValidatePattern(t.Ref, `^SKU-\\d+$`); err != nil {\n" +
+		"    errors = errors.Append(\"Ref\", err)\n" +
+		"}\n" +
+		"if len(errors) == 0 {\n    return nil\n}\nreturn errors"
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDeclWithOptions_SimpleModeSkipsPattern(t *testing.T) {
+	// Simple mode validates structs via validate.Struct(), which can't enforce a
+	// regex, so the pattern is intentionally not validated there. Per-field/
+	// per-item contexts (full-mode structs, arrays, maps) still validate it.
+	schema := GoSchema{
+		GoType: "struct { Code string }",
+		Properties: []Property{
+			{
+				GoName:        "Code",
+				JsonFieldName: "code",
+				Schema:        GoSchema{GoType: "string"},
+				Constraints: Constraints{
+					ValidationTags: []string{"required"},
+					Pattern:        ptr(`^[A-Z]{3}$`),
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDeclWithOptions("s", "validate", true)
+	assertCodeEqual(t, `return runtime.ConvertValidatorError(validate.Struct(s))`, result)
+}
+
+func TestGoSchema_ValidateDecl_NonStringTypeWithPatternIgnored(t *testing.T) {
+	// A pattern on a non-string Go type (time.Time) is meaningless and must be
+	// ignored; the struct falls back to simple validate.Struct() validation.
+	schema := GoSchema{
+		GoType: "struct { When time.Time }",
+		Properties: []Property{
+			{
+				GoName:        "When",
+				JsonFieldName: "when",
+				Schema:        GoSchema{GoType: "time.Time"},
+				Constraints:   Constraints{Pattern: ptr(`^x$`)},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("s", "validate")
+	expected := `return runtime.ConvertValidatorError(validate.Struct(s))`
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_UncompilablePatternSkipped(t *testing.T) {
+	// Lookahead is valid ECMA-262 but cannot be compiled by Go's RE2 engine, so
+	// no pattern check is generated (a warning is logged instead).
+	schema := GoSchema{
+		GoType:      "string",
+		Constraints: Constraints{Pattern: ptr(`(?=lookahead)`)},
+	}
+
+	result := schema.ValidateDecl("s", "validate")
+	assertCodeEqual(t, `return nil`, result)
+}
+
+func TestGoSchema_ValidateDecl_ArrayWithPatternItems(t *testing.T) {
+	schema := GoSchema{
+		GoType: "[]string",
+		ArrayType: &GoSchema{
+			GoType:      "string",
+			Constraints: Constraints{Pattern: ptr(`^[a-z]+$`)},
+		},
+	}
+
+	result := schema.ValidateDecl("p", "validate")
+	expected := "var errors runtime.ValidationErrors\n" +
+		"for i, item := range p {\n" +
+		"    if err := runtime.ValidatePattern(item, `^[a-z]+$`); err != nil {\n" +
+		"        errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)\n" +
+		"    }\n" +
+		"}\n" +
+		"if len(errors) == 0 {\n    return nil\n}\nreturn errors"
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_MapWithPatternValues(t *testing.T) {
+	schema := GoSchema{
+		GoType: "map[string]string",
+		AdditionalPropertiesType: &GoSchema{
+			GoType:      "string",
+			Constraints: Constraints{Pattern: ptr(`^[A-Z]{2}$`)},
+		},
+	}
+
+	result := schema.ValidateDecl("m", "validate")
+	expected := "var errors runtime.ValidationErrors\n" +
+		"for k, v := range m {\n" +
+		"    if err := runtime.ValidatePattern(v, `^[A-Z]{2}$`); err != nil {\n" +
+		"        errors = errors.Append(k, err)\n" +
+		"    }\n" +
+		"}\n" +
+		"if len(errors) == 0 {\n    return nil\n}\nreturn errors"
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_ArrayWithNullablePatternItems(t *testing.T) {
+	// Array of nullable strings ([]*string): pointer items are nil-guarded and
+	// dereferenced before pattern matching.
+	schema := GoSchema{
+		GoType: "[]*string",
+		ArrayType: &GoSchema{
+			GoType:        "string",
+			Constraints:   Constraints{Pattern: ptr(`^[a-z]+$`)},
+			OpenAPISchema: &base.Schema{Nullable: ptr(true)},
+		},
+	}
+
+	result := schema.ValidateDecl("p", "validate")
+	expected := "var errors runtime.ValidationErrors\n" +
+		"for i, item := range p {\n" +
+		"    if err := runtime.ValidatePattern(item, `^[a-z]+$`); err != nil {\n" +
+		"        errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)\n" +
+		"    }\n" +
+		"}\n" +
+		"if len(errors) == 0 {\n    return nil\n}\nreturn errors"
+	assertCodeEqual(t, expected, result)
+}
+
 // TestGoSchema_NeedsValidation_StructWithArrayOfCustomTypes tests that a struct
 // with only array properties whose item types need validation correctly returns
 // true for NeedsValidation(). This is a regression test for the bug where

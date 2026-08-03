@@ -60,7 +60,7 @@ func (o Order) Validate() error {
 
 type Order_Client struct {
 	Name               string              `json:"name" validate:"required"`
-	ID                 int                 `json:"id" validate:"required"`
+	ID                 int                 `json:"id"`
 	Order_Client_AnyOf *Order_Client_AnyOf `json:"-"`
 	Order_Client_OneOf *Order_Client_OneOf `json:"-"`
 }
@@ -69,9 +69,6 @@ func (o Order_Client) Validate() error {
 	var errors runtime.ValidationErrors
 	if err := typesValidator.Var(o.Name, "required"); err != nil {
 		errors = errors.Append("Name", err)
-	}
-	if err := typesValidator.Var(o.ID, "required"); err != nil {
-		errors = errors.Append("ID", err)
 	}
 	if o.Order_Client_AnyOf != nil {
 		if v, ok := any(o.Order_Client_AnyOf).(runtime.Validator); ok {

@@ -6,6 +6,7 @@ bin/
 .site/
 *.iml
 .go-version
+.claude/settings.local.json
 gosec-report*.json
 testdata/specs*/**/*
 .sandbox/

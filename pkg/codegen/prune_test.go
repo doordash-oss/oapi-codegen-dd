@@ -472,7 +472,7 @@ func TestPruneExamples(t *testing.T) {
 		assert.NotNil(t, header.Example)
 	})
 
-	t.Run("webhooks removed during pruning", func(t *testing.T) {
+	t.Run("webhook schema refs collected by findOperationRefs", func(t *testing.T) {
 		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
 		assert.NoError(t, err)
 
@@ -482,6 +482,25 @@ func TestPruneExamples(t *testing.T) {
 		model, err := doc.BuildV3Model()
 		assert.NoError(t, err)
 
+		refs := findOperationRefs(&model.Model)
+		assert.True(t, refs["#/components/schemas/PaymentRequest"], "PaymentRequest should be in refs from webhook")
+		assert.True(t, refs["#/components/schemas/Response"], "Response should be in refs from webhook")
+	})
+
+	t.Run("webhooks preserved during pruning", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+		assert.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		assert.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		assert.NoError(t, err)
+
+		// Before pruning: should have webhooks and schemas
+		assert.NotNil(t, model.Model.Webhooks)
+		assert.Equal(t, 2, model.Model.Components.Schemas.Len())
+
 		// Prune the document
 		err = pruneSchema(&model.Model)
 		assert.NoError(t, err)
@@ -489,7 +508,16 @@ func TestPruneExamples(t *testing.T) {
 		// components/examples should be removed (set to nil)
 		assert.Nil(t, model.Model.Components.Examples)
 
-		// webhooks should be removed
-		assert.Nil(t, model.Model.Webhooks)
+		// webhooks should be preserved
+		assert.NotNil(t, model.Model.Webhooks)
+
+		// schemas referenced by webhooks should be preserved
+		assert.Equal(t, 2, model.Model.Components.Schemas.Len())
+
+		_, hasPaymentRequest := model.Model.Components.Schemas.Get("PaymentRequest")
+		assert.True(t, hasPaymentRequest, "PaymentRequest schema should be preserved - referenced by webhook")
+
+		_, hasResponse := model.Model.Components.Schemas.Get("Response")
+		assert.True(t, hasResponse, "Response schema should be preserved - referenced by webhook")
 	})
 }

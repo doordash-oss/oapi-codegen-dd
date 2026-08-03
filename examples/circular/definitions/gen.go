@@ -11,11 +11,7 @@ import (
 
 type GetReportsIDPath struct {
 	// ID The ID of the report
-	ID int `json:"id" validate:"required"`
-}
-
-func (g GetReportsIDPath) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+	ID int `json:"id"`
 }
 
 type GetReportsIDResponse = Report

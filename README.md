@@ -16,13 +16,14 @@ on the real value-add for your organization.
 - **Smart pruning** - Automatically removes unused types by default (configurable)
 
 ### Type System
-- **Union types** - Full support for `oneOf`, `anyOf`, and `allOf` with intelligent type merging and `runtime.Either[A, B]` for two-element unions
+- **Union types** - Full support for `oneOf`, `anyOf`, `allOf`, and `if`/`then`/`else` with intelligent type merging, `runtime.Either[A, B]` for two-element unions, and `runtime.Conditional[T, E]` for conditional schemas
 - **Additional properties** - Handle dynamic fields with `map[string]interface{}` or custom types
 - **Validation** - Built-in validation using [go-playground/validator](https://github.com/go-playground/validator) with `Validate()` methods on generated types
 - **Custom extensions** - for fine-grained control over code generation
 
 ### Client Generation
 - **HTTP client generation** - Generate type-safe HTTP clients with customizable timeout and request editors
+- **Envelope `WithResponse` clients** - Opt-in `<Op>WithResponse` siblings that return a typed envelope with per-status bodies, typed headers, and the raw `*http.Response` - useful for operations that legitimately return multiple 2xx statuses or need typed access to response headers
 - **Custom client types** - Wrap generated clients with your own types for additional functionality
 - **Error mapping** - Map response types to implement the `error` interface automatically
 
@@ -40,9 +41,10 @@ on the real value-add for your organization.
 
 ### Configuration & Filtering
 - **YAML-based configuration** with JSON schema validation
-- **Flexible filtering** - Include/exclude by paths, tags, operation IDs, schema properties, or extensions
+- **Flexible filtering** - Include/exclude by paths, tags, operation IDs, webhooks, schema properties, or extensions
 - **Transitive pruning** - Automatically remove schemas that are only referenced by filtered-out properties
 - **[OpenAPI Overlays](https://doordash-oss.github.io/oapi-codegen-dd/overlays/)** - Modify specs without editing originals (add extensions, remove paths)
+- **External file `$ref` resolution** - Split specs across multiple files with relative `$ref` references (auto-detected from spec path, or set `base-path` in config)
 
 ### Programmatic Access
 - **Runtime package** - Public API for working with generated types
@@ -66,7 +68,7 @@ This project is a fork of [oapi-codegen](https://github.com/oapi-codegen/oapi-co
 
 ### Compatibility
 
-Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/cubahno/specs):
+Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/mockzilla/specs):
 
 | Version | Passed | Failed | Pass Rate |
 |---------|--------|--------|-----------|
@@ -84,7 +86,8 @@ Tested against [2,137 real-world OpenAPI 3.0 specs](https://github.com/cubahno/s
 | **Name Conflicts** | Manual fix required | Automatic resolution |
 | **Validation** | None | `Validate()` methods |
 | **Server Scaffold** | Interface only, manual boilerplate | Full typed solution (service, middleware, main.go) |
-| **Filtering** | Tags, operation IDs | + Paths, extensions, schema properties |
+| **Webhooks** | Not supported | Full type generation with filtering |
+| **Filtering** | Tags, operation IDs | + Paths, webhooks, extensions, schema properties |
 | **Overlays** | Single | Multiple, applied in order |
 | **Output** | Single file | Single or multiple files |
 | **Templates** | Monolithic | Composable with `{{define}}` blocks |

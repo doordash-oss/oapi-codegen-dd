@@ -229,3 +229,81 @@ func TestConvertValidatorError(t *testing.T) {
 		assert.Len(t, unwrapped, 2)
 	})
 }
+
+func TestValidatePattern(t *testing.T) {
+	t.Run("matching value passes", func(t *testing.T) {
+		assert.NoError(t, ValidatePattern("ABC", `^[A-Z]{3}$`))
+	})
+
+	t.Run("non-matching value fails", func(t *testing.T) {
+		err := ValidatePattern("abc", `^[A-Z]{3}$`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must match pattern")
+		assert.Contains(t, err.Error(), `^[A-Z]{3}$`)
+	})
+
+	t.Run("empty value is skipped", func(t *testing.T) {
+		// An empty value is treated as absent; a required constraint is
+		// responsible for rejecting it.
+		assert.NoError(t, ValidatePattern("", `^[A-Z]{3}$`))
+	})
+
+	t.Run("returned error is a ValidationError", func(t *testing.T) {
+		err := ValidatePattern("abc", `^[A-Z]{3}$`)
+		var ve ValidationError
+		require.True(t, errors.As(err, &ve))
+		assert.Empty(t, ve.Field, "field should be supplied by the caller via Append")
+	})
+
+	t.Run("field is applied by Append", func(t *testing.T) {
+		var verrs ValidationErrors
+		verrs = verrs.Append("Code", ValidatePattern("abc", `^[A-Z]{3}$`))
+		require.Len(t, verrs, 1)
+		assert.Equal(t, "Code", verrs[0].Field)
+	})
+
+	t.Run("uncompilable pattern reports an error", func(t *testing.T) {
+		// Lookahead is valid ECMA-262 but unsupported by Go's RE2 engine.
+		err := ValidatePattern("anything", `(?=x)`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unusable pattern")
+	})
+
+	t.Run("dereferences pointers", func(t *testing.T) {
+		s := "abc"
+		assert.NoError(t, ValidatePattern(&s, `^[a-z]+$`))
+		bad := "ABC"
+		assert.Error(t, ValidatePattern(&bad, `^[a-z]+$`))
+	})
+
+	t.Run("nil pointer is skipped", func(t *testing.T) {
+		var s *string
+		assert.NoError(t, ValidatePattern(s, `^[a-z]+$`))
+	})
+
+	t.Run("named string types are matched", func(t *testing.T) {
+		type code string
+		assert.NoError(t, ValidatePattern(code("abc"), `^[a-z]+$`))
+		assert.Error(t, ValidatePattern(code("ABC"), `^[a-z]+$`))
+		c := code("abc")
+		assert.NoError(t, ValidatePattern(&c, `^[a-z]+$`))
+	})
+
+	t.Run("non-string values are skipped", func(t *testing.T) {
+		// A regex can't apply to a slice/struct/number, so these pass rather than error.
+		assert.NoError(t, ValidatePattern([]string{"x"}, `^[a-z]+$`))
+		assert.NoError(t, ValidatePattern(42, `^[a-z]+$`))
+		assert.NoError(t, ValidatePattern(struct{ X int }{}, `^[a-z]+$`))
+	})
+
+	t.Run("compiled pattern is cached", func(t *testing.T) {
+		const pattern = `^cache-[0-9]+$`
+		require.NoError(t, ValidatePattern("cache-1", pattern))
+
+		// Second call hits the cache and behaves identically.
+		require.NoError(t, ValidatePattern("cache-2", pattern))
+
+		_, ok := patternCache.Load(pattern)
+		assert.True(t, ok, "pattern should be cached after first use")
+	})
+}

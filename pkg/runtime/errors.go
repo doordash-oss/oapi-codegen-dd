@@ -26,6 +26,28 @@ var (
 	ErrRequestBodyEmpty        = errors.New("request body is empty")
 )
 
+// ResponseDecodeError is returned when the client fails to decode (unmarshal)
+// an HTTP response body. It provides structured context for debugging.
+// Note: Body is available for programmatic access but is intentionally excluded
+// from Error() to avoid leaking sensitive data into logs.
+type ResponseDecodeError struct {
+	StatusCode    int    // HTTP status code of the response
+	ContentType   string // Content-Type header of the response
+	ContentLength int    // size of the response body in bytes
+	TargetType    string // name of the Go type we attempted to unmarshal into
+	Body          []byte // raw response body - excluded from Error() to avoid PII leakage
+	Err           error  // underlying unmarshal error
+}
+
+func (e *ResponseDecodeError) Error() string {
+	return fmt.Sprintf("error decoding response: status=%d, content-type=%s, content-length=%d, target-type=%s: %s",
+		e.StatusCode, e.ContentType, e.ContentLength, e.TargetType, e.Err)
+}
+
+func (e *ResponseDecodeError) Unwrap() error {
+	return e.Err
+}
+
 type ClientAPIErrorOption func(*ClientAPIError)
 
 // ClientAPIError represents type for client API errors.

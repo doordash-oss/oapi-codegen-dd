@@ -94,10 +94,15 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		return nil, nil
 	}
 
+	if err := cfg.Generate.Validate(); err != nil {
+		return nil, err
+	}
+
 	parseOptions := ParseOptions{
 		OmitDescription:        cfg.Generate.OmitDescription,
 		DefaultIntType:         cfg.Generate.DefaultIntType,
 		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
+		AdditionalTags:         cfg.Generate.AdditionalTags,
 		SkipValidation:         cfg.Generate.Validation.Skip,
 		ErrorMapping:           cfg.ErrorMapping,
 		typeTracker:            newTypeTracker(),
@@ -129,6 +134,14 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		typeDefs = append(typeDefs, opColl.typeDefs...)
 		responseErrors = opColl.responseErrors
 	}
+
+	// Collect webhook type definitions (request body and response types)
+	webhookTypeDefs, webhookSchemas, err := collectWebhookDefinitions(model, parseOptions)
+	if err != nil {
+		return nil, fmt.Errorf("error collecting webhook definitions: %w", err)
+	}
+	typeDefs = append(typeDefs, webhookTypeDefs...)
+	importSchemas = append(importSchemas, webhookSchemas...)
 
 	// Collect Schemas from components
 	for _, componentDef := range typeDefs {
@@ -219,7 +232,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 				pathParamsDef *TypeDefinition
 			)
 
-			operationID, err := createOperationID(method, path, operation.OperationId)
+			operationID, err := CreateOperationID(method, path, operation.OperationId)
 			if err != nil {
 				return nil, fmt.Errorf("error creating operation ID: %w", err)
 			}
@@ -354,6 +367,36 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		typeDefs:       allTypeDefs,
 		responseErrors: responseErrors,
 	}, nil
+}
+
+// assignWithResponseTypeNames pre-computes the envelope wrapper name and the
+// per-status header struct names for each operation, registering them on the
+// TypeTracker so collisions with user-declared schemas are resolved before the
+// templates run. Mutates the operations slice in place.
+func assignWithResponseTypeNames(operations []OperationDefinition, tracker *TypeTracker) {
+	for i := range operations {
+		op := &operations[i]
+		baseName := UppercaseFirstCharacter(op.ID) + "Resp"
+		op.WithResponseTypeName = tracker.generateUniqueName(baseName)
+		tracker.registerName(op.WithResponseTypeName)
+
+		statusesWithHeaders := func(rcds []*ResponseContentDefinition) {
+			for _, rcd := range rcds {
+				if len(rcd.Headers) == 0 {
+					continue
+				}
+				if op.HeaderTypeNames == nil {
+					op.HeaderTypeNames = make(map[int]string)
+				}
+				header := op.WithResponseTypeName + fmt.Sprintf("%dHeaders", rcd.StatusCode)
+				header = tracker.generateUniqueName(header)
+				tracker.registerName(header)
+				op.HeaderTypeNames[rcd.StatusCode] = header
+			}
+		}
+		statusesWithHeaders(op.Response.Successes)
+		statusesWithHeaders(op.Response.Errors)
+	}
 }
 
 // resolveRequestOptionsCollisions checks if any operation's RequestOptions type name
@@ -526,4 +569,52 @@ func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, e
 	}
 
 	return res, nil
+}
+
+// collectWebhookDefinitions walks webhook operations and collects type definitions
+// for request bodies and responses. Types are tagged with SpecLocationWebhook
+// so they appear in a separate "webhooks" output file in multi-file mode.
+func collectWebhookDefinitions(model *v3high.Document, options ParseOptions) ([]TypeDefinition, []GoSchema, error) {
+	if model.Webhooks == nil {
+		return nil, nil, nil
+	}
+
+	var (
+		typeDefs      []TypeDefinition
+		importSchemas []GoSchema
+	)
+
+	for webhookName, pathItem := range model.Webhooks.FromOldest() {
+		for method, operation := range pathItem.GetOperations().FromOldest() {
+			operationID, err := CreateOperationID(method, "/webhooks/"+webhookName, operation.OperationId)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error creating webhook operation ID: %w", err)
+			}
+
+			// Process Request Body
+			_, bodyTypeDef, err := createBodyDefinition(operationID, operation.RequestBody, options)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error generating webhook body definitions for %s: %w", webhookName, err)
+			}
+			if bodyTypeDef != nil {
+				bodyTypeDef.SpecLocation = SpecLocationWebhook
+				typeDefs = append(typeDefs, *bodyTypeDef)
+				importSchemas = append(importSchemas, bodyTypeDef.Schema)
+			}
+
+			// Process Responses
+			_, responseTypes, err := getOperationResponses(operationID, operation.Responses, options)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error getting webhook response types for %s: %w", webhookName, err)
+			}
+			for i := range responseTypes {
+				responseTypes[i].SpecLocation = SpecLocationWebhook
+				importSchemas = append(importSchemas, responseTypes[i].Schema)
+			}
+			typeDefs = append(typeDefs, responseTypes...)
+		}
+	}
+
+	allTypeDefs := extractAllTypeDefinitions(typeDefs)
+	return allTypeDefs, importSchemas, nil
 }

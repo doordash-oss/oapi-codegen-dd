@@ -27,8 +27,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc             ServiceInterface
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -37,7 +38,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, jsonBodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -48,6 +49,9 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -104,6 +108,9 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -140,7 +147,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, 400, NewError(err.Error()))
 		return
 	}
@@ -150,6 +157,9 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -193,6 +203,9 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -236,6 +249,9 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}

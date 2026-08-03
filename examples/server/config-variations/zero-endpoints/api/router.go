@@ -4,6 +4,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -11,8 +12,9 @@ import (
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []func(http.Handler) http.Handler
-	errHandler  OapiErrorHandler
+	middlewares     []func(http.Handler) http.Handler
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -27,6 +29,14 @@ func WithMiddleware(mw func(http.Handler) http.Handler) RouterOption {
 func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	return func(cfg *routerConfig) {
 		cfg.errHandler = h
+	}
+}
+
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.jsonBodyDecoder = fn
 	}
 }
 

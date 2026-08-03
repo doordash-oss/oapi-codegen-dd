@@ -1,0 +1,39 @@
+openapi: 3.0.0
+info:
+  title: Nested AllOf inside a no-type wrapper test
+  version: 1.0.0
+paths:
+  /contacts/{id}:
+    get:
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactDetails'
+components:
+  schemas:
+    ContactBase:
+      allOf:
+        - properties:
+            contactId: {type: string}
+            name: {type: string}
+          type: object
+        - properties:
+            note: {type: string}
+          type: object
+    ContactDetails:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ContactBase'
+        - properties:
+            tags:
+              type: array
+              items: {type: string}
+          type: object

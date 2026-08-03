@@ -104,7 +104,7 @@ func (t TimeBasedLocation) Validate() error {
 }
 
 type DistanceBasedLocation struct {
-	Distance float32 `json:"distance" validate:"required,gte=0"`
+	Distance float32 `json:"distance" validate:"gte=0"`
 }
 
 func (d DistanceBasedLocation) Validate() error {
@@ -191,7 +191,7 @@ func (a AbsoluteTimeRange) Validate() error {
 }
 
 type RelativeTimeDuration struct {
-	Duration int `json:"duration" validate:"required,gte=2"`
+	Duration int `json:"duration" validate:"gte=2"`
 }
 
 func (r RelativeTimeDuration) Validate() error {

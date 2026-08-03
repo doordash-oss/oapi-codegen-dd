@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -21,7 +22,7 @@ import (
 )
 
 func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document, error) {
-	doc, err := LoadDocumentFromContents(docContents)
+	doc, err := LoadDocumentFromContents(docContents, cfg.BasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -38,15 +39,12 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 		return nil, fmt.Errorf("error building model: %w", err)
 	}
 
-	var filtered bool
-	model, filtered, err := filterOutDocument(doc, cfg.Filter)
+	model, _, err := filterOutDocument(doc, cfg.Filter)
 	if err != nil {
 		return nil, fmt.Errorf("error filtering document: %w", err)
 	}
 
-	// If we filtered anything, we must prune to remove dangling references
-	// Otherwise, only prune if SkipPrune is false
-	if filtered || !cfg.SkipPrune {
+	if !cfg.SkipPrune {
 		if err = pruneSchema(model); err != nil {
 			return nil, fmt.Errorf("error pruning schema: %w", err)
 		}
@@ -56,9 +54,24 @@ func CreateDocument(docContents []byte, cfg Configuration) (libopenapi.Document,
 	return doc, nil
 }
 
-func LoadDocumentFromContents(contents []byte) (libopenapi.Document, error) {
+// LoadDocumentFromContents creates a libopenapi Document from raw bytes.
+// An optional basePath can be provided to resolve relative $ref file references.
+// If provided, basePath should be an absolute path to the directory containing the spec file.
+func LoadDocumentFromContents(contents []byte, basePath ...string) (libopenapi.Document, error) {
 	docConfig := &datamodel.DocumentConfiguration{
 		SkipCircularReferenceCheck: true,
+	}
+	if len(basePath) > 0 && basePath[0] != "" {
+		bp := basePath[0]
+		if !filepath.IsAbs(bp) {
+			var err error
+			bp, err = filepath.Abs(bp)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving base path %q: %w", basePath[0], err)
+			}
+		}
+		docConfig.BasePath = bp
+		docConfig.AllowFileReferences = true
 	}
 	doc, err := libopenapi.NewDocumentWithConfiguration(contents, docConfig)
 	if err != nil {

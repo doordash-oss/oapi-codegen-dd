@@ -63,6 +63,10 @@
       "type": "object",
       "description": "UserContext is the map of user-provided context values to be used in templates user overrides.",
       "additionalProperties": true
+    },
+    "base-path": {
+      "type": "string",
+      "description": "BasePath is the directory used to resolve relative $ref file references. When set, external file references like './common.yaml#/...' will be resolved relative to this directory. Typically set to the directory containing the spec file. When using the CLI, this is auto-detected from the spec file path."
     }
   },
   "required": [],
@@ -96,7 +100,11 @@
       "properties": {
         "client": {
           "type": "boolean",
-          "description": "Client specifies whether to generate a client. Defaults to false."
+          "description": "Generate the classic client: one method per operation returning the picked 2xx body directly (e.g. UploadDocument(...) (*DocumentStored, error)). Use this when callers only need the response body and the operation has a single documented success status; headers and non-picked 2xx bodies are not exposed. Combine with client-with-response when an operation has multiple 2xx statuses or callers need typed headers - both flags can be true and the generated ClientInterface will list both styles. Defaults to false."
+        },
+        "client-with-response": {
+          "type": "boolean",
+          "description": "Generate <Op>WithResponse sibling functions that return a typed envelope: one JSON<status> field per documented response, one Headers<status> typed struct per status that declares headers, plus HTTPResponse *http.Response for raw access. Use when an operation has multiple 2xx statuses with different bodies (e.g. 201 sync + 202 queued) or when callers need typed access to headers like Location or Retry-After. Additive to client: when both are true the combined ClientInterface lists both styles. Defaults to false."
         },
         "models": {
           "type": "boolean",
@@ -122,6 +130,13 @@
             "type": "boolean",
             "description": "AlwaysPrefixEnumValues specifies whether to always prefix enum values with the schema name. Defaults to true."
         },
+        "additional-tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional struct tags to emit on generated fields, mirroring the json tag value. For example, [\"yaml\"] emits yaml:\"field_name,omitempty\" alongside the json tag. Useful when structs are decoded by libraries that don't read json tags (e.g. go.yaml.in/yaml/v4). Per-property x-oapi-codegen-extra-tags take priority over these global tags."
+        },
         "validation": {
           "$ref": "#/definitions/ValidationOptions",
           "description": "Validation specifies options for Validate() method generation."
@@ -135,11 +150,11 @@
       "properties": {
         "include": {
           "$ref": "#/definitions/FilterParamsConfig",
-          "description": "Paths, tags, operation IDs, and schema properties to include."
+          "description": "Paths, tags, operation IDs, webhooks, and schema properties to include."
         },
         "exclude": {
           "$ref": "#/definitions/FilterParamsConfig",
-          "description": "Paths, tags, operation IDs, and schema properties to exclude."
+          "description": "Paths, tags, operation IDs, webhooks, and schema properties to exclude."
         }
       },
       "required": []
@@ -168,6 +183,13 @@
             "type": "string"
           },
           "description": "List of operation IDs to include or exclude."
+        },
+        "webhooks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of webhook names to include or exclude."
         },
         "schema-properties": {
           "type": "object",
@@ -265,7 +287,7 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["beego", "chi", "echo", "fasthttp", "fiber", "gin", "goframe", "go-zero", "gorilla-mux", "hertz", "iris", "kratos", "std-http"],
+          "enum": ["beego", "chi", "echo", "echo-v5", "fasthttp", "fiber", "gin", "goframe", "go-zero", "gorilla-mux", "hertz", "iris", "kratos", "std-http"],
           "description": "Router/framework to generate for. Required."
         },
         "models-package-alias": {

@@ -111,7 +111,12 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 		if schema != nil && schema.Properties != nil {
 			for pName, p := range schema.Properties.FromOldest() {
 				propertyPath := append(path, pName)
-				pRef := p.GoLow().GetReference()
+
+				pRef := ""
+				if low := p.GoLow(); low != nil {
+					pRef = low.GetReference()
+				}
+
 				opts := options.WithReference(pRef).WithPath(propertyPath)
 				pSchema, err := GenerateGoSchema(p, opts)
 				if err != nil {

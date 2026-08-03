@@ -11,6 +11,7 @@
 package codegen
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -343,4 +344,176 @@ func TestFilterOperationsByPath(t *testing.T) {
 		assert.Contains(t, combined, `"/test/{name}"`)
 		assert.Contains(t, combined, `"/enum"`)
 	})
+}
+
+func TestFilterWebhooks(t *testing.T) {
+	contents, err := os.ReadFile("testdata/filter-webhooks.yml")
+	require.NoError(t, err)
+
+	t.Run("include webhooks", func(t *testing.T) {
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		cfg := FilterConfig{
+			Include: FilterParamsConfig{
+				Webhooks: []string{"order.created"},
+			},
+		}
+
+		removed := filterOperations(&model.Model, cfg)
+		assert.True(t, removed)
+
+		// order.created should remain
+		_, hasOrder := model.Model.Webhooks.Get("order.created")
+		assert.True(t, hasOrder, "order.created webhook should be included")
+
+		// payment.completed should be removed
+		_, hasPayment := model.Model.Webhooks.Get("payment.completed")
+		assert.False(t, hasPayment, "payment.completed webhook should be excluded")
+	})
+
+	t.Run("exclude webhooks", func(t *testing.T) {
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		cfg := FilterConfig{
+			Exclude: FilterParamsConfig{
+				Webhooks: []string{"payment.completed"},
+			},
+		}
+
+		removed := filterOperations(&model.Model, cfg)
+		assert.True(t, removed)
+
+		// order.created should remain
+		_, hasOrder := model.Model.Webhooks.Get("order.created")
+		assert.True(t, hasOrder, "order.created webhook should remain")
+
+		// payment.completed should be removed
+		_, hasPayment := model.Model.Webhooks.Get("payment.completed")
+		assert.False(t, hasPayment, "payment.completed webhook should be excluded")
+	})
+
+	t.Run("empty webhook filter does not remove webhooks", func(t *testing.T) {
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		cfg := FilterConfig{}
+		removed := filterOperations(&model.Model, cfg)
+		assert.False(t, removed)
+
+		// Both webhooks should remain
+		_, hasOrder := model.Model.Webhooks.Get("order.created")
+		assert.True(t, hasOrder)
+		_, hasPayment := model.Model.Webhooks.Get("payment.completed")
+		assert.True(t, hasPayment)
+	})
+
+	t.Run("filter webhook operations by tag", func(t *testing.T) {
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		cfg := FilterConfig{
+			Include: FilterParamsConfig{
+				Tags: []string{"orders"},
+			},
+		}
+
+		removed := filterOperations(&model.Model, cfg)
+		assert.True(t, removed)
+
+		// order.created should still have its post operation
+		orderItem, hasOrder := model.Model.Webhooks.Get("order.created")
+		assert.True(t, hasOrder)
+		assert.NotNil(t, orderItem.Post)
+
+		// payment.completed should have its post operation nil'd out
+		paymentItem, hasPayment := model.Model.Webhooks.Get("payment.completed")
+		assert.True(t, hasPayment)
+		assert.Nil(t, paymentItem.Post)
+	})
+
+	t.Run("filter webhook operations by operationID", func(t *testing.T) {
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		cfg := FilterConfig{
+			Exclude: FilterParamsConfig{
+				OperationIDs: []string{"paymentCompleted"},
+			},
+		}
+
+		removed := filterOperations(&model.Model, cfg)
+		assert.True(t, removed)
+
+		// order.created post should remain
+		orderItem, _ := model.Model.Webhooks.Get("order.created")
+		assert.NotNil(t, orderItem.Post)
+
+		// payment.completed post should be nil'd out
+		paymentItem, _ := model.Model.Webhooks.Get("payment.completed")
+		assert.Nil(t, paymentItem.Post)
+	})
+}
+
+func TestGenerateWebhookTypes(t *testing.T) {
+	contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+	require.NoError(t, err)
+
+	cfg := Configuration{
+		PackageName: "webhooktest",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	code, err := Generate(contents, cfg)
+	require.NoError(t, err)
+	assert.NotEmpty(t, code)
+
+	combined := code.GetCombined()
+	assert.Contains(t, combined, "PaymentRequest")
+	assert.Contains(t, combined, "Response")
+}
+
+func TestGenerateWebhookTypesMultiFile(t *testing.T) {
+	contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+	require.NoError(t, err)
+
+	cfg := Configuration{
+		PackageName: "webhooktest",
+		Output: &Output{
+			UseSingleFile: false,
+		},
+	}
+
+	code, err := Generate(contents, cfg)
+	require.NoError(t, err)
+	assert.NotEmpty(t, code)
+
+	// Webhook types should be in the "webhooks" output file
+	webhooksCode, hasWebhooks := code["webhooks"]
+	assert.True(t, hasWebhooks, "should have a 'webhooks' output file for webhook types")
+	assert.Contains(t, webhooksCode, "PaymentCreatedBody")
+	assert.Contains(t, webhooksCode, "PaymentCreatedResponse")
+
+	// Component schemas should be in the "types" output file
+	typesCode, hasTypes := code["types"]
+	assert.True(t, hasTypes, "should have a 'types' output file for component schemas")
+	assert.Contains(t, typesCode, "PaymentRequest")
 }

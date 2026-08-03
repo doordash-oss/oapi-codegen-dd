@@ -28,10 +28,39 @@ limitations under the License.
     {{$properties := .Schema.Properties -}}
 
     {{ $eitherType := eq (len .Schema.UnionElements) 2}}
+    {{ $conditionalType := .Schema.IsConditional }}
 
     {{/* Add Validate method for union types */}}
     func ({{$alias}} *{{$typeName}}) Validate() error {
-        {{- if $eitherType }}
+        {{- if and $eitherType $conditionalType }}
+        {{- $elementThen := index .Schema.UnionElements 0 }}
+        {{- $elementElse := index .Schema.UnionElements 1 }}
+        {{- $tagsThen := filterOmitEmpty $elementThen.Schema.Constraints.ValidationTags }}
+        {{- $tagsElse := filterOmitEmpty $elementElse.Schema.Constraints.ValidationTags }}
+        if {{$alias}}.IsThen() {
+            {{- if gt (len $tagsThen) 0 }}
+            if err := typesValidator.Var({{$alias}}.Then, "{{join "," $tagsThen}}"); err != nil {
+                return err
+            }
+            {{- else }}
+            if v, ok := any({{$alias}}.Then).(runtime.Validator); ok {
+                return v.Validate()
+            }
+            {{- end }}
+        }
+        if {{$alias}}.IsElse() {
+            {{- if gt (len $tagsElse) 0 }}
+            if err := typesValidator.Var({{$alias}}.Else, "{{join "," $tagsElse}}"); err != nil {
+                return err
+            }
+            {{- else }}
+            if v, ok := any({{$alias}}.Else).(runtime.Validator); ok {
+                return v.Validate()
+            }
+            {{- end }}
+        }
+        return nil
+        {{- else if $eitherType }}
         {{- $elementA := index .Schema.UnionElements 0 }}
         {{- $elementB := index .Schema.UnionElements 1 }}
         {{- $tagsA := filterOmitEmpty $elementA.Schema.Constraints.ValidationTags }}

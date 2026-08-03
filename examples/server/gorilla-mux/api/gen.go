@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
@@ -102,8 +103,9 @@ type ServiceInterface interface {
 // HTTPAdapter adapts the ServiceInterface to HTTP handlers.
 // This struct is generated and should not be modified.
 type HTTPAdapter struct {
-	svc        ServiceInterface
-	errHandler OapiErrorHandler
+	svc             ServiceInterface
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // NewHTTPAdapter creates a new HTTPAdapter wrapping the given service.
@@ -112,7 +114,7 @@ func NewHTTPAdapter(svc ServiceInterface, errHandler OapiErrorHandler) *HTTPAdap
 	if errHandler == nil {
 		errHandler = &OapiDefaultErrorHandler{}
 	}
-	return &HTTPAdapter{svc: svc, errHandler: errHandler}
+	return &HTTPAdapter{svc: svc, errHandler: errHandler, jsonBodyDecoder: runtime.DecodeJSONBody}
 }
 
 // HealthCheck handles GET /health
@@ -123,6 +125,9 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.HealthCheck(ctx)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -179,6 +184,9 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.ListUsers(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -215,7 +223,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	defer r.Body.Close()
 	var body CreateUserBody
-	if err := runtime.DecodeJSONBody(r.Body, &body); err != nil {
+	if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
 		a.errHandler.HandleError(w, r, 400, NewCreateUserErrorResponse(err.Error()))
 		return
 	}
@@ -225,7 +233,11 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.CreateUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
-		if _, ok := err.(*CreateUserErrorResponse); ok {
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
+		var errResp *CreateUserErrorResponse
+		if errors.As(err, &errResp) {
 			code = 400
 		}
 		a.errHandler.HandleError(w, r, code, err)
@@ -271,6 +283,9 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.GetUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -314,6 +329,9 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.svc.DeleteUser(ctx, opts)
 	if err != nil {
 		code := http.StatusInternalServerError
+		if resp != nil && resp.Status != 0 {
+			code = resp.Status
+		}
 		a.errHandler.HandleError(w, r, code, err)
 		return
 	}
@@ -339,8 +357,9 @@ func (a *HTTPAdapter) DeleteUser(w http.ResponseWriter, r *http.Request) {
 type RouterOption func(*routerConfig)
 
 type routerConfig struct {
-	middlewares []mux.MiddlewareFunc
-	errHandler  OapiErrorHandler
+	middlewares     []mux.MiddlewareFunc
+	errHandler      OapiErrorHandler
+	jsonBodyDecoder runtime.JSONBodyDecoderFunc
 }
 
 // WithMiddleware adds middleware to the router.
@@ -358,6 +377,14 @@ func WithErrorHandler(h OapiErrorHandler) RouterOption {
 	}
 }
 
+// WithJSONBodyDecoder sets a custom function for decoding JSON request bodies.
+// If not set, runtime.DecodeJSONBody is used.
+func WithJSONBodyDecoder(fn runtime.JSONBodyDecoderFunc) RouterOption {
+	return func(cfg *routerConfig) {
+		cfg.jsonBodyDecoder = fn
+	}
+}
+
 // NewRouter creates a new mux.Router with the given service implementation.
 func NewRouter(svc ServiceInterface, opts ...RouterOption) *mux.Router {
 	cfg := &routerConfig{}
@@ -371,6 +398,9 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) *mux.Router {
 	}
 
 	adapter := NewHTTPAdapter(svc, cfg.errHandler)
+	if cfg.jsonBodyDecoder != nil {
+		adapter.jsonBodyDecoder = cfg.jsonBodyDecoder
+	}
 	r.HandleFunc("/health", adapter.HealthCheck).Methods("GET")
 	r.HandleFunc("/users", adapter.ListUsers).Methods("GET")
 	r.HandleFunc("/users", adapter.CreateUser).Methods("POST")
