@@ -11,11 +11,7 @@ import (
 
 type GetNodesIDPath struct {
 	// ID The ID of the node
-	ID int `json:"id" validate:"required"`
-}
-
-func (g GetNodesIDPath) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+	ID int `json:"id"`
 }
 
 type GetNodesIDResponse = Node

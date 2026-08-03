@@ -14,6 +14,7 @@ import (
 	"embed"
 	"go/format"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -365,6 +366,124 @@ func TestOperationResponseAliasReusesSameType(t *testing.T) {
 	require.NoError(t, err, "Generated code should compile without syntax errors")
 }
 
+func TestAssignWithResponseTypeNames(t *testing.T) {
+	t.Run("empty operations slice is a no-op", func(t *testing.T) {
+		tracker := newTypeTracker()
+		var ops []OperationDefinition
+		assignWithResponseTypeNames(ops, tracker)
+		assert.Empty(t, ops)
+	})
+
+	t.Run("operation without response headers gets WithResponseTypeName but no HeaderTypeNames", func(t *testing.T) {
+		tracker := newTypeTracker()
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{
+					{StatusCode: 201, IsSuccess: true},
+				},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.Equal(t, "UploadDocumentResp", ops[0].WithResponseTypeName)
+		assert.Nil(t, ops[0].HeaderTypeNames)
+	})
+
+	t.Run("headers on success and error both get header type names", func(t *testing.T) {
+		tracker := newTypeTracker()
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{
+					{StatusCode: 201, IsSuccess: true, Headers: map[string]GoSchema{
+						"Location": {GoType: "string"},
+					}},
+					// no headers on this one
+					{StatusCode: 202, IsSuccess: true},
+				},
+				Errors: []*ResponseContentDefinition{
+					{StatusCode: 422, Headers: map[string]GoSchema{
+						"Retry-After": {GoType: "string"},
+					}},
+				},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		require.NotNil(t, ops[0].HeaderTypeNames)
+		assert.Equal(t, "UploadDocumentResp201Headers", ops[0].HeaderTypeNames[201])
+		_, has202 := ops[0].HeaderTypeNames[202]
+		assert.False(t, has202, "202 has no spec headers, so no Headers202 type should be reserved")
+		assert.Equal(t, "UploadDocumentResp422Headers", ops[0].HeaderTypeNames[422])
+	})
+
+	t.Run("colliding wrapper name is disambiguated against existing tracker entries", func(t *testing.T) {
+		tracker := newTypeTracker()
+		// Simulate a user-declared schema that collides with the natural wrapper
+		// name we'd otherwise generate.
+		tracker.registerName("UploadDocumentResp")
+
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{{StatusCode: 201, IsSuccess: true}},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.NotEqual(t, "UploadDocumentResp", ops[0].WithResponseTypeName,
+			"wrapper name must avoid the existing schema; got the colliding name back")
+		assert.NotEmpty(t, ops[0].WithResponseTypeName)
+	})
+
+	t.Run("colliding header name is disambiguated", func(t *testing.T) {
+		tracker := newTypeTracker()
+		tracker.registerName("UploadDocumentResp201Headers")
+
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{
+					{StatusCode: 201, IsSuccess: true, Headers: map[string]GoSchema{
+						"Location": {GoType: "string"},
+					}},
+				},
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.NotEqual(t, "UploadDocumentResp201Headers", ops[0].HeaderTypeNames[201],
+			"header name must avoid the existing schema; got the colliding name back")
+		assert.NotEmpty(t, ops[0].HeaderTypeNames[201])
+	})
+
+	t.Run("two operations get independent names registered with the tracker", func(t *testing.T) {
+		tracker := newTypeTracker()
+		ops := []OperationDefinition{
+			{ID: "uploadDocument", Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{{StatusCode: 201, IsSuccess: true}},
+			}},
+			{ID: "deleteDocument", Response: ResponseDefinition{
+				Successes: []*ResponseContentDefinition{{StatusCode: 204, IsSuccess: true}},
+			}},
+		}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		assert.Equal(t, "UploadDocumentResp", ops[0].WithResponseTypeName)
+		assert.Equal(t, "DeleteDocumentResp", ops[1].WithResponseTypeName)
+		// Both names must be present in the tracker so subsequent unique-name
+		// resolution doesn't reuse them.
+		assert.True(t, tracker.Exists("UploadDocumentResp"))
+		assert.True(t, tracker.Exists("DeleteDocumentResp"))
+	})
+}
+
 func TestOverlayAppliesExtensions(t *testing.T) {
 	cfg := Configuration{
 		PackageName: "api",
@@ -488,4 +607,139 @@ func TestRawContentTypesGenerateByteSlice(t *testing.T) {
 	// Verify that the code compiles
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestExternalFileRefResolution(t *testing.T) {
+	testdataDir, err := filepath.Abs("testdata")
+	require.NoError(t, err)
+
+	specPath := filepath.Join(testdataDir, "external-ref-api.yaml")
+	contents, err := os.ReadFile(specPath)
+	require.NoError(t, err)
+
+	t.Run("fails without BasePath", func(t *testing.T) {
+		cfg := NewDefaultConfiguration()
+		cfg.BasePath = ""
+
+		_, err := CreateDocument(contents, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not exist in the specification")
+	})
+
+	t.Run("succeeds with BasePath", func(t *testing.T) {
+		cfg := NewDefaultConfiguration()
+		cfg.BasePath = testdataDir
+
+		doc, err := CreateDocument(contents, cfg)
+		require.NoError(t, err)
+
+		model, errs := doc.BuildV3Model()
+		require.Empty(t, errs)
+
+		getUserResp := model.Model.Paths.PathItems.GetOrZero("/users/{id}").Get.Responses.Codes.GetOrZero("200")
+		require.NotNil(t, getUserResp)
+
+		jsonContent := getUserResp.Content.GetOrZero("application/json")
+		require.NotNil(t, jsonContent)
+
+		schema := jsonContent.Schema.Schema()
+		require.NotNil(t, schema)
+
+		addressProp := schema.Properties.GetOrZero("address")
+		require.NotNil(t, addressProp)
+
+		resolvedSchema := addressProp.Schema()
+		require.NotNil(t, resolvedSchema)
+		assert.True(t, resolvedSchema.Properties.Len() > 0, "Address schema should have properties after ref resolution")
+
+		streetProp := resolvedSchema.Properties.GetOrZero("street")
+		assert.NotNil(t, streetProp, "Address should have a 'street' property")
+
+		cityProp := resolvedSchema.Properties.GetOrZero("city")
+		assert.NotNil(t, cityProp, "Address should have a 'city' property")
+	})
+
+	t.Run("end-to-end code generation with external refs", func(t *testing.T) {
+		cfg := NewDefaultConfiguration()
+		cfg.BasePath = testdataDir
+
+		code, err := Generate(contents, cfg)
+		require.NoError(t, err)
+		assert.NotEmpty(t, code)
+
+		combined := code.GetCombined()
+		assert.Contains(t, combined, "Address")
+		assert.Contains(t, combined, "Street")
+		assert.Contains(t, combined, "City")
+	})
+}
+
+func TestCollectWebhookDefinitions(t *testing.T) {
+	t.Run("nil webhooks returns nothing", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-cat-dog.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
+		typeDefs, schemas, err := collectWebhookDefinitions(&model.Model, opts)
+		require.NoError(t, err)
+		assert.Empty(t, typeDefs)
+		assert.Empty(t, schemas)
+	})
+
+	t.Run("ref webhooks produce alias types", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/webhooks-with-examples.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
+		typeDefs, schemas, err := collectWebhookDefinitions(&model.Model, opts)
+		require.NoError(t, err)
+
+		assert.NotEmpty(t, typeDefs)
+		assert.NotEmpty(t, schemas)
+
+		// All types should be tagged as webhook
+		for _, td := range typeDefs {
+			assert.Equal(t, SpecLocationWebhook, td.SpecLocation, "type %s should have webhook SpecLocation", td.Name)
+		}
+
+		// Should have body and response aliases
+		names := make(map[string]bool)
+		for _, td := range typeDefs {
+			names[td.Name] = true
+		}
+		assert.True(t, names["PaymentCreatedBody"], "should have PaymentCreatedBody")
+		assert.True(t, names["PaymentCreatedResponse"], "should have PaymentCreatedResponse")
+	})
+
+	t.Run("inline webhook body produces struct type", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/filter-webhooks.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
+		typeDefs, _, err := collectWebhookDefinitions(&model.Model, opts)
+		require.NoError(t, err)
+
+		// All types should be tagged as webhook
+		for _, td := range typeDefs {
+			assert.Equal(t, SpecLocationWebhook, td.SpecLocation, "type %s should have webhook SpecLocation", td.Name)
+		}
+	})
 }

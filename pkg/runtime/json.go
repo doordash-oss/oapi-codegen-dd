@@ -213,6 +213,10 @@ func UnmarshalAs[T any](v json.RawMessage) (T, error) {
 	return res, err
 }
 
+// JSONBodyDecoderFunc decodes a request body into the target value.
+// The default implementation is DecodeJSONBody.
+type JSONBodyDecoderFunc func(body io.Reader, target any) error
+
 // DecodeJSONBody decodes a JSON request body into the target value.
 // It wraps common JSON decoding errors with user-friendly messages:
 //   - io.EOF or empty body -> "request body is empty"

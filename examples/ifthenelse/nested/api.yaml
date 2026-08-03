@@ -1,0 +1,47 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Nested if/then/else
+  description: Conditional branches with nesting in the then branch
+paths:
+  /items:
+    get:
+      operationId: listItems
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        level:
+          type: string
+      if:
+        properties:
+          level:
+            const: "outer"
+      then:
+        type: object
+        properties:
+          outerField:
+            type: string
+        if:
+          properties:
+            outerField:
+              const: "nested"
+        then:
+          type: object
+          properties:
+            nestedField:
+              type: integer
+      else:
+        type: object
+        properties:
+          fallbackField:
+            type: boolean

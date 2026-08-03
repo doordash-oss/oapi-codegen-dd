@@ -13,6 +13,7 @@ import (
 	"github.com/beego/beego/v2/server/web"
 	beegoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/beego/testcase"
 	chiapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/chi/testcase"
+	echov5api "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo-v5/testcase"
 	echoapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/echo/testcase"
 	fasthttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fasthttp/testcase"
 	fiberapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/fiber/testcase"
@@ -24,10 +25,12 @@ import (
 	irisapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/iris/testcase"
 	kratosapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/kratos/testcase"
 	stdhttpapi "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/test/std-http/testcase"
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/gin-gonic/gin"
 	"github.com/gofiber/fiber/v3"
 	iris "github.com/kataras/iris/v12"
 	"github.com/labstack/echo/v4"
+	echov5 "github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/valyala/fasthttp"
@@ -131,6 +134,11 @@ func testServers() []serverTestCase {
 		{"echo", httpHandler{func() http.Handler {
 			e := echo.New()
 			echoapi.NewRouter(e, echoapi.NewService())
+			return e
+		}()}},
+		{"echo-v5", httpHandler{func() http.Handler {
+			e := echov5.New()
+			echov5api.NewRouter(e, echov5api.NewService())
 			return e
 		}()}},
 		{"gin", httpHandler{func() http.Handler {
@@ -457,4 +465,53 @@ func TestGetItemsByStatus_TypeAndRatingPathParams(t *testing.T) {
 			assert.Contains(t, items[0], "rating-4.5")
 		})
 	}
+}
+
+func TestWithJSONBodyDecoder(t *testing.T) {
+	t.Run("custom decoder is called for JSON body", func(t *testing.T) {
+		var called bool
+		mux := stdhttpapi.NewRouter(stdhttpapi.NewService(),
+			stdhttpapi.WithJSONBodyDecoder(func(body io.Reader, target any) error {
+				called = true
+				return runtime.DecodeJSONBody(body, target)
+			}),
+		)
+
+		reqBody := `{"name": "Alice", "email": "alice@example.com"}`
+		req := httptest.NewRequest("POST", "/users", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := httpHandler{mux}.Do(req)
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.True(t, called, "custom body decoder should have been called")
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	})
+
+	t.Run("custom decoder can transform the body", func(t *testing.T) {
+		mux := stdhttpapi.NewRouter(stdhttpapi.NewService(),
+			stdhttpapi.WithJSONBodyDecoder(func(body io.Reader, target any) error {
+				data, err := io.ReadAll(body)
+				if err != nil {
+					return err
+				}
+				modified := strings.Replace(string(data), "Original", "Transformed", 1)
+				return runtime.DecodeJSONBody(strings.NewReader(modified), target)
+			}),
+		)
+
+		reqBody := `{"name": "Original", "email": "test@example.com"}`
+		req := httptest.NewRequest("POST", "/users", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := httpHandler{mux}.Do(req)
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var user map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&user)
+		require.NoError(t, err)
+		assert.Equal(t, "Transformed", user["name"])
+	})
 }

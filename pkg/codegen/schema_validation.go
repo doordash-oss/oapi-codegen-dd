@@ -12,7 +12,10 @@ package codegen
 
 import (
 	"fmt"
+	"log/slog"
+	"regexp"
 	"strings"
+	"sync"
 )
 
 // This file contains all validation generation logic for GoSchema.
@@ -37,6 +40,20 @@ const (
 	errMsgMapMinPropsNil = "must have at least %d properties, got 0"
 )
 
+var (
+	patternCompileMu    sync.Mutex
+	patternCompileCache = map[string]bool{}
+)
+
+// Go types a string pattern can't apply to: non-string-convertible, or a regex over raw bytes is meaningless.
+var nonPatternStringTypes = map[string]bool{
+	"time.Time":       true,
+	"uuid.UUID":       true,
+	"runtime.File":    true,
+	"runtime.Date":    true,
+	"json.RawMessage": true,
+}
+
 // Code generation helpers
 func returnNilIfEmptyErrors() string {
 	return "if len(errors) == 0 {\n    return nil\n}\nreturn errors"
@@ -54,84 +71,29 @@ func declareErrorsVar() string {
 	return "var errors runtime.ValidationErrors"
 }
 
-// ValidateDecl generates the body of the Validate() method for this schema.
-// It returns the Go code that should appear inside the Validate() method.
-// The alias parameter is the receiver variable name (e.g., "p" for "func (p Person) Validate()").
-// The validatorVar parameter is the name of the validator variable to use (e.g., "bodyTypesValidate").
-func (s GoSchema) ValidateDecl(alias string, validatorVar string) string {
-	return s.ValidateDeclWithOptions(alias, validatorVar, false)
-}
-
-// ValidateDeclWithOptions generates the body of the Validate() method for this schema with options.
-// The forceSimple parameter forces the use of simple validation (validate.Struct()) even for complex types.
-func (s GoSchema) ValidateDeclWithOptions(alias string, validatorVar string, forceSimple bool) string {
-	// If forceSimple is true, always use simple validation for structs
-	if forceSimple && s.isStructType() {
-		return s.generateSimpleStructValidation(alias, validatorVar)
-	}
-
-	// OPTIMIZATION: If this is a struct with no unions anywhere in its tree,
-	// AND no properties need custom validation (like RefTypes),
-	// we can use the simple validate.Struct() approach instead of custom validation.
-	// This is much cleaner and more efficient.
-	if s.canUseSimpleStructValidation() {
-		return s.generateSimpleStructValidation(alias, validatorVar)
-	}
-
-	// Handle array types
-	if s.isArrayType() {
-		return s.generateArrayValidation(alias, validatorVar)
-	}
-
-	// If this schema has a RefType set, it means it's a reference to another type
-	// In this case, we should delegate validation to the underlying type
-	if s.isRefTypeDelegation() {
-		return s.generateRefTypeDelegation(alias)
-	}
-
-	// If this schema has properties but GoType is a reference to another type
-	// (not a struct/map/slice), delegate to the underlying type
-	if s.isTypeAliasDelegation() {
-		return s.generateTypeAliasDelegation(alias)
-	}
-
-	// Handle map types (from additionalProperties)
-	if s.isMapType() && !s.hasCustomValidation() {
-		return s.generateMapValidation(alias, validatorVar)
-	}
-
-	// For other non-struct types (slices, primitives) without custom validation
-	if !s.hasCustomValidation() {
-		return s.generateNonStructValidation(alias, validatorVar)
-	}
-
-	// Generate custom validation for struct properties
-	return s.generateCustomPropertyValidation(alias, validatorVar)
-}
-
 // Validation generators (in order of appearance in ValidateDecl)
 
 // generateSimpleStructValidation generates validation using validator.Struct()
-func (s GoSchema) generateSimpleStructValidation(alias, validatorVar string) string {
+func generateSimpleStructValidation(s GoSchema, alias, validatorVar string) string {
 	return returnNilIfNoError(validatorVar, alias)
 }
 
 // generateRefTypeDelegation generates validation that delegates to a RefType
-func (s GoSchema) generateRefTypeDelegation(alias string) string {
+func generateRefTypeDelegation(s GoSchema, alias string) string {
 	// Cast to the underlying type to avoid infinite recursion
 	// (the current type might implement Validator itself)
 	return delegateToValidator(fmt.Sprintf("%s(%s)", s.RefType, alias))
 }
 
 // generateTypeAliasDelegation generates validation that delegates to the underlying type
-func (s GoSchema) generateTypeAliasDelegation(alias string) string {
+func generateTypeAliasDelegation(s GoSchema, alias string) string {
 	// This is a type definition like "type X Y" where Y is another type
 	// Cast to the underlying type to avoid infinite recursion
 	return delegateToValidator(fmt.Sprintf("%s(%s)", s.TypeDecl(), alias))
 }
 
 // generateArrayValidation generates validation for array types
-func (s GoSchema) generateArrayValidation(alias, validatorVar string) string {
+func generateArrayValidation(s GoSchema, alias, validatorVar string) string {
 	var lines []string
 
 	// Allow nil if:
@@ -190,16 +152,23 @@ func (s GoSchema) generateArrayValidation(alias, validatorVar string) string {
 	}
 	// Validate array items if they need validation
 	if s.ArrayType != nil && s.ArrayType.NeedsValidation() {
+		hasItemTags := len(s.ArrayType.Constraints.ValidationTags) > 0
+		hasItemPattern := s.ArrayType.needsPatternValidation()
 		lines = append(lines, "for i, item := range "+alias+" {")
 
 		// If items have validation tags, use validator.Var()
-		if len(s.ArrayType.Constraints.ValidationTags) > 0 {
+		if hasItemTags {
 			tags := strings.Join(s.ArrayType.Constraints.ValidationTags, ",")
 			lines = append(lines, fmt.Sprintf("    if err := %s.Var(item, \"%s\"); err != nil {", validatorVar, tags))
 			lines = append(lines, "        errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)")
 			lines = append(lines, "    }")
-		} else {
-			// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+		}
+		// Enforce a regex pattern on string items.
+		if hasItemPattern {
+			lines = append(lines, generateElementPatternLines("item", "fmt.Sprintf(\"[%d]\", i)", s.ArrayType)...)
+		}
+		// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+		if !hasItemTags && !hasItemPattern {
 			lines = append(lines, "    if v, ok := any(item).(runtime.Validator); ok {")
 			lines = append(lines, "        if err := v.Validate(); err != nil {")
 			lines = append(lines, "            errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)")
@@ -220,7 +189,7 @@ func (s GoSchema) generateArrayValidation(alias, validatorVar string) string {
 }
 
 // generateMapValidation generates validation for map types
-func (s GoSchema) generateMapValidation(alias, validatorVar string) string {
+func generateMapValidation(s GoSchema, alias, validatorVar string) string {
 	var lines []string
 
 	// Only allow nil if explicitly nullable OR if there's no minProperties constraint
@@ -261,6 +230,7 @@ func (s GoSchema) generateMapValidation(alias, validatorVar string) string {
 		}
 		lines = append(lines, "}")
 	}
+
 	// Check MaxProperties constraint
 	if s.Constraints.MaxProperties != nil {
 		errMsg := fmt.Sprintf(errMsgMapMaxProps, *s.Constraints.MaxProperties)
@@ -272,15 +242,23 @@ func (s GoSchema) generateMapValidation(alias, validatorVar string) string {
 		}
 		lines = append(lines, "}")
 	}
+
 	// Validate each value if it needs validation
 	if s.AdditionalPropertiesType != nil {
-		// Check if map values have validation tags (for primitive types)
-		if len(s.AdditionalPropertiesType.Constraints.ValidationTags) > 0 {
-			tags := strings.Join(s.AdditionalPropertiesType.Constraints.ValidationTags, ",")
+		hasValTags := len(s.AdditionalPropertiesType.Constraints.ValidationTags) > 0
+		hasValPattern := s.AdditionalPropertiesType.needsPatternValidation()
+		if hasValTags || hasValPattern {
+			// Primitive values: validator tags and/or a regex pattern.
 			lines = append(lines, "for k, v := range "+alias+" {")
-			lines = append(lines, fmt.Sprintf("    if err := %s.Var(v, \"%s\"); err != nil {", validatorVar, tags))
-			lines = append(lines, "        errors = errors.Append(k, err)")
-			lines = append(lines, "    }")
+			if hasValTags {
+				tags := strings.Join(s.AdditionalPropertiesType.Constraints.ValidationTags, ",")
+				lines = append(lines, fmt.Sprintf("    if err := %s.Var(v, \"%s\"); err != nil {", validatorVar, tags))
+				lines = append(lines, "        errors = errors.Append(k, err)")
+				lines = append(lines, "    }")
+			}
+			if hasValPattern {
+				lines = append(lines, generateElementPatternLines("v", "k", s.AdditionalPropertiesType)...)
+			}
 			lines = append(lines, "}")
 			lines = append(lines, returnNilIfEmptyErrors())
 		} else if s.AdditionalPropertiesType.NeedsValidation() {
@@ -309,14 +287,32 @@ func (s GoSchema) generateMapValidation(alias, validatorVar string) string {
 }
 
 // generateNonStructValidation generates validation for non-struct types (slices, primitives)
-func (s GoSchema) generateNonStructValidation(alias, validatorVar string) string {
+func generateNonStructValidation(s GoSchema, alias, validatorVar string) string {
 	typeDecl := s.TypeDecl()
 	var lines []string
 
 	// For other non-struct types (slices, primitives)
 	if strings.HasPrefix(typeDecl, "[]") || len(s.Properties) == 0 {
+		hasTags := len(s.Constraints.ValidationTags) > 0
+		hasPattern := s.needsPatternValidation()
+
+		// When both tags and a pattern apply, collect errors so neither check
+		// short-circuits the other.
+		if hasTags && hasPattern {
+			tags := strings.Join(s.Constraints.ValidationTags, ",")
+			lines = append(lines, declareErrorsVar())
+			lines = append(lines, fmt.Sprintf("if err := %s.Var(%s, \"%s\"); err != nil {", validatorVar, alias, tags))
+			lines = append(lines, "    errors = errors.Append(\"\", err)")
+			lines = append(lines, "}")
+			lines = append(lines, fmt.Sprintf("if err := runtime.ValidatePattern(%s, %s); err != nil {", alias, goStringLiteral(*s.Constraints.Pattern)))
+			lines = append(lines, "    errors = errors.Append(\"\", err)")
+			lines = append(lines, "}")
+			lines = append(lines, returnNilIfEmptyErrors())
+			return strings.Join(lines, "\n")
+		}
+
 		// Check if the schema itself has validation tags (for primitive types)
-		if len(s.Constraints.ValidationTags) > 0 {
+		if hasTags {
 			tags := strings.Join(s.Constraints.ValidationTags, ",")
 			lines = append(lines, fmt.Sprintf("if err := %s.Var(%s, \"%s\"); err != nil {", validatorVar, alias, tags))
 			lines = append(lines, "    return err")
@@ -324,6 +320,16 @@ func (s GoSchema) generateNonStructValidation(alias, validatorVar string) string
 			lines = append(lines, returnNil)
 			return strings.Join(lines, "\n")
 		}
+
+		// Otherwise enforce just the regex pattern, if present.
+		if hasPattern {
+			lines = append(lines, fmt.Sprintf("if err := runtime.ValidatePattern(%s, %s); err != nil {", alias, goStringLiteral(*s.Constraints.Pattern)))
+			lines = append(lines, "    return err")
+			lines = append(lines, "}")
+			lines = append(lines, returnNil)
+			return strings.Join(lines, "\n")
+		}
+
 		return returnNil
 	}
 
@@ -332,7 +338,7 @@ func (s GoSchema) generateNonStructValidation(alias, validatorVar string) string
 }
 
 // generateCustomPropertyValidation generates custom validation for struct properties
-func (s GoSchema) generateCustomPropertyValidation(alias, validatorVar string) string {
+func generateCustomPropertyValidation(s GoSchema, alias, validatorVar string) string {
 	var lines []string
 
 	// Generate custom validation for each property
@@ -384,25 +390,65 @@ func (s GoSchema) generateCustomPropertyValidation(alias, validatorVar string) s
 					}
 				}
 			}
-		} else if len(prop.Constraints.ValidationTags) > 0 {
-			// Property with validation tags - use Var()
-			tags := strings.Join(prop.Constraints.ValidationTags, ",")
-			if prop.IsPointerType() {
-				lines = append(lines, fmt.Sprintf("if %s.%s != nil {", alias, prop.GoName))
-				lines = append(lines, fmt.Sprintf("    if err := %s.Var(%s.%s, \"%s\"); err != nil {", validatorVar, alias, prop.GoName, tags))
-				lines = append(lines, fmt.Sprintf("        errors = errors.Append(\"%s\", err)", prop.GoName))
-				lines = append(lines, "    }")
-				lines = append(lines, "}")
-			} else {
-				lines = append(lines, fmt.Sprintf("if err := %s.Var(%s.%s, \"%s\"); err != nil {", validatorVar, alias, prop.GoName, tags))
-				lines = append(lines, fmt.Sprintf("    errors = errors.Append(\"%s\", err)", prop.GoName))
-				lines = append(lines, "}")
-			}
+		} else {
+			// Primitive property: may carry validator tags and/or a regex pattern.
+			lines = append(lines, generatePrimitivePropertyValidation(alias, prop, validatorVar)...)
 		}
 	}
 
 	lines = append(lines, returnNilIfEmptyErrors())
 	return strings.Join(lines, "\n")
+}
+
+// generatePrimitivePropertyValidation emits Var() tag checks and/or a ValidatePattern() check
+// for a primitive property. The pattern value is passed as-is: runtime.ValidatePattern derefs
+// pointers and skips nil/non-string, so no type conversion or nil-guard is needed here.
+func generatePrimitivePropertyValidation(alias string, prop Property, validatorVar string) []string {
+	hasTags := len(prop.Constraints.ValidationTags) > 0
+	hasPattern := prop.needsPatternValidation()
+	if !hasTags && !hasPattern {
+		return nil
+	}
+
+	field := fmt.Sprintf("%s.%s", alias, prop.GoName)
+	var lines []string
+
+	if hasTags {
+		tags := strings.Join(prop.Constraints.ValidationTags, ",")
+		if prop.IsPointerType() {
+			lines = append(lines,
+				fmt.Sprintf("if %s != nil {", field),
+				fmt.Sprintf("    if err := %s.Var(%s, \"%s\"); err != nil {", validatorVar, field, tags),
+				fmt.Sprintf("        errors = errors.Append(\"%s\", err)", prop.GoName),
+				"    }",
+				"}")
+		} else {
+			lines = append(lines,
+				fmt.Sprintf("if err := %s.Var(%s, \"%s\"); err != nil {", validatorVar, field, tags),
+				fmt.Sprintf("    errors = errors.Append(\"%s\", err)", prop.GoName),
+				"}")
+		}
+	}
+
+	if hasPattern {
+		lines = append(lines,
+			fmt.Sprintf("if err := runtime.ValidatePattern(%s, %s); err != nil {", field, goStringLiteral(*prop.Constraints.Pattern)),
+			fmt.Sprintf("    errors = errors.Append(\"%s\", err)", prop.GoName),
+			"}")
+	}
+
+	return lines
+}
+
+// generateElementPatternLines emits a ValidatePattern check for one collection element
+// (array item or map value). The element is passed as-is; runtime.ValidatePattern derefs
+// pointers and skips nil/non-string. keyExpr is the error field-key expression.
+func generateElementPatternLines(itemExpr, keyExpr string, elem *GoSchema) []string {
+	return []string{
+		fmt.Sprintf("    if err := runtime.ValidatePattern(%s, %s); err != nil {", itemExpr, goStringLiteral(*elem.Constraints.Pattern)),
+		fmt.Sprintf("        errors = errors.Append(%s, err)", keyExpr),
+		"    }",
+	}
 }
 
 // generateArrayPropertyValidation generates validation code for an array property
@@ -411,16 +457,26 @@ func generateArrayPropertyValidation(alias string, prop Property, validatorVar s
 	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
 
 	// Check for nil before iterating
+	hasItemTags := len(prop.Schema.ArrayType.Constraints.ValidationTags) > 0
+	hasItemPattern := prop.Schema.ArrayType.needsPatternValidation()
 	lines = append(lines, fmt.Sprintf("for i, item := range %s {", fieldAccess))
 
 	// If items have validation tags, use validator.Var()
-	if len(prop.Schema.ArrayType.Constraints.ValidationTags) > 0 {
+	if hasItemTags {
 		tags := strings.Join(prop.Schema.ArrayType.Constraints.ValidationTags, ",")
 		lines = append(lines, fmt.Sprintf("    if err := %s.Var(item, \"%s\"); err != nil {", validatorVar, tags))
 		lines = append(lines, fmt.Sprintf("        errors = errors.Append(fmt.Sprintf(\"%s[%%d]\", i), err)", prop.GoName))
 		lines = append(lines, "    }")
-	} else {
-		// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+	}
+
+	// Enforce a regex pattern on string items.
+	if hasItemPattern {
+		keyExpr := fmt.Sprintf("fmt.Sprintf(\"%s[%%d]\", i)", prop.GoName)
+		lines = append(lines, generateElementPatternLines("item", keyExpr, prop.Schema.ArrayType)...)
+	}
+
+	// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+	if !hasItemTags && !hasItemPattern {
 		lines = append(lines, "    if v, ok := any(item).(runtime.Validator); ok {")
 		lines = append(lines, "        if err := v.Validate(); err != nil {")
 		lines = append(lines, fmt.Sprintf("            errors = errors.Append(fmt.Sprintf(\"%s[%%d]\", i), err)", prop.GoName))
@@ -438,16 +494,26 @@ func generateMapPropertyValidation(alias string, prop Property, validatorVar str
 	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
 
 	// Iterate over map values
+	hasValTags := len(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags) > 0
+	hasValPattern := prop.Schema.AdditionalPropertiesType.needsPatternValidation()
 	lines = append(lines, fmt.Sprintf("for k, v := range %s {", fieldAccess))
 
 	// If values have validation tags, use validator.Var()
-	if len(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags) > 0 {
+	if hasValTags {
 		tags := strings.Join(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags, ",")
 		lines = append(lines, fmt.Sprintf("    if err := %s.Var(v, \"%s\"); err != nil {", validatorVar, tags))
 		lines = append(lines, fmt.Sprintf("        errors = errors.Append(fmt.Sprintf(\"%s[%%s]\", k), err)", prop.GoName))
 		lines = append(lines, "    }")
-	} else {
-		// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+	}
+
+	// Enforce a regex pattern on string values.
+	if hasValPattern {
+		keyExpr := fmt.Sprintf("fmt.Sprintf(\"%s[%%s]\", k)", prop.GoName)
+		lines = append(lines, generateElementPatternLines("v", keyExpr, prop.Schema.AdditionalPropertiesType)...)
+	}
+
+	// Otherwise, try to call Validate() method (for RefTypes, structs, unions)
+	if !hasValTags && !hasValPattern {
 		lines = append(lines, "    if validator, ok := any(v).(runtime.Validator); ok {")
 		lines = append(lines, "        if err := validator.Validate(); err != nil {")
 		lines = append(lines, fmt.Sprintf("            errors = errors.Append(fmt.Sprintf(\"%s[%%s]\", k), err)", prop.GoName))
@@ -459,23 +525,22 @@ func generateMapPropertyValidation(alias string, prop Property, validatorVar str
 	return lines
 }
 
-// Helper predicates
-
 // isStructType checks if this schema represents a struct type
-func (s GoSchema) isStructType() bool {
+func isStructType(s GoSchema) bool {
 	typeDecl := s.TypeDecl()
 	return strings.HasPrefix(typeDecl, "struct") && len(s.Properties) > 0
 }
 
 // canUseSimpleStructValidation checks if we can use the optimized validator.Struct() approach
-func (s GoSchema) canUseSimpleStructValidation() bool {
+func canUseSimpleStructValidation(s GoSchema) bool {
 	typeDecl := s.TypeDecl()
 	if !strings.HasPrefix(typeDecl, "struct") || len(s.Properties) == 0 || s.ContainsUnions() {
 		return false
 	}
-	// Check if any property needs custom validation
+
+	// A property needing custom validation or a regex pattern rules out validator.Struct().
 	for _, prop := range s.Properties {
-		if prop.needsCustomValidation() {
+		if prop.needsCustomValidation() || prop.needsPatternValidation() {
 			return false
 		}
 	}
@@ -483,17 +548,17 @@ func (s GoSchema) canUseSimpleStructValidation() bool {
 }
 
 // isArrayType checks if this schema represents an array type
-func (s GoSchema) isArrayType() bool {
+func isArrayType(s GoSchema) bool {
 	return s.ArrayType != nil && strings.HasPrefix(s.TypeDecl(), "[]")
 }
 
 // isRefTypeDelegation checks if this schema should delegate to a RefType
-func (s GoSchema) isRefTypeDelegation() bool {
+func isRefTypeDelegation(s GoSchema) bool {
 	return s.RefType != "" && !s.IsExternalRef()
 }
 
 // isTypeAliasDelegation checks if this schema is a type alias that should delegate
-func (s GoSchema) isTypeAliasDelegation() bool {
+func isTypeAliasDelegation(s GoSchema) bool {
 	typeDecl := s.TypeDecl()
 	return len(s.Properties) > 0 &&
 		!strings.HasPrefix(typeDecl, "struct") &&
@@ -502,17 +567,63 @@ func (s GoSchema) isTypeAliasDelegation() bool {
 }
 
 // isMapType checks if this schema represents a map type
-func (s GoSchema) isMapType() bool {
+func isMapType(s GoSchema) bool {
 	typeDecl := s.TypeDecl()
 	return strings.HasPrefix(typeDecl, "map[")
 }
 
-// hasCustomValidation checks if any property needs custom validation
-func (s GoSchema) hasCustomValidation() bool {
+// hasCustomValidation reports whether any property needs custom validation, including a regex pattern.
+func hasCustomValidation(s GoSchema) bool {
 	for _, prop := range s.Properties {
-		if prop.needsCustomValidation() {
+		if prop.needsCustomValidation() || prop.needsPatternValidation() {
 			return true
 		}
 	}
 	return false
+}
+
+// isPatternValidatable reports whether emitting a regex check for goType is worthwhile.
+// It filters obvious non-strings (slices, maps, non-string primitives) at generation time;
+// runtime.ValidatePattern is the final authority and safely skips anything non-string-kinded.
+func isPatternValidatable(goType string) bool {
+	base := strings.TrimPrefix(goType, "*")
+	if strings.HasPrefix(base, "[]") || strings.HasPrefix(base, "map[") {
+		return false
+	}
+
+	if nonPatternStringTypes[base] {
+		return false
+	}
+
+	// Non-string primitives (int, bool, time.Time, ...) can't carry a regex.
+	if isPrimitiveType(base) && base != "string" {
+		return false
+	}
+	return true
+}
+
+// goStringLiteral renders s as a Go literal, preferring a raw string unless s contains a backtick.
+func goStringLiteral(s string) string {
+	if !strings.ContainsRune(s, '`') {
+		return "`" + s + "`"
+	}
+	return fmt.Sprintf("%q", s)
+}
+
+// patternCompiles reports (and caches) whether Go's RE2 engine can compile pattern; unsupported ones are skipped with a warning.
+func patternCompiles(pattern string) bool {
+	patternCompileMu.Lock()
+	defer patternCompileMu.Unlock()
+	if ok, seen := patternCompileCache[pattern]; seen {
+		return ok
+	}
+
+	_, err := regexp.Compile(pattern)
+	ok := err == nil
+	patternCompileCache[pattern] = ok
+	if !ok {
+		slog.Warn("skipping unsupported regex pattern in generated Validate(): Go's regexp engine (RE2) could not compile it",
+			"pattern", pattern, "error", err)
+	}
+	return ok
 }

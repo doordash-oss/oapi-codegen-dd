@@ -1,0 +1,42 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Basic if/then/else
+  description: Both then and else branches produce a union (Either) type
+paths:
+  /resources:
+    get:
+      operationId: listResources
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+
+components:
+  schemas:
+    Resource:
+      type: object
+      properties:
+        kind:
+          type: string
+      if:
+        properties:
+          kind:
+            const: "typeA"
+      then:
+        type: object
+        properties:
+          fieldA:
+            type: string
+          valueA:
+            type: integer
+      else:
+        type: object
+        properties:
+          fieldB:
+            type: boolean
+          valueB:
+            type: number

@@ -78,7 +78,17 @@ func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opt
 func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $modelsPrefix }}{{ $op.Response.Success.ResponseName }})), nil
+	{{- if $op.Response.Success.IsRaw }}
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
+	{{- else }}
+	{{- $bodyType := $op.Response.Success.ResponseName -}}
+	{{- if eq $bodyType "struct{}" }}
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(nil), nil
+	{{- else }}
+	{{- if $modelsPrefix }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
+	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
+	{{- end }}
+	{{- end }}
 	{{- else }}
 	return nil
 	{{- end }}

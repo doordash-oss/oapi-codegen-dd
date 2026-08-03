@@ -63,59 +63,106 @@ func filterOperations(model *v3high.Document, cfg FilterConfig) bool {
 			continue
 		}
 
-		for method, op := range pathItem.GetOperations().FromOldest() {
-			remove := false
+		removed = filterPathItemOperations(path, pathItem, cfg, removed)
+	}
 
-			// Tags
+	// Filter webhooks
+	if model.Webhooks != nil {
+		webhooks := map[string]*v3high.PathItem{}
+		for name, pathItem := range model.Webhooks.FromOldest() {
+			webhooks[name] = pathItem
+		}
+
+		for name, pathItem := range webhooks {
+			if len(cfg.Include.Webhooks) > 0 && !slices.Contains(cfg.Include.Webhooks, name) {
+				model.Webhooks.Delete(name)
+				removed = true
+				continue
+			}
+
+			if len(cfg.Exclude.Webhooks) > 0 && slices.Contains(cfg.Exclude.Webhooks, name) {
+				model.Webhooks.Delete(name)
+				removed = true
+				continue
+			}
+
+			// Mirror codegen.go's webhook operation ID synthesis so the
+			// filter sees the same canonical IDs the rest of the pipeline
+			// emits for webhook operations.
+			removed = filterPathItemOperations("/webhooks/"+name, pathItem, cfg, removed)
+		}
+	}
+
+	return removed
+}
+
+// filterPathItemOperations filters operations within a PathItem by tags and operation IDs.
+// The path is needed to canonicalize operation IDs via CreateOperationID so
+// filters work for specs that omit `operationId`. Returns the updated removed flag.
+func filterPathItemOperations(path string, pathItem *v3high.PathItem, cfg FilterConfig, removed bool) bool {
+	for method, op := range pathItem.GetOperations().FromOldest() {
+		remove := false
+
+		// Tags
+		for _, tag := range op.Tags {
+			if slices.Contains(cfg.Exclude.Tags, tag) {
+				remove = true
+				break
+			}
+		}
+
+		if !remove && len(cfg.Include.Tags) > 0 {
+			// Only include if it matches Include.Tags
+			includeMatch := false
 			for _, tag := range op.Tags {
-				if slices.Contains(cfg.Exclude.Tags, tag) {
-					remove = true
+				if slices.Contains(cfg.Include.Tags, tag) {
+					includeMatch = true
 					break
 				}
 			}
-
-			if !remove && len(cfg.Include.Tags) > 0 {
-				// Only include if it matches Include.Tags
-				includeMatch := false
-				for _, tag := range op.Tags {
-					if slices.Contains(cfg.Include.Tags, tag) {
-						includeMatch = true
-						break
-					}
-				}
-				if !includeMatch {
-					remove = true
-				}
-			}
-
-			// OperationIDs
-			if len(cfg.Exclude.OperationIDs) > 0 && slices.Contains(cfg.Exclude.OperationIDs, op.OperationId) {
+			if !includeMatch {
 				remove = true
 			}
-			if len(cfg.Include.OperationIDs) > 0 && !slices.Contains(cfg.Include.OperationIDs, op.OperationId) {
+		}
+
+		// OperationIDs: compare against the literal operationId when the
+		// spec declares one (preserves existing behavior). For specs that
+		// omit `operationId`, fall back to the synthesized ID so the
+		// filter matches what downstream code uses (see codegen.go's
+		// CreateOperationID calls). Without this fallback, filters
+		// against operationId-less specs would silently match nothing.
+		if len(cfg.Exclude.OperationIDs) > 0 || len(cfg.Include.OperationIDs) > 0 {
+			opID := op.OperationId
+			if opID == "" {
+				opID, _ = CreateOperationID(method, path, "")
+			}
+			if len(cfg.Exclude.OperationIDs) > 0 && slices.Contains(cfg.Exclude.OperationIDs, opID) {
 				remove = true
 			}
+			if len(cfg.Include.OperationIDs) > 0 && !slices.Contains(cfg.Include.OperationIDs, opID) {
+				remove = true
+			}
+		}
 
-			if remove {
-				removed = true
-				switch strings.ToLower(method) {
-				case "get":
-					pathItem.Get = nil
-				case "post":
-					pathItem.Post = nil
-				case "put":
-					pathItem.Put = nil
-				case "delete":
-					pathItem.Delete = nil
-				case "patch":
-					pathItem.Patch = nil
-				case "head":
-					pathItem.Head = nil
-				case "options":
-					pathItem.Options = nil
-				case "trace":
-					pathItem.Trace = nil
-				}
+		if remove {
+			removed = true
+			switch strings.ToLower(method) {
+			case "get":
+				pathItem.Get = nil
+			case "post":
+				pathItem.Post = nil
+			case "put":
+				pathItem.Put = nil
+			case "delete":
+				pathItem.Delete = nil
+			case "patch":
+				pathItem.Patch = nil
+			case "head":
+				pathItem.Head = nil
+			case "options":
+				pathItem.Options = nil
+			case "trace":
+				pathItem.Trace = nil
 			}
 		}
 	}

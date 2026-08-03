@@ -16,7 +16,10 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"regexp"
+	"sync"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -24,6 +27,30 @@ import (
 // Validator is an interface for types that can validate themselves.
 type Validator interface {
 	Validate() error
+}
+
+// patternCache memoizes compiled regexps by source pattern; safe for concurrent use.
+var patternCache sync.Map // map[string]*regexp.Regexp
+
+// ValidatePattern reports whether value matches the OpenAPI `pattern` regex, for generated
+// Validate() methods. value may be a string, a named string type, or a pointer to either;
+// nil, non-string, and empty values are skipped (pair with `required` to reject empties).
+// An uncompilable pattern yields a ValidationError.
+func ValidatePattern(value any, pattern string) error {
+	s, ok := patternInput(value)
+	if !ok || s == "" {
+		return nil
+	}
+
+	re, err := compilePattern(pattern)
+	if err != nil {
+		return NewValidationError("", fmt.Sprintf("has an unusable pattern '%s': %s", pattern, err))
+	}
+
+	if !re.MatchString(s) {
+		return NewValidationError("", fmt.Sprintf("must match pattern '%s'", pattern))
+	}
+	return nil
 }
 
 // RegisterCustomTypeFunc registers a custom type function with the validator
@@ -75,4 +102,54 @@ func ConvertValidatorError(err error) error {
 
 	// Use the existing NewValidationErrorsFromError which handles validator errors properly
 	return NewValidationErrorsFromError(err)
+}
+
+// compilePattern returns the compiled form of pattern, caching the result.
+func compilePattern(pattern string) (*regexp.Regexp, error) {
+	// patternCache holds any; assert with comma-ok so a future change caching a
+	// non-*regexp.Regexp recompiles instead of panicking.
+	if cached, ok := patternCache.Load(pattern); ok {
+		if re, ok := cached.(*regexp.Regexp); ok {
+			return re, nil
+		}
+	}
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	actual, _ := patternCache.LoadOrStore(pattern, re)
+	if cached, ok := actual.(*regexp.Regexp); ok {
+		return cached, nil
+	}
+	return re, nil
+}
+
+// patternInput extracts the string to match from value, dereferencing one pointer
+// level and accepting named string types (e.g. type Email string). It returns false
+// when value is nil or not string-kinded, so a regex over a non-string (slice, struct,
+// number, ...) is skipped rather than misapplied or causing a type error.
+func patternInput(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case *string:
+		if v == nil {
+			return "", false
+		}
+		return *v, true
+	}
+
+	rv := reflect.ValueOf(value)
+	if rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return "", false
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() == reflect.String {
+		return rv.String(), true
+	}
+	return "", false
 }

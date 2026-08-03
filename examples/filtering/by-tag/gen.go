@@ -61,8 +61,14 @@ func (c *Client) GetPurchases(ctx context.Context, reqEditors ...runtime.Request
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetPurchasesResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -98,8 +104,14 @@ func (c *Client) GetPurchase(ctx context.Context, reqEditors ...runtime.RequestE
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetPurchaseResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -118,11 +130,7 @@ type GetPurchasesResponse []Purchase
 type GetPurchaseResponse = Purchase
 
 type Purchase struct {
-	ID int `json:"id" validate:"required"`
-}
-
-func (p Purchase) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(p))
+	ID int `json:"id"`
 }
 
 var typesValidator *validator.Validate

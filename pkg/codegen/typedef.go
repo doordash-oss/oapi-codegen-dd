@@ -25,6 +25,7 @@ const (
 	SpecLocationResponse SpecLocation = "response"
 	SpecLocationSchema   SpecLocation = "schema"
 	SpecLocationUnion    SpecLocation = "union"
+	SpecLocationWebhook  SpecLocation = "webhook"
 )
 
 // TypeDefinition describes a Go type definition in generated code.

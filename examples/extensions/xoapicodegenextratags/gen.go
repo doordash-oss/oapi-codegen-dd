@@ -9,7 +9,7 @@ import (
 
 type Client struct {
 	Name string  `json:"name" validate:"required"`
-	ID   float32 `json:"id" validate:"required"`
+	ID   float32 `json:"id"`
 }
 
 func (c Client) Validate() error {

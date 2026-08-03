@@ -75,7 +75,7 @@ func TestCreateOperationID(t *testing.T) {
 	}
 
 	for _, test := range suite {
-		got, err := createOperationID(test.method, test.path, "")
+		got, err := CreateOperationID(test.method, test.path, "")
 		if err != nil {
 			if !test.wantErr {
 				t.Fatalf("did not expected error but got %v", err)

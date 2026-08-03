@@ -13,7 +13,17 @@ type GetClientHeaders struct {
 }
 
 func (g GetClientHeaders) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(g.MerchantSerialNumber, "required,max=7,min=4"); err != nil {
+		errors = errors.Append("MerchantSerialNumber", err)
+	}
+	if err := runtime.ValidatePattern(g.MerchantSerialNumber, `^[0-9]{4,7}$`); err != nil {
+		errors = errors.Append("MerchantSerialNumber", err)
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
 }
 
 type UpdateClientHeaders struct {
@@ -21,5 +31,15 @@ type UpdateClientHeaders struct {
 }
 
 func (u UpdateClientHeaders) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(u))
+	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(u.MerchantSerialNumber, "required,max=7,min=4"); err != nil {
+		errors = errors.Append("MerchantSerialNumber", err)
+	}
+	if err := runtime.ValidatePattern(u.MerchantSerialNumber, `^[0-9]{4,7}$`); err != nil {
+		errors = errors.Append("MerchantSerialNumber", err)
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
 }

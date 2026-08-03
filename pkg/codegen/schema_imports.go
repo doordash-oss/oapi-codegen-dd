@@ -40,11 +40,41 @@ type importMap map[string]goImport
 // We use `-` to indicate that this is a bit of a special case
 const importMappingCurrentPackage = "-"
 
+// templateHardcodedImports lists import paths that are already present in header.tmpl.
+// GoImports() filters these out to avoid duplicate imports in generated code.
+var templateHardcodedImports = map[string]bool{
+	"bytes":           true,
+	"compress/gzip":   true,
+	"context":         true,
+	"encoding/base64": true,
+	"encoding/json":   true,
+	"encoding/xml":    true,
+	"errors":          true,
+	"fmt":             true,
+	"io":              true,
+	"os":              true,
+	"mime":            true,
+	"mime/multipart":  true,
+	"net/http":        true,
+	"net/url":         true,
+	"path":            true,
+	"strings":         true,
+	"time":            true,
+	"log/slog":        true,
+	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime": true,
+	"github.com/google/go-querystring/query":                 true,
+	"github.com/google/uuid":                                 true,
+	"github.com/go-playground/validator/v10":                 true,
+}
+
 // GoImports returns a slice of go import statements
 func (im importMap) GoImports() []string {
 	goImports := make([]string, 0, len(im))
 	for _, v := range im {
 		if v.Path == importMappingCurrentPackage {
+			continue
+		}
+		if v.Name == "" && templateHardcodedImports[v.Path] {
 			continue
 		}
 		goImports = append(goImports, v.String())

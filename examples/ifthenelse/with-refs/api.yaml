@@ -1,0 +1,52 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: if/then/else with $ref branches
+  description: Conditional branches that reference component schemas
+paths:
+  /events:
+    get:
+      operationId: listEvents
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+
+components:
+  schemas:
+    ClickData:
+      type: object
+      properties:
+        elementId:
+          type: string
+        x:
+          type: integer
+        y:
+          type: integer
+
+    PageViewData:
+      type: object
+      properties:
+        url:
+          type: string
+        duration:
+          type: integer
+
+    Event:
+      type: object
+      properties:
+        type:
+          type: string
+        timestamp:
+          type: string
+      if:
+        properties:
+          type:
+            const: "click"
+      then:
+        $ref: '#/components/schemas/ClickData'
+      else:
+        $ref: '#/components/schemas/PageViewData'

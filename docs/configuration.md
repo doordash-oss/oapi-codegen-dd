@@ -13,7 +13,7 @@ go run github.com/doordash-oss/oapi-codegen-dd/v3/cmd/oapi-codegen --config cfg.
 !!! tip
     Use the JSON schema for IDE autocomplete and validation:
     ```yaml
-    # yaml-language-server: $schema=https://raw.githubusercontent.com/doordash/oapi-codegen/HEAD/configuration-schema.json
+    # yaml-language-server: $schema=https://raw.githubusercontent.com/doordash-oss/oapi-codegen-dd/HEAD/configuration-schema.json
     ```
 
 ## Configuration Options
@@ -62,6 +62,30 @@ overlay:
 ```
 
 See [Overlays](overlays.md) for detailed documentation and examples.
+
+### External File References
+
+#### `base-path`
+**Type:** `string` | **Default:** auto-detected from spec file path
+
+Directory used to resolve relative `$ref` file references. When using the CLI with a local spec file, this is automatically set to the spec file's parent directory. Set this explicitly when using the library programmatically or when the spec references files relative to a different directory.
+
+```yaml
+base-path: ./specs
+```
+
+This enables splitting large specs across multiple files:
+
+```yaml
+# specs/api.yaml
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        address:
+          $ref: './common.yaml#/components/schemas/Address'
+```
 
 ### Output Settings
 
@@ -116,7 +140,9 @@ output:
 #### `generate.client`
 **Type:** `boolean` | **Default:** `false`
 
-Generate HTTP client code for calling the API.
+Generate the classic HTTP client: one method per operation that returns the picked 2xx body type directly (e.g. `func (c *Client) UploadDocument(...) (*DocumentStored, error)`).
+
+Use this when callers only need the response body and the operation has a single documented success status. Headers and non-picked 2xx bodies are not exposed by this style; for those, use [`generate.client-with-response`](#generateclient-with-response) instead, or both together.
 
 ```yaml
 generate:
@@ -124,6 +150,32 @@ generate:
 ```
 
 See [examples/client/example1/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/client/example1/cfg.yaml){:target="_blank"} for a complete example.
+
+#### `generate.client-with-response`
+**Type:** `boolean` | **Default:** `false`
+
+Generate `<Op>WithResponse` sibling functions that return a typed envelope: one `JSON<status>` (or `Text<status>` / `HTML<status>` / etc.) field per documented response, one `Headers<status>` typed struct per status that declares headers, plus `HTTPResponse *http.Response` for raw access (undocumented headers, raw body bytes, status string, etc.).
+
+Use this when an operation has multiple 2xx statuses with different bodies (e.g. 201 sync + 202 queued), or when callers need typed access to response headers like `Location` or `Retry-After`.
+
+Additive to [`generate.client`](#generateclient). When both flags are true, the generated `ClientInterface` lists every classic method alongside its `WithResponse` sibling so a single mock or test double covers both shapes.
+
+```yaml
+generate:
+  client: true
+  client-with-response: true
+```
+
+The four valid combinations:
+
+| `client` | `client-with-response` | Output |
+|----------|------------------------|--------|
+| `false` | `false` | No client (types/server only) |
+| `true`  | `false` | Classic client only |
+| `false` | `true`  | Envelope client only |
+| `true`  | `true`  | Both styles, combined into one `ClientInterface` |
+
+See [examples/responses/multiple/client-with-response/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-with-response/cfg.yaml){:target="_blank"} for envelope-only and [examples/responses/multiple/client-combined/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-combined/cfg.yaml){:target="_blank"} for the combined case.
 
 #### `generate.omit-description`
 **Type:** `boolean` | **Default:** `false`
@@ -403,6 +455,25 @@ filter:
       - deleteUser
 ```
 
+### Filter by Webhooks
+
+Filter webhook entries by name. This is useful for OpenAPI 3.1 specs that define [webhooks](https://spec.openapis.org/oas/v3.1.0#fixed-fields) - 
+schemas referenced by included webhooks are preserved during pruning.
+
+```yaml
+filter:
+  include:
+    webhooks:
+      - order.created
+      - payment.completed
+  exclude:
+    webhooks:
+      - internal.debug
+```
+
+Webhook operations also respect tag and operation ID filters - if a webhook's operation doesn't match the tag/operation ID filter, 
+it will be removed just like path operations.
+
 ### Filter by Schema Properties
 
 Filter which properties are included in generated types. This triggers **transitive pruning** - schemas that are only referenced by filtered-out properties will also be pruned.
@@ -557,7 +628,7 @@ user-context:
 Here's a comprehensive configuration example:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/doordash/oapi-codegen/HEAD/configuration-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/doordash-oss/oapi-codegen-dd/HEAD/configuration-schema.json
 
 package: myapi
 copyright-header: "Copyright 2024 My Company. Code generated by oapi-codegen. DO NOT EDIT."

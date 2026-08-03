@@ -1,12 +1,13 @@
 # Union Types
 
-Union types in OpenAPI allow schemas to accept multiple different types or structures. The `oapi-codegen` generator handles `allOf`, `anyOf`, and `oneOf` with intelligent type generation based on the number and nature of the variants.
+Union types in OpenAPI allow schemas to accept multiple different types or structures. The `oapi-codegen` generator handles `allOf`, `anyOf`, `oneOf`, and `if`/`then`/`else` with intelligent type generation based on the number and nature of the variants.
 
 ## Overview
 
 - **`allOf`**: Merges all schemas into a single struct with all fields combined
 - **`anyOf`**: Can match any of the specified schemas
 - **`oneOf`**: Must match exactly one of the specified schemas
+- **`if`/`then`/`else`**: Conditional schemas (OpenAPI 3.1) - uses `runtime.Conditional[T, E]`
 
 The generator applies smart optimizations based on the union structure:
 
@@ -166,4 +167,84 @@ The generator creates custom `MarshalJSON` and `UnmarshalJSON` methods that merg
 The `runtime.JSONMerge` function combines all the JSON parts into a single object, ensuring that the base fields and union fields are properly merged.
 
 [View complex union example](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/union/allof-anyof-oneof/){:target="_blank"}
+
+---
+
+## Conditional Schemas (`if`/`then`/`else`)
+
+OpenAPI 3.1 supports JSON Schema conditional keywords. The generator
+treats `then` and `else` as structural branches. The `if` schema is
+ignored - it's a validation predicate (e.g. "if kind equals typeA")
+with no structural properties. `if` is also a reserved keyword in Go.
+
+### Both Branches - `runtime.Conditional`
+
+When both `then` and `else` are present, the generator creates a
+`runtime.Conditional[T, E]` wrapper with named variant types. Unlike
+`runtime.Either` (`.A`/`.B`), `Conditional` uses `.Then`/`.Else`
+fields and `.IsThen()`/`.IsElse()` methods.
+
+**OpenAPI Spec:**
+
+```yaml
+--8<-- "ifthenelse/basic/api.yaml:20:42"
+```
+
+**Generated Go Code:**
+
+```go
+--8<-- "ifthenelse/basic/gen.go:16:19"
+```
+
+The variant types use `_Then` and `_Else` suffixes:
+
+```go
+--8<-- "ifthenelse/basic/gen.go:86:98"
+```
+
+Usage:
+
+```go
+if resource.Resource_IfThenElse.IsThen() {
+    fmt.Println(resource.Resource_IfThenElse.Then.FieldA)
+}
+if resource.Resource_IfThenElse.IsElse() {
+    fmt.Println(resource.Resource_IfThenElse.Else.FieldB)
+}
+```
+
+[View basic example](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/ifthenelse/basic/){:target="_blank"}
+
+### Single Branch - Flat Merge
+
+When only `then` or only `else` is present, the branch properties
+are flat-merged into the parent struct. No wrapper type is created.
+
+**OpenAPI Spec:**
+
+```yaml
+--8<-- "ifthenelse/then-only/api.yaml:20:35"
+```
+
+**Generated Go Code:**
+
+```go
+--8<-- "ifthenelse/then-only/gen.go:12:16"
+```
+
+The `timeout` and `retries` fields from the `then` branch appear
+directly on the `Config` struct.
+
+[View then-only example](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/ifthenelse/then-only/){:target="_blank"}
+
+### With `$ref` Branches
+
+When `then`/`else` reference component schemas, the generated
+`Conditional` uses the referenced type names directly:
+
+```go
+--8<-- "ifthenelse/with-refs/gen.go:98:100"
+```
+
+[View with-refs example](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/ifthenelse/with-refs/){:target="_blank"}
 
