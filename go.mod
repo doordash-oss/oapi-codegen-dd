@@ -1,6 +1,6 @@
 module github.com/doordash-oss/oapi-codegen-dd/v3
 
-go 1.25.3
+go 1.25.7
 
 require (
 	github.com/go-playground/validator/v10 v10.30.3

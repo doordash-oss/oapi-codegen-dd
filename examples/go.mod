@@ -1,6 +1,6 @@
 module github.com/doordash-oss/oapi-codegen-dd/v3/examples
 
-go 1.25.3
+go 1.25.7
 
 replace github.com/doordash-oss/oapi-codegen-dd/v3 => ../
 
