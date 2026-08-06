@@ -13,6 +13,7 @@ package codegen
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -32,6 +33,10 @@ func applyOverlays(doc libopenapi.Document, sources []string) (libopenapi.Docume
 		result, err := libopenapi.ApplyOverlayFromBytes(doc, overlayBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error applying overlay %q: %w", source, err)
+		}
+
+		for _, w := range result.Warnings {
+			slog.Warn("overlay: "+w.Message, "source", source, "target", w.Target)
 		}
 
 		doc = result.OverlayDocument
