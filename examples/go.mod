@@ -19,6 +19,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/kataras/iris/v12 v12.2.11
 	github.com/labstack/echo/v4 v4.15.0
+	github.com/labstack/echo/v5 v5.1.0
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fasthttp v1.69.0
@@ -86,7 +87,6 @@ require (
 	github.com/kataras/tunnel v0.0.4 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/labstack/echo/v5 v5.1.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
