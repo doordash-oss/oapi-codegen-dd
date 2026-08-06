@@ -94,10 +94,15 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		return nil, nil
 	}
 
+	if err := cfg.Generate.Validate(); err != nil {
+		return nil, err
+	}
+
 	parseOptions := ParseOptions{
 		OmitDescription:        cfg.Generate.OmitDescription,
 		DefaultIntType:         cfg.Generate.DefaultIntType,
 		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
+		AdditionalTags:         cfg.Generate.AdditionalTags,
 		SkipValidation:         cfg.Generate.Validation.Skip,
 		ErrorMapping:           cfg.ErrorMapping,
 		typeTracker:            newTypeTracker(),
@@ -227,7 +232,7 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 				pathParamsDef *TypeDefinition
 			)
 
-			operationID, err := createOperationID(method, path, operation.OperationId)
+			operationID, err := CreateOperationID(method, path, operation.OperationId)
 			if err != nil {
 				return nil, fmt.Errorf("error creating operation ID: %w", err)
 			}
@@ -362,6 +367,36 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 		typeDefs:       allTypeDefs,
 		responseErrors: responseErrors,
 	}, nil
+}
+
+// assignWithResponseTypeNames pre-computes the envelope wrapper name and the
+// per-status header struct names for each operation, registering them on the
+// TypeTracker so collisions with user-declared schemas are resolved before the
+// templates run. Mutates the operations slice in place.
+func assignWithResponseTypeNames(operations []OperationDefinition, tracker *TypeTracker) {
+	for i := range operations {
+		op := &operations[i]
+		baseName := UppercaseFirstCharacter(op.ID) + "Resp"
+		op.WithResponseTypeName = tracker.generateUniqueName(baseName)
+		tracker.registerName(op.WithResponseTypeName)
+
+		statusesWithHeaders := func(rcds []*ResponseContentDefinition) {
+			for _, rcd := range rcds {
+				if len(rcd.Headers) == 0 {
+					continue
+				}
+				if op.HeaderTypeNames == nil {
+					op.HeaderTypeNames = make(map[int]string)
+				}
+				header := op.WithResponseTypeName + fmt.Sprintf("%dHeaders", rcd.StatusCode)
+				header = tracker.generateUniqueName(header)
+				tracker.registerName(header)
+				op.HeaderTypeNames[rcd.StatusCode] = header
+			}
+		}
+		statusesWithHeaders(op.Response.Successes)
+		statusesWithHeaders(op.Response.Errors)
+	}
 }
 
 // resolveRequestOptionsCollisions checks if any operation's RequestOptions type name
@@ -551,7 +586,7 @@ func collectWebhookDefinitions(model *v3high.Document, options ParseOptions) ([]
 
 	for webhookName, pathItem := range model.Webhooks.FromOldest() {
 		for method, operation := range pathItem.GetOperations().FromOldest() {
-			operationID, err := createOperationID(method, "/webhooks/"+webhookName, operation.OperationId)
+			operationID, err := CreateOperationID(method, "/webhooks/"+webhookName, operation.OperationId)
 			if err != nil {
 				return nil, nil, fmt.Errorf("error creating webhook operation ID: %w", err)
 			}

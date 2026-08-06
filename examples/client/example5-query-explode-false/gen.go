@@ -65,8 +65,14 @@ func (c *Client) GetCharge(ctx context.Context, options *GetChargeRequestOptions
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetChargeResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}

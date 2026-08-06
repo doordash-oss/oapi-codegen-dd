@@ -12,12 +12,58 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResponseDecodeError(t *testing.T) {
+	underlyingErr := errors.New("json: cannot unmarshal string into Go struct field Foo.bar of type int")
+	body := []byte(`{"secret":"hunter2","ssn":"123-45-6789"}`)
+
+	decodeErr := &ResponseDecodeError{
+		StatusCode:    200,
+		ContentType:   "application/json",
+		ContentLength: len(body),
+		TargetType:    "MyResponse",
+		Body:          body,
+		Err:           underlyingErr,
+	}
+
+	t.Run("Error includes metadata but not body", func(t *testing.T) {
+		errMsg := decodeErr.Error()
+
+		assert.Contains(t, errMsg, "status=200")
+		assert.Contains(t, errMsg, "content-type=application/json")
+		assert.Contains(t, errMsg, fmt.Sprintf("content-length=%d", len(body)))
+		assert.Contains(t, errMsg, "target-type=MyResponse")
+		assert.Contains(t, errMsg, underlyingErr.Error())
+
+		// Body must not leak into Error() output
+		assert.NotContains(t, errMsg, "hunter2")
+		assert.NotContains(t, errMsg, "123-45-6789")
+	})
+
+	t.Run("Unwrap returns underlying error", func(t *testing.T) {
+		assert.Equal(t, underlyingErr, decodeErr.Unwrap())
+		assert.True(t, errors.Is(decodeErr, underlyingErr))
+	})
+
+	t.Run("errors.As exposes all fields including body", func(t *testing.T) {
+		wrapped := fmt.Errorf("operation failed: %w", decodeErr)
+
+		var target *ResponseDecodeError
+		require.True(t, errors.As(wrapped, &target))
+		assert.Equal(t, 200, target.StatusCode)
+		assert.Equal(t, "application/json", target.ContentType)
+		assert.Equal(t, len(body), target.ContentLength)
+		assert.Equal(t, "MyResponse", target.TargetType)
+		assert.Equal(t, body, target.Body)
+	})
+}
 
 func TestNewClientAPIError(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {

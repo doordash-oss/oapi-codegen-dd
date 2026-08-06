@@ -546,7 +546,10 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         if w.Header().Get("Content-Type") == "" {
             w.Header().Set("Content-Type", "{{ escapeGoString $op.Response.Success.ContentType }}")
         }
-    {{- if or (eq $op.Response.Success.ContentType "application/json") (hasPrefix $op.Response.Success.ContentType "application/json;") (hasSuffix $op.Response.Success.ContentType "+json") (contains $op.Response.Success.ContentType "+json;") }}
+    {{- if eq $op.Response.Success.ResponseName "struct{}" }}
+        {{/* Schema-less body (e.g. `text/html: {}`): declare the content type but write no body. */}}
+        w.WriteHeader(status)
+    {{- else if or (eq $op.Response.Success.ContentType "application/json") (hasPrefix $op.Response.Success.ContentType "application/json;") (hasSuffix $op.Response.Success.ContentType "+json") (contains $op.Response.Success.ContentType "+json;") }}
         w.WriteHeader(status)
         if resp != nil && resp.Body != nil {
             _ = json.NewEncoder(w).Encode(resp.Body)

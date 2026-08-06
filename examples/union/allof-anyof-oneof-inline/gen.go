@@ -39,12 +39,8 @@ func (c CreateUserBody) Validate() error {
 }
 
 type CreateUserBody_User struct {
-	ID    int      `json:"id" validate:"required"`
+	ID    int      `json:"id"`
 	Score *float32 `json:"score,omitempty"`
-}
-
-func (c CreateUserBody_User) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(c))
 }
 
 type CreateUserBody_Pages []CreateUserBody_Pages_Item
@@ -68,7 +64,7 @@ func (c CreateUserBody_Pages) Validate() error {
 }
 
 type CreateUserBody_Pages_Item struct {
-	Limit                      int                         `json:"limit" validate:"required"`
+	Limit                      int                         `json:"limit"`
 	Tag1                       *string                     `json:"tag1,omitempty"`
 	Tag2                       *string                     `json:"tag2,omitempty"`
 	CreateUserBody_Pages_AnyOf *CreateUserBody_Pages_AnyOf `json:"-"`
@@ -77,9 +73,6 @@ type CreateUserBody_Pages_Item struct {
 
 func (c CreateUserBody_Pages_Item) Validate() error {
 	var errors runtime.ValidationErrors
-	if err := typesValidator.Var(c.Limit, "required"); err != nil {
-		errors = errors.Append("Limit", err)
-	}
 	if c.CreateUserBody_Pages_AnyOf != nil {
 		if v, ok := any(c.CreateUserBody_Pages_AnyOf).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
@@ -167,11 +160,7 @@ func (c *CreateUserBody_Pages_Item) UnmarshalJSON(data []byte) error {
 }
 
 type CreateUserBody_Pages_AnyOf_0 struct {
-	Offset int `json:"offset" validate:"required"`
-}
-
-func (c CreateUserBody_Pages_AnyOf_0) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+	Offset int `json:"offset"`
 }
 
 type CreateUserBody_Pages_AnyOf_1 struct {
@@ -183,20 +172,12 @@ func (c CreateUserBody_Pages_AnyOf_1) Validate() error {
 }
 
 type CreateUserBody_Pages_OneOf_0 struct {
-	First  int `json:"first" validate:"required"`
-	Second int `json:"second" validate:"required"`
-}
-
-func (c CreateUserBody_Pages_OneOf_0) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+	First  int `json:"first"`
+	Second int `json:"second"`
 }
 
 type CreateUserBody_Pages_OneOf_1 struct {
-	Last int `json:"last" validate:"required"`
-}
-
-func (c CreateUserBody_Pages_OneOf_1) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(c))
+	Last int `json:"last"`
 }
 
 type CreateUserBody_Pages_AnyOf struct {

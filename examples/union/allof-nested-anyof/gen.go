@@ -104,11 +104,7 @@ func (o *Order_Product) UnmarshalJSON(data []byte) error {
 }
 
 type Base struct {
-	Weight float32 `json:"weight" validate:"required"`
-}
-
-func (b Base) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(b))
+	Weight float32 `json:"weight"`
 }
 
 type VariantA struct {

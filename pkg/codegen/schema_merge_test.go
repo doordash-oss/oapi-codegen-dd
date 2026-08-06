@@ -119,6 +119,149 @@ func TestMergeOpenapiSchemas(t *testing.T) {
 		assert.NotEmpty(t, code)
 	})
 
+	t.Run("nested allOf inside a no-type wrapper preserves properties", func(t *testing.T) {
+		// When an allOf entry is itself an allOf wrapper without an
+		// explicit `type`, the merge has to flatten the nested allOf
+		// before checking types: otherwise the type-presence
+		// short-circuit drops the wrapper entirely and the composed
+		// schema ends up with only the second branch's properties.
+		contents, err := os.ReadFile("testdata/merge-nested-allof-no-type-wrapper.yml")
+		require.NoError(t, err)
+
+		opts := Configuration{
+			PackageName: "testpkg",
+			Output: &Output{
+				UseSingleFile: true,
+			},
+		}
+
+		code, err := Generate(contents, opts)
+		require.NoError(t, err)
+		combined := code.GetCombined()
+
+		assert.Contains(t, combined, "type ContactDetails struct",
+			"ContactDetails should be a struct")
+		// Properties from the nested allOf wrapper must survive.
+		assert.Regexp(t, `(?m)ContactID\s+\*?string`, combined,
+			"ContactID must come through from the nested allOf wrapper")
+		assert.Regexp(t, `(?m)Note\s+\*?string`, combined,
+			"Note must come through from the nested allOf wrapper")
+		// And the outer branch's own properties stay.
+		assert.Regexp(t, `(?m)Tags\s+\*?\[\]string`, combined,
+			"Tags must stay alongside the inherited fields")
+	})
+
+	t.Run("allOf with colliding array items keeps the later branch", func(t *testing.T) {
+		// Regression: when two allOf branches both declare `items`,
+		// mergeItems used to pick the first branch and silently drop
+		// the second, losing any anyOf/oneOf union inside it. allOf
+		// composition refines an earlier declaration, so the later
+		// branch should win - same rule as property collisions.
+		contents := []byte(`
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Test
+paths:
+  /test:
+    post:
+      operationId: testEndpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CombinedError'
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    BaseError:
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              issue:
+                type: string
+    SpecificError:
+      properties:
+        issues:
+          type: array
+          items:
+            anyOf:
+              - title: ERROR_TYPE_A
+                properties:
+                  issue:
+                    type: string
+                    enum:
+                      - ERROR_A
+              - title: ERROR_TYPE_B
+                properties:
+                  issue:
+                    type: string
+                    enum:
+                      - ERROR_B
+    CombinedError:
+      allOf:
+        - $ref: '#/components/schemas/BaseError'
+        - $ref: '#/components/schemas/SpecificError'
+`)
+		opts := Configuration{
+			PackageName: "testpkg",
+			Output:      &Output{UseSingleFile: true},
+		}
+
+		code, err := Generate(contents, opts)
+		require.NoError(t, err)
+		combined := code.GetCombined()
+
+		// The anyOf branches from SpecificError must survive the
+		// merge - the previous bug collapsed CombinedError items to
+		// just BaseError's {field, issue} object and dropped the
+		// ERROR_A/ERROR_B enums entirely.
+		assert.Contains(t, combined, "ERRORA",
+			"ERROR_A enum from SpecificError's anyOf must survive the merge")
+		assert.Contains(t, combined, "ERRORB",
+			"ERROR_B enum from SpecificError's anyOf must survive the merge")
+		assert.Contains(t, combined, "CombinedError_Issues_AnyOf",
+			"the anyOf union type on items must be generated for CombinedError")
+	})
+
+	t.Run("overlapping property keeps typed declaration", func(t *testing.T) {
+		// When two allOf branches declare the same property and only
+		// one of them gives it a type (the other only attaches an
+		// annotation such as `example`), the typed declaration must
+		// survive the merge. Previously the second branch silently
+		// overwrote the first, turning a `status: string` into an
+		// empty struct.
+		contents, err := os.ReadFile("testdata/merge-overlapping-property-typed-wins.yml")
+		require.NoError(t, err)
+
+		opts := Configuration{
+			PackageName: "testpkg",
+			Output: &Output{
+				UseSingleFile: true,
+			},
+		}
+
+		code, err := Generate(contents, opts)
+		require.NoError(t, err)
+		combined := code.GetCombined()
+
+		assert.Contains(t, combined, "type InvoiceCancellation struct",
+			"InvoiceCancellation should be a struct")
+		assert.Regexp(t, `(?m)Status\s+\*?string`, combined,
+			"Status should keep the string type from the referenced Invoice schema, not collapse to an empty struct from the annotation-only override")
+		assert.NotRegexp(t, `(?m)Status\s+\*?struct\{\}`, combined,
+			"Status must not be generated as struct{}; that would mean the annotation-only override dropped the typed declaration")
+	})
+
 	t.Run("allOf with sibling properties preserves all fields", func(t *testing.T) {
 		contents, err := os.ReadFile("testdata/allof-with-sibling-properties.yml")
 		require.NoError(t, err)
@@ -778,5 +921,131 @@ components:
 	t.Run("returns false for nil schema", func(t *testing.T) {
 		result := isDiscriminatedUnionWithChild(nil, "#/components/schemas/Child")
 		assert.False(t, result)
+	})
+
+	t.Run("returns false for inheritance base with discriminator but no oneOf", func(t *testing.T) {
+		contents := []byte(`
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Test
+paths: {}
+components:
+  schemas:
+    Parent:
+      type: object
+      properties:
+        kind:
+          type: string
+      discriminator:
+        propertyName: kind
+        mapping:
+          CHILD: '#/components/schemas/Child'
+    Child:
+      allOf:
+        - $ref: '#/components/schemas/Parent'
+        - type: object
+          properties:
+            extra:
+              type: string
+`)
+		doc := loadDoc(t, contents)
+		parentSchema := doc.Model.Components.Schemas.GetOrZero("Parent").Schema()
+		result := isDiscriminatedUnionWithChild(parentSchema, "#/components/schemas/Child")
+		assert.False(t, result)
+	})
+
+	t.Run("returns true for anyOf with child ref", func(t *testing.T) {
+		contents := []byte(`
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Test
+paths: {}
+components:
+  schemas:
+    Parent:
+      discriminator:
+        propertyName: type
+      anyOf:
+        - $ref: '#/components/schemas/Child'
+    Child:
+      type: object
+      properties:
+        name:
+          type: string
+`)
+		doc := loadDoc(t, contents)
+		parentSchema := doc.Model.Components.Schemas.GetOrZero("Parent").Schema()
+		result := isDiscriminatedUnionWithChild(parentSchema, "#/components/schemas/Child")
+		assert.True(t, result)
+	})
+}
+
+func TestIfThenElse(t *testing.T) {
+	contents, err := os.ReadFile("testdata/if-then-else.yml")
+	require.NoError(t, err)
+
+	opts := Configuration{
+		PackageName: "testpkg",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+	}
+
+	code, err := Generate(contents, opts)
+	require.NoError(t, err)
+	combined := code.GetCombined()
+
+	t.Run("basic if/then/else generates union with named variants", func(t *testing.T) {
+		// BasicIfThenElse should have its own properties plus a union wrapper
+		assert.Contains(t, combined, "type BasicIfThenElse struct")
+		assert.Contains(t, combined, "Kind")
+
+		// Union wrapper type with named variants (_Then/_Else, not _0/_1)
+		assert.Contains(t, combined, "BasicIfThenElse_IfThenElse")
+		assert.Contains(t, combined, "type BasicIfThenElse_Then struct")
+		assert.Contains(t, combined, "type BasicIfThenElse_Else struct")
+		assert.Contains(t, combined, "Conditional[BasicIfThenElse_Then, BasicIfThenElse_Else]")
+
+		// Properties from then branch
+		assert.Contains(t, combined, "FieldA")
+		assert.Contains(t, combined, "ValueA")
+
+		// Properties from else branch
+		assert.Contains(t, combined, "FieldB")
+		assert.Contains(t, combined, "ValueB")
+	})
+
+	t.Run("then only flat merges", func(t *testing.T) {
+		// ThenOnly should have properties from both the base schema and the then branch
+		assert.Contains(t, combined, "type ThenOnly struct")
+		assert.Contains(t, combined, "Enabled")
+
+		// With a single branch, the then properties should be merged into the parent,
+		// so we should see Config and Timeout as fields
+		assert.Contains(t, combined, "Config")
+		assert.Contains(t, combined, "Timeout")
+	})
+
+	t.Run("if/then/else inside allOf", func(t *testing.T) {
+		// InsideAllOf should inherit from BaseResource and handle the conditional
+		assert.Contains(t, combined, "InsideAllOf")
+		assert.Contains(t, combined, "Category")
+	})
+
+	t.Run("nested if/then/else", func(t *testing.T) {
+		// Nested should handle the outer if/then/else
+		assert.Contains(t, combined, "Nested")
+		assert.Contains(t, combined, "Level")
+	})
+
+	t.Run("validation only if/then does not break generation", func(t *testing.T) {
+		// ValidationOnly should generate without errors even when then only adds required.
+		// Since the then branch only adds "required" with no new properties or type,
+		// it resolves as an empty/zero schema and is effectively a no-op for code
+		// generation. The parent properties (mode, requiredInStrict) are still present
+		// but the then branch contributes no structural types.
+		assert.Contains(t, combined, "ValidationOnly")
 	})
 }

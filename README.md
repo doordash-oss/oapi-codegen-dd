@@ -16,13 +16,14 @@ on the real value-add for your organization.
 - **Smart pruning** - Automatically removes unused types by default (configurable)
 
 ### Type System
-- **Union types** - Full support for `oneOf`, `anyOf`, and `allOf` with intelligent type merging and `runtime.Either[A, B]` for two-element unions
+- **Union types** - Full support for `oneOf`, `anyOf`, `allOf`, and `if`/`then`/`else` with intelligent type merging, `runtime.Either[A, B]` for two-element unions, and `runtime.Conditional[T, E]` for conditional schemas
 - **Additional properties** - Handle dynamic fields with `map[string]interface{}` or custom types
 - **Validation** - Built-in validation using [go-playground/validator](https://github.com/go-playground/validator) with `Validate()` methods on generated types
 - **Custom extensions** - for fine-grained control over code generation
 
 ### Client Generation
 - **HTTP client generation** - Generate type-safe HTTP clients with customizable timeout and request editors
+- **Envelope `WithResponse` clients** - Opt-in `<Op>WithResponse` siblings that return a typed envelope with per-status bodies, typed headers, and the raw `*http.Response` - useful for operations that legitimately return multiple 2xx statuses or need typed access to response headers
 - **Custom client types** - Wrap generated clients with your own types for additional functionality
 - **Error mapping** - Map response types to implement the `error` interface automatically
 

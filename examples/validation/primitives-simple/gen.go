@@ -29,7 +29,7 @@ type Response struct {
 	MsnReqWithConstraints    MsnWithConstraints     `json:"msn-req-with-constraints" validate:"required,max=7,min=4"`
 	MsnReqWithoutConstraints MsnWithoutConstraints  `json:"msn-req-without-constraints" validate:"required"`
 	Msn3                     *int                   `json:"msn3,omitempty" validate:"omitempty,gte=1,lte=100"`
-	MsnFloat                 MsnFloat               `json:"msn-float" validate:"required"`
+	MsnFloat                 MsnFloat               `json:"msn-float"`
 	MsnBool                  MsnBool                `json:"msn-bool"`
 	MsnBoolOptional          *MsnBool               `json:"msn-bool-optional,omitempty"`
 	UserRequired             User                   `json:"user-required"`

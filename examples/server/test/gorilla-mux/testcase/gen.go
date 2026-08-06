@@ -92,16 +92,12 @@ func (g GetItemsByTypePath) Validate() error {
 }
 
 type GetCategoryPath struct {
-	CategoryID int `json:"categoryId" validate:"required"`
-}
-
-func (g GetCategoryPath) Validate() error {
-	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+	CategoryID int `json:"categoryId"`
 }
 
 type GetItemsByStatusPath struct {
 	Type   string  `json:"type" validate:"required"`
-	Rating float32 `json:"rating" validate:"required"`
+	Rating float32 `json:"rating"`
 }
 
 func (g GetItemsByStatusPath) Validate() error {
@@ -363,7 +359,7 @@ type XMLPayload struct {
 }
 
 type Category struct {
-	ID          int     `json:"id" validate:"required"`
+	ID          int     `json:"id"`
 	Name        string  `json:"name" validate:"required"`
 	Description *string `json:"description,omitempty"`
 }
@@ -375,7 +371,7 @@ func (c Category) Validate() error {
 type Product struct {
 	ID    string   `json:"id" validate:"required"`
 	Name  string   `json:"name" validate:"required"`
-	Price float32  `json:"price" validate:"required"`
+	Price float32  `json:"price"`
 	Tags  []string `json:"tags,omitempty"`
 }
 
@@ -476,7 +472,7 @@ func (c ConflictError) Validate() error {
 
 type CreateOrderRequest struct {
 	ProductID string  `json:"productId" validate:"required"`
-	Quantity  int     `json:"quantity" validate:"required,gte=1"`
+	Quantity  int     `json:"quantity" validate:"gte=1"`
 	Notes     *string `json:"notes,omitempty"`
 }
 
@@ -487,7 +483,7 @@ func (c CreateOrderRequest) Validate() error {
 type Order struct {
 	ID        string      `json:"id" validate:"required"`
 	ProductID string      `json:"productId" validate:"required"`
-	Quantity  int         `json:"quantity" validate:"required"`
+	Quantity  int         `json:"quantity"`
 	Status    OrderStatus `json:"status" validate:"required"`
 	CreatedAt *time.Time  `json:"createdAt,omitempty"`
 }
@@ -499,9 +495,6 @@ func (o Order) Validate() error {
 	}
 	if err := typesValidator.Var(o.ProductID, "required"); err != nil {
 		errors = errors.Append("ProductID", err)
-	}
-	if err := typesValidator.Var(o.Quantity, "required"); err != nil {
-		errors = errors.Append("Quantity", err)
 	}
 	if v, ok := any(o.Status).(runtime.Validator); ok {
 		if err := v.Validate(); err != nil {

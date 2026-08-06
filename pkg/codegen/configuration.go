@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -161,6 +162,9 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			if other.Generate.Client {
 				o.Generate.Client = other.Generate.Client
 			}
+			if other.Generate.ClientWithResponse {
+				o.Generate.ClientWithResponse = other.Generate.ClientWithResponse
+			}
 			if other.Generate.OmitDescription {
 				o.Generate.OmitDescription = other.Generate.OmitDescription
 			}
@@ -169,6 +173,9 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			}
 			if other.Generate.AlwaysPrefixEnumValues {
 				o.Generate.AlwaysPrefixEnumValues = other.Generate.AlwaysPrefixEnumValues
+			}
+			if len(other.Generate.AdditionalTags) > 0 {
+				o.Generate.AdditionalTags = other.Generate.AdditionalTags
 			}
 			// Overwrite Validation options
 			if other.Generate.Validation.Skip {
@@ -287,8 +294,38 @@ func (o FilterParamsConfig) IsEmpty() bool {
 }
 
 type GenerateOptions struct {
-	// Client specifies whether to generate a client. Defaults to false.
+	// Client specifies whether to generate the classic client - one method
+	// per operation that returns the picked 2xx body type directly (e.g.
+	// `func (c *Client) UploadDocument(...) (*DocumentStored, error)`).
+	// Use this when callers only need the response body and the operation
+	// has a single documented success status. Headers and non-picked 2xx
+	// bodies are not exposed by this style; for that, use
+	// ClientWithResponse instead, or both together.
+	//
+	// Combinations with ClientWithResponse:
+	//   - client: true, client-with-response: false → classic only
+	//   - client: false, client-with-response: true → envelope only
+	//   - client: true, client-with-response: true  → both styles, combined
+	//                                                 into a single ClientInterface
+	//
+	// Defaults to false.
 	Client bool `yaml:"client"`
+
+	// ClientWithResponse specifies whether to generate `<Op>WithResponse`
+	// sibling functions that return a typed envelope: one `JSON<status>`
+	// field per documented response, one `Headers<status>` typed struct per
+	// status that declares headers, plus `HTTPResponse *http.Response` for
+	// raw access (undocumented headers, status string, etc.). Use this when
+	// an operation has multiple 2xx statuses with different bodies (e.g.
+	// 201 sync + 202 queued), or when callers need typed access to headers
+	// like Location or Retry-After.
+	//
+	// Additive to Client: when both flags are true, the generated
+	// ClientInterface lists both `<Op>` and `<Op>WithResponse` methods so a
+	// single mock or test double covers both shapes.
+	//
+	// Defaults to false.
+	ClientWithResponse bool `yaml:"client-with-response"`
 
 	// Models specifies whether to generate model types. Defaults to true.
 	// Set to false when models are generated in a separate package.
@@ -312,8 +349,23 @@ type GenerateOptions struct {
 	// AlwaysPrefixEnumValues specifies whether to always prefix enum values with the schema name. Defaults to true.
 	AlwaysPrefixEnumValues bool `yaml:"always-prefix-enum-values"`
 
+	// AdditionalTags specifies additional struct tags to emit on generated fields,
+	// mirroring the json tag value. For example, ["yaml"] emits yaml:"field_name,omitempty"
+	// alongside the json tag. Per-property x-oapi-codegen-extra-tags take priority.
+	AdditionalTags []string `yaml:"additional-tags"`
+
 	// Validation specifies options for Validate() method generation.
 	Validation ValidationOptions `yaml:"validation"`
+}
+
+// Validate returns an error if any generate options are invalid.
+func (o GenerateOptions) Validate() error {
+	for _, tag := range o.AdditionalTags {
+		if tag == "" || strings.ContainsAny(tag, " \t\"'`:") {
+			return fmt.Errorf("%w: %q", ErrInvalidAdditionalTag, tag)
+		}
+	}
+	return nil
 }
 
 type ValidationOptions struct {
@@ -356,6 +408,7 @@ const (
 	HandlerKindBeego      HandlerKind = "beego"
 	HandlerKindChi        HandlerKind = "chi"
 	HandlerKindEcho       HandlerKind = "echo"
+	HandlerKindEchoV5     HandlerKind = "echo-v5"
 	HandlerKindFastHTTP   HandlerKind = "fasthttp"
 	HandlerKindFiber      HandlerKind = "fiber"
 	HandlerKindGin        HandlerKind = "gin"
@@ -371,7 +424,7 @@ const (
 // IsValid returns true if the handler kind is a supported value.
 func (k HandlerKind) IsValid() bool {
 	switch k {
-	case HandlerKindBeego, HandlerKindChi, HandlerKindEcho, HandlerKindFastHTTP, HandlerKindFiber, HandlerKindGin, HandlerKindGoFrame, HandlerKindGoZero, HandlerKindGorillaMux, HandlerKindHertz, HandlerKindIris, HandlerKindKratos, HandlerKindStdHTTP:
+	case HandlerKindBeego, HandlerKindChi, HandlerKindEcho, HandlerKindEchoV5, HandlerKindFastHTTP, HandlerKindFiber, HandlerKindGin, HandlerKindGoFrame, HandlerKindGoZero, HandlerKindGorillaMux, HandlerKindHertz, HandlerKindIris, HandlerKindKratos, HandlerKindStdHTTP:
 		return true
 	default:
 		return false

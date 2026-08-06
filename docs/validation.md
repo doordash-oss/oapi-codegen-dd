@@ -19,7 +19,7 @@ When `true`, no `Validate()` methods are generated. Use this if you don't need v
 
 ### `simple`
 
-When `true`, all struct types use simple `validate.Struct()` validation instead of custom validation logic. This produces cleaner code but doesn't support advanced features like union type validation.
+When `true`, all struct types use simple `validate.Struct()` validation instead of custom validation logic. This produces cleaner code but doesn't support advanced features like union type validation or regex `pattern` constraints.
 
 ### `response`
 
@@ -42,6 +42,11 @@ The following OpenAPI constraints are translated to validation tags:
 | `minItems` | `min=N` | arrays |
 | `maxItems` | `max=N` | arrays |
 | `enum` | custom switch | string, integer enums |
+| `pattern` | `runtime.ValidatePattern()` | strings |
+
+`pattern` is a regex, which `validate.Struct()` cannot express, so it is enforced
+wherever per-field/per-item validation is generated (full-mode structs, arrays, maps).
+It is not enforced in `simple` mode (see below).
 
 ## Generated Code Examples
 

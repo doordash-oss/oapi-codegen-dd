@@ -67,6 +67,7 @@ type ParseOptions struct {
 	OmitDescription        bool
 	DefaultIntType         string
 	AlwaysPrefixEnumValues bool
+	AdditionalTags         []string
 	SkipValidation         bool
 
 	// ErrorMapping maps response type names to the field that should be used
@@ -202,17 +203,34 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 	}
 
-	if p.cfg.Generate.Client {
+	// When envelope generation is on, pre-compute the wrapper and per-status
+	// header type names once so they're stable across every emission step
+	// (response types append, client-with-response template, etc.).
+	if p.cfg.Generate.ClientWithResponse {
+		assignWithResponseTypeNames(p.ctx.Operations, p.ctx.TypeTracker)
+	}
+
+	if p.cfg.Generate.Client || p.cfg.Generate.ClientWithResponse {
 		opsCtx := &TplOperationsContext{
 			Operations: p.ctx.Operations,
 			Imports:    p.ctx.Imports,
 			Config:     p.cfg,
 			WithHeader: withHeader,
 		}
-		for _, tmpl := range []string{"client", "client-options"} {
+		// client-options runs whenever any client style is enabled - the
+		// envelope function calls into RequestOptions just like the classic
+		// client does.
+		tmpls := []string{"client-options"}
+		if p.cfg.Generate.Client {
+			tmpls = append(tmpls, "client")
+		}
+		if p.cfg.Generate.ClientWithResponse {
+			tmpls = append(tmpls, "client-with-response")
+		}
+		for _, tmpl := range tmpls {
 			out, err := p.ParseTemplates([]string{tmpl + ".tmpl"}, opsCtx)
 			if err != nil {
-				return nil, fmt.Errorf("error generating code for client: %w", err)
+				return nil, fmt.Errorf("error generating code for %s: %w", tmpl, err)
 			}
 			formatted := out
 			if !useSingleFile {
@@ -494,6 +512,58 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				}
 			}
 			typesOut[getSpecLocationOutName(sl)] = formatted
+		}
+
+		// When envelope client generation is on, emit the wrapper struct and
+		// per-status header structs into responses.go so they sit alongside
+		// the body type aliases they reference. goimports adds net/http on
+		// format. If the spec produced no other SpecLocationResponse types
+		// (e.g. operations only reference component schemas), the responses
+		// file may not exist yet - seed it with a package-decl header in
+		// multi-file mode so my types-only append produces compilable Go.
+		if p.cfg.Generate.ClientWithResponse {
+			respKey := getSpecLocationOutName(SpecLocationResponse)
+			if _, ok := typesOut[respKey]; !ok {
+				if useSingleFile {
+					typesOut[respKey] = ""
+				} else {
+					seedCtx := &TplTypeContext{
+						Types:          nil,
+						TypeSchemaMap:  typeSchemaMap,
+						SpecLocation:   string(SpecLocationResponse),
+						Imports:        p.ctx.Imports,
+						Config:         p.cfg,
+						WithHeader:     withHeader,
+						ResponseErrors: responseErrs,
+						TypeTracker:    p.ctx.TypeTracker,
+					}
+					seed, err := p.ParseTemplates([]string{"types.tmpl"}, seedCtx)
+					if err != nil {
+						return nil, fmt.Errorf("error seeding responses.go for envelope: %w", err)
+					}
+					typesOut[respKey] = seed
+				}
+			}
+
+			opsCtx := &TplOperationsContext{
+				Operations: p.ctx.Operations,
+				Imports:    p.ctx.Imports,
+				Config:     p.cfg,
+				WithHeader: false,
+			}
+			extra, err := p.ParseTemplates([]string{"client-with-response-types.tmpl"}, opsCtx)
+			if err != nil {
+				return nil, fmt.Errorf("error generating envelope response types: %w", err)
+			}
+
+			combined := typesOut[respKey] + "\n" + extra
+			if !useSingleFile {
+				combined, err = p.formatCode(combined)
+				if err != nil {
+					return nil, fmt.Errorf("error formatting responses.go after envelope append: %w", err)
+				}
+			}
+			typesOut[respKey] = combined
 		}
 
 		if len(p.ctx.UnionTypes) > 0 {

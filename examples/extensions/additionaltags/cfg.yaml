@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: additionaltags
+# to make sure that all types are generated, even if they're unreferenced
+skip-prune: true
+generate:
+  client: false
+  additional-tags:
+    - yaml
+output:
+  use-single-file: true

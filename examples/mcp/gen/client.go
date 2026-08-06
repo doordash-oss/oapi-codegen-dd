@@ -75,8 +75,14 @@ func (c *Client) HealthCheck(ctx context.Context, reqEditors ...runtime.RequestE
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "HealthCheckResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -114,8 +120,14 @@ func (c *Client) ListUsers(ctx context.Context, options *ListUsersRequestOptions
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "ListUsersResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -149,7 +161,14 @@ func (c *Client) CreateUser(ctx context.Context, options *CreateUserRequestOptio
 			// Handle empty error response body gracefully - skip unmarshal if no content
 			if len(bodyBytes) > 0 {
 				if err = json.Unmarshal(bodyBytes, target); err != nil {
-					return nil, fmt.Errorf("error decoding response: %w", err)
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "CreateUserErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
 				}
 			}
 			// Return error with (possibly empty) target
@@ -165,8 +184,14 @@ func (c *Client) CreateUser(ctx context.Context, options *CreateUserRequestOptio
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "CreateUserResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -199,7 +224,14 @@ func (c *Client) GetUser(ctx context.Context, options *GetUserRequestOptions, re
 			// Handle empty error response body gracefully - skip unmarshal if no content
 			if len(bodyBytes) > 0 {
 				if err = json.Unmarshal(bodyBytes, target); err != nil {
-					return nil, fmt.Errorf("error decoding response: %w", err)
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "GetUserErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
 				}
 			}
 			// Return error with (possibly empty) target
@@ -215,8 +247,14 @@ func (c *Client) GetUser(ctx context.Context, options *GetUserRequestOptions, re
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetUserResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}
@@ -282,8 +320,14 @@ func (c *Client) GetMetrics(ctx context.Context, reqEditors ...runtime.RequestEd
 			return target, nil
 		}
 		if err = json.Unmarshal(bodyBytes, target); err != nil {
-			err = fmt.Errorf("error decoding response: %w", err)
-			return nil, err
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetMetricsResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
 		}
 		return target, nil
 	}

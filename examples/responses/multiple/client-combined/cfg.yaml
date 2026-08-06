@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: gen
+output:
+  use-single-file: false
+generate:
+  client: true
+  client-with-response: true
+  omit-description: true

@@ -308,8 +308,8 @@ func collectSchemaRefs(schema *base.Schema, refSet map[string]bool, model *v3hig
 		collectSchemaRefs(ap.A.Schema(), refSet, model)
 	}
 
-	// allOf / oneOf / anyOf / not
-	for _, group := range [][]*base.SchemaProxy{schema.AllOf, schema.OneOf, schema.AnyOf, {schema.Not}} {
+	// allOf / oneOf / anyOf / not / if / then / else
+	for _, group := range [][]*base.SchemaProxy{schema.AllOf, schema.OneOf, schema.AnyOf, {schema.Not}, {schema.If}, {schema.Then}, {schema.Else}} {
 		for _, sp := range group {
 			if sp == nil {
 				continue

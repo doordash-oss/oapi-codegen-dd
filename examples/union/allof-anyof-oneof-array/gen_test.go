@@ -25,7 +25,7 @@ func TestCreateUserBody_User_Validation(t *testing.T) {
 		}
 		err := user.Validate()
 		assert.Error(t, err)
-		assert.Equal(t, "ID is required", err.Error())
+		assert.Equal(t, "ID must be greater than or equal to 1", err.Error())
 	})
 
 	t.Run("id above maximum", func(t *testing.T) {
@@ -94,7 +94,7 @@ func TestCreateUserBody_Pages_Validation(t *testing.T) {
 		}
 		err := pages.Validate()
 		assert.Error(t, err)
-		assert.Equal(t, "Limit is required", err.Error())
+		assert.Equal(t, "Limit must be greater than or equal to 1", err.Error())
 	})
 
 	t.Run("limit above maximum", func(t *testing.T) {
@@ -192,7 +192,7 @@ func TestCreateUserBody_Pages_OneOf_Validation(t *testing.T) {
 		}
 		err := oneOf.Validate()
 		assert.Error(t, err)
-		assert.Equal(t, "First is required", err.Error())
+		assert.Equal(t, "First must be greater than or equal to 1", err.Error())
 	})
 
 	t.Run("valid last", func(t *testing.T) {
@@ -213,7 +213,7 @@ func TestCreateUserBody_Pages_OneOf_Validation(t *testing.T) {
 		}
 		err := oneOf.Validate()
 		assert.Error(t, err)
-		assert.Equal(t, "Last is required", err.Error())
+		assert.Equal(t, "Last must be greater than or equal to 1", err.Error())
 	})
 }
 
