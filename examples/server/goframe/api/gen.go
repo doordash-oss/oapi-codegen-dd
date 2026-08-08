@@ -150,8 +150,10 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -209,8 +211,10 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -262,8 +266,10 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -308,8 +314,10 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -491,6 +499,16 @@ func (r *HealthCheckResponseData) WithStatus(code int) *HealthCheckResponseData 
 	return r
 }
 
+// Payload returns the value to be JSON-encoded as the response body. Override
+// this template to customize the encoded shape (e.g. to wrap it in an envelope)
+// without needing to change the adapter template.
+func (r *HealthCheckResponseData) Payload() any {
+	if r.Body == nil {
+		return nil
+	}
+	return r.Body
+}
+
 // ListUsersResponseData wraps the success response with optional headers and status override.
 type ListUsersResponseData struct {
 	Body    *ListUsersResponse
@@ -513,6 +531,16 @@ func (r *ListUsersResponseData) WithHeaders(h http.Header) *ListUsersResponseDat
 func (r *ListUsersResponseData) WithStatus(code int) *ListUsersResponseData {
 	r.Status = code
 	return r
+}
+
+// Payload returns the value to be JSON-encoded as the response body. Override
+// this template to customize the encoded shape (e.g. to wrap it in an envelope)
+// without needing to change the adapter template.
+func (r *ListUsersResponseData) Payload() any {
+	if r.Body == nil {
+		return nil
+	}
+	return r.Body
 }
 
 // CreateUserResponseData wraps the success response with optional headers and status override.
@@ -539,6 +567,16 @@ func (r *CreateUserResponseData) WithStatus(code int) *CreateUserResponseData {
 	return r
 }
 
+// Payload returns the value to be JSON-encoded as the response body. Override
+// this template to customize the encoded shape (e.g. to wrap it in an envelope)
+// without needing to change the adapter template.
+func (r *CreateUserResponseData) Payload() any {
+	if r.Body == nil {
+		return nil
+	}
+	return r.Body
+}
+
 // GetUserResponseData wraps the success response with optional headers and status override.
 type GetUserResponseData struct {
 	Body    *GetUserResponse
@@ -563,6 +601,16 @@ func (r *GetUserResponseData) WithStatus(code int) *GetUserResponseData {
 	return r
 }
 
+// Payload returns the value to be JSON-encoded as the response body. Override
+// this template to customize the encoded shape (e.g. to wrap it in an envelope)
+// without needing to change the adapter template.
+func (r *GetUserResponseData) Payload() any {
+	if r.Body == nil {
+		return nil
+	}
+	return r.Body
+}
+
 // DeleteUserResponseData wraps the success response with optional headers and status override.
 type DeleteUserResponseData struct {
 	Body    *struct{}
@@ -585,6 +633,16 @@ func (r *DeleteUserResponseData) WithHeaders(h http.Header) *DeleteUserResponseD
 func (r *DeleteUserResponseData) WithStatus(code int) *DeleteUserResponseData {
 	r.Status = code
 	return r
+}
+
+// Payload returns the value to be JSON-encoded as the response body. Override
+// this template to customize the encoded shape (e.g. to wrap it in an envelope)
+// without needing to change the adapter template.
+func (r *DeleteUserResponseData) Payload() any {
+	if r.Body == nil {
+		return nil
+	}
+	return r.Body
 }
 
 type HealthCheckResponse = HealthStatus

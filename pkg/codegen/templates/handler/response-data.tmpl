@@ -54,5 +54,15 @@ func (r *{{ $op.ID | ucFirst }}ResponseData) WithStatus(code int) *{{ $op.ID | u
     r.Status = code
     return r
 }
+
+// Payload returns the value to be JSON-encoded as the response body. Override
+// this template to customize the encoded shape (e.g. to wrap it in an envelope)
+// without needing to change the adapter template.
+func (r *{{ $op.ID | ucFirst }}ResponseData) Payload() any {
+    if r.Body == nil {
+        return nil
+    }
+    return r.Body
+}
 {{- end }}
 {{ end }}

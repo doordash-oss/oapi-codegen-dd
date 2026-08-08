@@ -551,8 +551,10 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         w.WriteHeader(status)
     {{- else if or (eq $op.Response.Success.ContentType "application/json") (hasPrefix $op.Response.Success.ContentType "application/json;") (hasSuffix $op.Response.Success.ContentType "+json") (contains $op.Response.Success.ContentType "+json;") }}
         w.WriteHeader(status)
-        if resp != nil && resp.Body != nil {
-            _ = json.NewEncoder(w).Encode(resp.Body)
+        if resp != nil {
+            if payload := resp.Payload(); payload != nil {
+                _ = json.NewEncoder(w).Encode(payload)
+            }
         }
     {{- else if or (eq $op.Response.Success.ContentType "text/plain") (hasPrefix $op.Response.Success.ContentType "text/plain;") (eq $op.Response.Success.ContentType "text/html") (hasPrefix $op.Response.Success.ContentType "text/html;") }}
         w.WriteHeader(status)
@@ -576,7 +578,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{- else }}
             // NOTE: application/octet-stream with struct schema - this may be a spec issue.
             // octet-stream typically expects binary data, falling back to JSON encoding.
-            _ = json.NewEncoder(w).Encode(resp.Body)
+            _ = json.NewEncoder(w).Encode(resp.Payload())
             {{- end }}
         }
     {{- else if eq $op.Response.Success.ContentType "application/x-www-form-urlencoded" }}
