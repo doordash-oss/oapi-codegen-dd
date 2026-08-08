@@ -74,8 +74,10 @@ func (a *HTTPAdapter) HealthCheck(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -133,8 +135,10 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -186,8 +190,10 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
@@ -232,8 +238,10 @@ func (a *HTTPAdapter) GetUser(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 	w.WriteHeader(status)
-	if resp != nil && resp.Body != nil {
-		_ = json.NewEncoder(w).Encode(resp.Body)
+	if resp != nil {
+		if payload := resp.Payload(); payload != nil {
+			_ = json.NewEncoder(w).Encode(payload)
+		}
 	}
 }
 
