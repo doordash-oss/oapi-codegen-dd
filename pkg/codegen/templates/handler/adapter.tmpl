@@ -13,6 +13,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{- define "decode-error" -}}
+{{- if .HasTypedError }}
+        a.errHandler.HandleError(w, r, {{ .Op.Response.Error.StatusCode }}, New{{ .ErrorTypeName }}(err.Error()))
+{{- else }}
+        a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
+            Kind:        OapiErrorKindDecode,
+            OperationID: "{{ .Op.ID }}",
+            Message:     err.Error(),
+        })
+{{- end }}
+{{- end -}}
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
 {{- $serviceName := $config.Generate.Handler.Name -}}
@@ -332,19 +343,25 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     defer r.Body.Close()
     {{- if or (eq $op.Body.ContentType "application/json") (hasSuffix $op.Body.ContentType "+json") }}
     var body {{ $op.Body.Name }}
+    {{- if $op.Body.Required }}
     if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
-        {{- if $hasTypedError }}
-        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
-        {{- else }}
-        a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
-            Kind:        OapiErrorKindDecode,
-            OperationID: "{{ $op.ID }}",
-            Message:     err.Error(),
-        })
-        {{- end }}
+        {{- template "decode-error" dict "Op" $op "HasTypedError" $hasTypedError "ErrorTypeName" $errorTypeName }}
         return
     }
     opts.Body = &body
+    {{- else }}
+    switch err := a.jsonBodyDecoder(r.Body, &body); {
+    case errors.Is(err, runtime.ErrRequestBodyEmpty):
+        // requestBody is optional, so a request carrying none leaves opts.Body
+        // nil rather than failing. Decoding into the zero value instead would
+        // hand the validator a body nobody sent, and fail on its required fields.
+    case err != nil:
+        {{- template "decode-error" dict "Op" $op "HasTypedError" $hasTypedError "ErrorTypeName" $errorTypeName }}
+        return
+    default:
+        opts.Body = &body
+    }
+    {{- end }}
     {{- else if eq $op.Body.ContentType "application/x-www-form-urlencoded" }}
     var body {{ $op.Body.Name }}
     formBytes, err := io.ReadAll(r.Body)
