@@ -1,0 +1,57 @@
+openapi: 3.0.3
+info:
+  title: Optional request body
+  version: 1.0.0
+paths:
+  /things/{id}/settle:
+    post:
+      operationId: settleThing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettleRequest'
+      responses:
+        '200':
+          description: Settled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+  /things:
+    post:
+      operationId: createThing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thing'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+components:
+  schemas:
+    Thing:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    SettleRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: integer

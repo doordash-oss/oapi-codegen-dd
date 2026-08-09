@@ -15,6 +15,7 @@ import (
 	"go/format"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -742,4 +743,34 @@ func TestCollectWebhookDefinitions(t *testing.T) {
 			assert.Equal(t, SpecLocationWebhook, td.SpecLocation, "type %s should have webhook SpecLocation", td.Name)
 		}
 	})
+}
+
+// An operation whose requestBody is optional must accept a request that carries
+// none: the decoder reports an empty body, and the handler leaves opts.Body nil
+// so the request reaches the service. A required body keeps failing to decode.
+func TestOptionalRequestBodyToleratesAnEmptyBody(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output:      &Output{UseSingleFile: true},
+		Generate: &GenerateOptions{
+			Handler: &HandlerOptions{Kind: "chi"},
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "optional-request-body.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	assert.Contains(t, code, "case errors.Is(err, runtime.ErrRequestBodyEmpty):",
+		"the optional body admits a request that carries none")
+	assert.Equal(t, 1, strings.Count(code, "runtime.ErrRequestBodyEmpty"),
+		"only the optional operation admits it")
+
+	// The required body keeps the shape it had before, so no consumer's
+	// generated output shifts for an operation this does not change.
+	assert.Contains(t, code, "if err := a.jsonBodyDecoder(r.Body, &body); err != nil {")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
 }
