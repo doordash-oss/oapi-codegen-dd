@@ -79,3 +79,12 @@ func (file File) FileSize() int64 {
 	}
 	return int64(len(file.data))
 }
+
+// ContentType reports the media type the multipart part declared, and the empty
+// string when the file did not arrive as a part or the part declared none.
+func (file File) ContentType() string {
+	if file.multipart != nil {
+		return file.multipart.Header.Get("Content-Type")
+	}
+	return ""
+}
