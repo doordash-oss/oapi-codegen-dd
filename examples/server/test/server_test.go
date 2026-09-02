@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -514,4 +515,108 @@ func TestWithJSONBodyDecoder(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Transformed", user["name"])
 	})
+}
+
+// capturingErrorHandler records the error the adapter hands to the error handler
+// and delegates the response to the default handler.
+type capturingErrorHandler struct {
+	chiapi.OapiDefaultErrorHandler
+
+	err error
+}
+
+func (h *capturingErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, statusCode int, err error) {
+	h.err = err
+	h.OapiDefaultErrorHandler.HandleError(w, r, statusCode, err)
+}
+
+// doChi runs req against the chi testcase, which is the only one generated with
+// request validation enabled.
+func doChi(t *testing.T, h *capturingErrorHandler, req *http.Request) *http.Response {
+	t.Helper()
+	router := chiapi.NewRouter(chiapi.NewService(), chiapi.WithErrorHandler(h))
+	resp, err := httpHandler{router}.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	return resp
+}
+
+func TestErrorHandlerUnwrapsValidationError(t *testing.T) {
+	h := &capturingErrorHandler{}
+	body := `{"productId": "", "quantity": 0}`
+	req := httptest.NewRequest("POST", "/orders", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp := doChi(t, h, req)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var handlerErr chiapi.OapiHandlerError
+	require.ErrorAs(t, h.err, &handlerErr)
+	assert.Equal(t, chiapi.OapiErrorKindValidation, handlerErr.Kind)
+	assert.Equal(t, "CreateOrder", handlerErr.OperationID)
+
+	// The structured error survives, so a custom handler can build a field-level
+	// response instead of parsing handlerErr.Message.
+	var validationErrs runtime.ValidationErrors
+	require.ErrorAs(t, h.err, &validationErrs)
+
+	fields := make([]string, 0, len(validationErrs))
+	for _, ve := range validationErrs {
+		fields = append(fields, ve.Field)
+	}
+	assert.ElementsMatch(t, []string{"Body.ProductID", "Body.Quantity"}, fields)
+}
+
+func TestErrorHandlerUnwrapsParseError(t *testing.T) {
+	h := &capturingErrorHandler{}
+	resp := doChi(t, h, httptest.NewRequest("GET", "/categories/not-a-number", nil))
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var handlerErr chiapi.OapiHandlerError
+	require.ErrorAs(t, h.err, &handlerErr)
+	assert.Equal(t, chiapi.OapiErrorKindParse, handlerErr.Kind)
+	assert.Equal(t, "categoryId", handlerErr.ParamName)
+	assert.Equal(t, "path", handlerErr.ParamLocation)
+
+	var numErr *strconv.NumError
+	require.ErrorAs(t, h.err, &numErr)
+	assert.ErrorIs(t, h.err, strconv.ErrSyntax)
+}
+
+func TestErrorHandlerUnwrapsDecodeError(t *testing.T) {
+	h := &capturingErrorHandler{}
+	req := httptest.NewRequest("POST", "/users", strings.NewReader(`{"name":,}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := doChi(t, h, req)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var handlerErr chiapi.OapiHandlerError
+	require.ErrorAs(t, h.err, &handlerErr)
+	assert.Equal(t, chiapi.OapiErrorKindDecode, handlerErr.Kind)
+
+	var syntaxErr *json.SyntaxError
+	require.ErrorAs(t, h.err, &syntaxErr)
+}
+
+// TestDefaultErrorHandlerResponse pins the wire format of the default error
+// handler: the wrapped cause must stay out of the response body.
+func TestDefaultErrorHandlerResponse(t *testing.T) {
+	body := `{"productId": "p-1", "quantity": 0}`
+	req := httptest.NewRequest("POST", "/orders", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpHandler{chiapi.NewRouter(chiapi.NewService())}.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var payload map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	assert.Equal(t, map[string]any{
+		"error":        "Body.Quantity must be greater than or equal to 1",
+		"operation_id": "CreateOrder",
+	}, payload)
 }

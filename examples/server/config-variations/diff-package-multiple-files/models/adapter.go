@@ -99,6 +99,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "limit",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
@@ -156,6 +157,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}

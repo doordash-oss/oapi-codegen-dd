@@ -41,10 +41,18 @@ type OapiHandlerError struct {
 	Message       string
 	ParamName     string
 	ParamLocation string
+
+	// Err is the error that caused this handler error.
+	Err error `json:"-"`
 }
 
 func (e OapiHandlerError) Error() string {
 	return e.Message
+}
+
+// Unwrap returns the underlying error, enabling errors.Is and errors.As.
+func (e OapiHandlerError) Unwrap() error {
+	return e.Err
 }
 
 // OapiErrorResponse is the default JSON error response structure used by OapiDefaultErrorHandler.
@@ -211,6 +219,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "limit",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
@@ -277,6 +286,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -333,6 +343,7 @@ func (a *HTTPAdapter) ImportUsers(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "ImportUsers",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -584,6 +595,7 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 			Kind:        OapiErrorKindDecode,
 			OperationID: "SubmitContactForm",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -593,6 +605,7 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 			Kind:        OapiErrorKindDecode,
 			OperationID: "SubmitContactForm",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -601,6 +614,7 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 			Kind:        OapiErrorKindDecode,
 			OperationID: "SubmitContactForm",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -656,6 +670,7 @@ func (a *HTTPAdapter) CreateNote(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateNote",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -798,6 +813,7 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "GetOAuthToken",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -807,6 +823,7 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "GetOAuthToken",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -815,6 +832,7 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "GetOAuthToken",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -1068,6 +1086,7 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "categoryIds",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
@@ -1082,6 +1101,7 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "minPrice",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
@@ -1096,6 +1116,7 @@ func (a *HTTPAdapter) ListProducts(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "active",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
@@ -1157,6 +1178,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 			Message:       err.Error(),
 			ParamName:     "categoryId",
 			ParamLocation: "path",
+			Err:           err,
 		})
 		return
 	}
@@ -1175,6 +1197,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "X-Include-Products",
 				ParamLocation: "header",
+				Err:           err,
 			})
 			return
 		}
@@ -1189,6 +1212,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "X-Max-Depth",
 				ParamLocation: "header",
+				Err:           err,
 			})
 			return
 		}
@@ -1203,6 +1227,7 @@ func (a *HTTPAdapter) GetCategory(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "X-Price-Threshold",
 				ParamLocation: "header",
+				Err:           err,
 			})
 			return
 		}
@@ -1266,6 +1291,7 @@ func (a *HTTPAdapter) GetItemsByStatus(w http.ResponseWriter, r *http.Request) {
 			Message:       err.Error(),
 			ParamName:     "rating",
 			ParamLocation: "path",
+			Err:           err,
 		})
 		return
 	}
@@ -1372,6 +1398,7 @@ func (a *HTTPAdapter) CreateOrder(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateOrder",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
@@ -1427,6 +1454,7 @@ func (a *HTTPAdapter) CreateCompany(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateCompany",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
