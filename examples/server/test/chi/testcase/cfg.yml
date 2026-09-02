@@ -8,4 +8,5 @@ generate:
   handler:
     kind: chi
     service: {}
-
+    validation:
+      request: true

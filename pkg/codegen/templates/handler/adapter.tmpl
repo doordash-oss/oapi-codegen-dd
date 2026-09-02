@@ -21,6 +21,7 @@ limitations under the License.
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ .Op.ID }}",
             Message:     err.Error(),
+            Err:         err,
         })
 {{- end }}
 {{- end -}}
@@ -84,6 +85,7 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
             Kind:        OapiErrorKindValidation,
             OperationID: "{{ $op.ID }}",
             Message:     err.Error(),
+            Err:         err,
         })
         {{- end }}
         return
@@ -164,6 +166,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     Message:       err.Error(),
                     ParamName:     "{{ .JsonFieldName }}",
                     ParamLocation: "path",
+                    Err:           err,
                 })
                 {{- end }}
                 return
@@ -195,6 +198,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         Kind:        OapiErrorKindDecode,
                         OperationID: "{{ $op.ID }}",
                         Message:     fmt.Sprintf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %v", err),
+                        Err:         err,
                     })
                     {{- end }}
                     return
@@ -227,6 +231,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                             Message:       err.Error(),
                             ParamName:     "{{ escapeGoString .ParamName }}",
                             ParamLocation: "query",
+                            Err:           err,
                         })
                         {{- end }}
                         return
@@ -258,6 +263,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                             Message:       err.Error(),
                             ParamName:     "{{ escapeGoString .ParamName }}",
                             ParamLocation: "query",
+                            Err:           err,
                         })
                         {{- end }}
                         return
@@ -284,6 +290,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         Message:       err.Error(),
                         ParamName:     "{{ escapeGoString .ParamName }}",
                         ParamLocation: "query",
+                        Err:           err,
                     })
                     {{- end }}
                     return
@@ -324,6 +331,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     Message:       err.Error(),
                     ParamName:     "{{ escapeGoString .ParamName }}",
                     ParamLocation: "header",
+                    Err:           err,
                 })
                 {{- end }}
                 return
@@ -373,6 +381,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Message:     err.Error(),
+            Err:         err,
         })
         {{- end }}
         return
@@ -386,6 +395,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Message:     err.Error(),
+            Err:         err,
         })
         {{- end }}
         return
@@ -398,6 +408,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             Kind:        OapiErrorKindDecode,
             OperationID: "{{ $op.ID }}",
             Message:     err.Error(),
+            Err:         err,
         })
         {{- end }}
         return
@@ -414,6 +425,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     Kind:        OapiErrorKindDecode,
                     OperationID: "{{ $op.ID }}",
                     Message:     err.Error(),
+                    Err:         err,
                 })
                 {{- end }}
                 return
@@ -434,6 +446,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 Kind:        OapiErrorKindDecode,
                 OperationID: "{{ $op.ID }}",
                 Message:     err.Error(),
+                Err:         err,
             })
             {{- end }}
             return
@@ -472,6 +485,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                             Kind:        OapiErrorKindDecode,
                             OperationID: "{{ $op.ID }}",
                             Message:     err.Error(),
+                            Err:         err,
                         })
                         {{- end }}
                         return
@@ -535,6 +549,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         Kind:        OapiErrorKindValidation,
                         OperationID: "{{ $op.ID }}",
                         Message:     fmt.Sprintf("response validation failed: %v", err),
+                        Err:         err,
                     })
                     return
                 }

@@ -99,6 +99,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "limit",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
