@@ -477,8 +477,37 @@ type OapiHandlerError struct {
     Message       string         // Error message
     ParamName     string         // Parameter name (for parse errors)
     ParamLocation string         // Parameter location: "path", "query", "header" (for parse errors)
+    Err           error          // Underlying error, exposed via Unwrap()
 }
 ```
+
+`OapiHandlerError` implements `Unwrap()`, so `errors.Is` and `errors.As` reach the
+error that caused it. With `generate.handler.validation.request: true`, request
+validation failures wrap a `runtime.ValidationErrors`, which lets a custom handler
+return field-level details instead of parsing `Message`:
+
+```go
+func (h *ValidationErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, statusCode int, err error) {
+    var validationErrs runtime.ValidationErrors
+    if errors.As(err, &validationErrs) {
+        fields := make(map[string]string, len(validationErrs))
+        for _, ve := range validationErrs {
+            fields[ve.Field] = ve.Message
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(statusCode)
+        json.NewEncoder(w).Encode(map[string]any{"fields": fields})
+        return
+    }
+
+    // Fall back to the default behavior for everything else
+    (&api.OapiDefaultErrorHandler{}).HandleError(w, r, statusCode, err)
+}
+```
+
+Parse and decode errors wrap their cause the same way, so `errors.As` also reaches
+types like `*strconv.NumError` or `*json.SyntaxError`.
 
 Example custom handler with logging:
 

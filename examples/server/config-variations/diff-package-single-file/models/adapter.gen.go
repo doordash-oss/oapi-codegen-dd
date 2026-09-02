@@ -37,10 +37,18 @@ type OapiHandlerError struct {
 	Message       string
 	ParamName     string
 	ParamLocation string
+
+	// Err is the error that caused this handler error.
+	Err error `json:"-"`
 }
 
 func (e OapiHandlerError) Error() string {
 	return e.Message
+}
+
+// Unwrap returns the underlying error, enabling errors.Is and errors.As.
+func (e OapiHandlerError) Unwrap() error {
+	return e.Err
 }
 
 // OapiErrorResponse is the default JSON error response structure used by OapiDefaultErrorHandler.
@@ -173,6 +181,7 @@ func (a *HTTPAdapter) ListUsers(w http.ResponseWriter, r *http.Request) {
 				Message:       err.Error(),
 				ParamName:     "limit",
 				ParamLocation: "query",
+				Err:           err,
 			})
 			return
 		}
@@ -230,6 +239,7 @@ func (a *HTTPAdapter) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Kind:        OapiErrorKindDecode,
 			OperationID: "CreateUser",
 			Message:     err.Error(),
+			Err:         err,
 		})
 		return
 	}
