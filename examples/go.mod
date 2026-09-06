@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/kataras/iris/v12 v12.2.11
 	github.com/labstack/echo/v4 v4.15.0
-	github.com/labstack/echo/v5 v5.1.0
+	github.com/labstack/echo/v5 v5.2.0
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fasthttp v1.71.0
