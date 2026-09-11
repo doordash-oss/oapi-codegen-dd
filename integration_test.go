@@ -358,6 +358,7 @@ func TestIntegration(t *testing.T) {
 				Generate: &codegen.GenerateOptions{
 					Client:             true,
 					ClientWithResponse: true,
+					ClientStreaming:    true,
 					Validation: codegen.ValidationOptions{
 						Response: true,
 					},
@@ -569,8 +570,11 @@ func processSpecMultiFramework(name string, frameworks []codegen.HandlerKind, bi
 		handlerCfg := codegen.Configuration{
 			PackageName: "integration",
 			Generate: &codegen.GenerateOptions{
-				Models:  boolPtr(false),
-				Handler: &codegen.HandlerOptions{Kind: fw, Service: &codegen.ServiceOptions{}},
+				Models:             boolPtr(false),
+				Client:             true,
+				ClientWithResponse: true,
+				ClientStreaming:    true,
+				Handler:            &codegen.HandlerOptions{Kind: fw, Service: &codegen.ServiceOptions{}},
 			},
 			Output: &codegen.Output{Directory: string(fw), UseSingleFile: true, Filename: "handler.go"},
 		}

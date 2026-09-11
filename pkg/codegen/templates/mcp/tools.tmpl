@@ -125,7 +125,10 @@ mcp.WithObject("{{ escapeGoString $name }}"{{ if $description }}, mcp.Descriptio
     opts := &{{ $op.ID | ucFirst }}RequestOptions{}
 {{- template "mcp-extract-params" $op }}
 {{- end }}
-{{- if eq $op.Response.SuccessStatusCode 204 }}
+{{- if $op.Response.Success.IsStream }}
+    // A sequential response has no single-value tool result.
+    return mcp.NewToolResultError("streaming operations are not supported as MCP tools"), nil
+{{- else if eq $op.Response.SuccessStatusCode 204 }}
     _, err := t.client.{{ $op.ID }}(ctx{{ if $op.HasRequestOptions }}, opts{{ end }})
     if err != nil {
         return mcp.NewToolResultError(err.Error()), nil

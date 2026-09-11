@@ -51,6 +51,12 @@ type OperationDefinition struct {
 	// Empty when the feature is disabled.
 	WithResponseTypeName string
 
+	// StreamMethodName is the streaming sibling's name (e.g. "GetEventsStream"),
+	// empty when the feature is off or the operation has no sequential
+	// response. Disambiguated via the TypeTracker, because "<ID>Stream"
+	// collides readily.
+	StreamMethodName string
+
 	// HeaderTypeNames maps each documented status code to the name of the
 	// per-status typed header struct emitted alongside the envelope (e.g.
 	// 201 -> "UploadDocumentResp201Headers"). Only populated for statuses

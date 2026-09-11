@@ -11,8 +11,10 @@
 package codegen
 
 import (
+	"bytes"
 	"embed"
 	"go/format"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -608,6 +610,236 @@ func TestRawContentTypesGenerateByteSlice(t *testing.T) {
 	// Verify that the code compiles
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestSequentialContentTypesGenerateStreamSiblings(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+		Generate: &GenerateOptions{
+			Client:             true,
+			ClientWithResponse: true,
+			ClientStreaming:    true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "streaming.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// The non-streaming methods keep their media type and signature, whether or
+	// not the operation also documents a sequential response.
+	assert.Contains(t, code, "func (c *Client) GetEvents(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetEventsResponse, error)")
+	assert.Contains(t, code, "type GetEventsResponse = []byte")
+	assert.Contains(t, code, "type ChatResponse = Completion")
+
+	// Streaming siblings carry the per-frame type: a $ref reuses the component,
+	// an inline schema becomes <OperationID>ResponseItem, and a schema that
+	// cannot be JSON-decoded falls back to raw frames.
+	assert.Contains(t, code, "func (c *Client) GetEventsStream(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*runtime.Stream[Event], error)")
+	assert.Contains(t, code, "func (c *Client) StreamLogsStream(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*runtime.Stream[StreamLogsResponseItem], error)")
+	assert.Contains(t, code, "(*runtime.Stream[[]byte], error)")
+	assert.Contains(t, code, "type StreamLogsResponseItem struct")
+
+	// An operation declaring both application/json and text/event-stream at one
+	// status exposes both shapes - no media type is displaced.
+	assert.Contains(t, code, "func (c *Client) Chat(ctx context.Context, options *ChatRequestOptions, reqEditors ...runtime.RequestEditorFn) (*ChatResponse, error)")
+	assert.Contains(t, code, "func (c *Client) ChatStream(ctx context.Context, options *ChatRequestOptions, reqEditors ...runtime.RequestEditorFn) (*runtime.Stream[Chunk], error)")
+	assert.Contains(t, code, "JSON200      *ChatResponse")
+	assert.Contains(t, code, "Stream200    *runtime.Stream[Chunk]")
+
+	// The request advertises the media type and is marked so ExecuteRequest
+	// leaves the body unread; framing follows the media type.
+	// gofmt aligns struct keys per literal, so match without fixed spacing.
+	assert.Regexp(t, `Stream:\s+"text/event-stream"`, code)
+	assert.Regexp(t, `Stream:\s+"application/x-ndjson"`, code)
+	assert.Contains(t, code, "return runtime.NewEventStream[Event](resp.Raw), nil")
+	assert.Contains(t, code, "out.Stream200 = runtime.NewLineStream[StreamLogsResponseItem](resp.Raw)")
+
+	// A `default` response standing in as the success is sequential too, and
+	// is reached by a different code path than an explicit status.
+	assert.Contains(t, code, "func (c *Client) FeedStream(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*runtime.Stream[Event], error)")
+
+	// A plain JSON operation gains nothing.
+	assert.NotContains(t, code, "ListUsersStream")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestSequentialContentTypesAreOptIn(t *testing.T) {
+	newCfg := func(streaming bool) Configuration {
+		return Configuration{
+			PackageName: "api",
+			Output:      &Output{UseSingleFile: true},
+			Generate: &GenerateOptions{
+				Client:             true,
+				ClientWithResponse: true,
+				ClientStreaming:    streaming,
+			},
+		}
+	}
+
+	off, err := Generate([]byte(readTestdata(t, "streaming.yml")), newCfg(false))
+	require.NoError(t, err)
+	on, err := Generate([]byte(readTestdata(t, "streaming.yml")), newCfg(true))
+	require.NoError(t, err)
+
+	offCode, onCode := off.GetCombined(), on.GetCombined()
+
+	// With the flag off nothing streaming-related is emitted at all - not the
+	// sibling methods, not the envelope fields, and not the per-frame item
+	// types. That is what keeps the change non-breaking on upgrade.
+	assert.NotContains(t, offCode, "runtime.Stream")
+	assert.NotContains(t, offCode, "ResponseItem")
+	assert.NotContains(t, offCode, "Stream:")
+
+	// And the flag only ever adds: every method of the off output survives.
+	for _, line := range strings.Split(offCode, "\n") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "func (c *Client)") {
+			assert.Contains(t, onCode, trimmed, "enabling client-streaming must not change existing methods")
+		}
+	}
+}
+
+func TestSequentialContentTypesUseItemSchema(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+		Generate: &GenerateOptions{
+			Client:          true,
+			ClientStreaming: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "streaming-item-schema.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// itemSchema describes one frame, so a $ref points at the component even
+	// though the media type has no `schema` at all - and the component must
+	// survive pruning, which only reaches it through itemSchema.
+	assert.Contains(t, code, "type Chunk struct")
+	assert.Contains(t, code, "(*runtime.Stream[Chunk], error)")
+
+	// An inline itemSchema is generated exactly once.
+	assert.Contains(t, code, "type InlineItemsResponseItem struct")
+	assert.Equal(t, 1, strings.Count(code, "type InlineItemsResponseItem struct"))
+	assert.Contains(t, code, "(*runtime.Stream[InlineItemsResponseItem], error)")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+func TestSequentialContentTypesLeaveHandlerGenerationAlone(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output: &Output{
+			UseSingleFile: true,
+		},
+		Generate: &GenerateOptions{
+			Handler:         &HandlerOptions{Kind: HandlerKindStdHTTP},
+			ClientStreaming: true,
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "streaming.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// Streaming lives entirely in the client templates, so the server side
+	// never sees a stream type even with the flag on.
+	assert.NotContains(t, code, "runtime.Stream[")
+	assert.Contains(t, code, "type GetEventsResponse = []byte")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+// captureLogs redirects the default slog logger for the duration of a test.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return buf
+}
+
+func TestSequentialContentTypesWarnWhenNotConsumable(t *testing.T) {
+	tests := []struct {
+		name            string
+		generate        GenerateOptions
+		expectBlocking  bool
+		expectAvailable bool
+	}{
+		{
+			name:     "client without streaming warns about blocking methods",
+			generate: GenerateOptions{Client: true},
+			// /events, /logs, /raw and /feed document nothing but a sequential
+			// media type, so their generated methods block.
+			expectBlocking: true,
+			// /chat also declares application/json, so its method is fine - it
+			// just cannot reach the stream.
+			expectAvailable: true,
+		},
+		{
+			name:            "envelope client without streaming warns too",
+			generate:        GenerateOptions{ClientWithResponse: true},
+			expectBlocking:  true,
+			expectAvailable: true,
+		},
+		{
+			name:            "streaming enabled says nothing",
+			generate:        GenerateOptions{Client: true, ClientStreaming: true},
+			expectBlocking:  false,
+			expectAvailable: false,
+		},
+		{
+			name:            "server-only generation says nothing",
+			generate:        GenerateOptions{Handler: &HandlerOptions{Kind: HandlerKindStdHTTP}},
+			expectBlocking:  false,
+			expectAvailable: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs := captureLogs(t)
+
+			generate := tt.generate
+			_, err := Generate([]byte(readTestdata(t, "streaming.yml")), Configuration{
+				PackageName: "api",
+				Output:      &Output{UseSingleFile: true},
+				Generate:    &generate,
+			})
+			require.NoError(t, err)
+
+			out := logs.String()
+			if tt.expectBlocking {
+				assert.Contains(t, out, "will block")
+				assert.Contains(t, out, "GET /events")
+				assert.Contains(t, out, "GET /feed", "a `default` response standing in as the success counts too")
+				assert.NotContains(t, out, `operations="POST /chat, `, "an operation with a buffered alternative does not block")
+			} else {
+				assert.NotContains(t, out, "will block")
+			}
+
+			if tt.expectAvailable {
+				assert.Contains(t, out, "alongside a buffered one")
+				assert.Contains(t, out, "POST /chat")
+			} else {
+				assert.NotContains(t, out, "alongside a buffered one")
+			}
+		})
+	}
 }
 
 func TestExternalFileRefResolution(t *testing.T) {

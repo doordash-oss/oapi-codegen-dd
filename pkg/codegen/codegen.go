@@ -104,6 +104,7 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		AlwaysPrefixEnumValues: cfg.Generate.AlwaysPrefixEnumValues,
 		AdditionalTags:         cfg.Generate.AdditionalTags,
 		SkipValidation:         cfg.Generate.Validation.Skip,
+		ClientStreaming:        cfg.Generate.ClientStreaming,
 		ErrorMapping:           cfg.ErrorMapping,
 		typeTracker:            newTypeTracker(),
 		visited:                map[string]bool{},
@@ -121,6 +122,8 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 	if err != nil {
 		return nil, fmt.Errorf("error collecting component definitions: %s", err)
 	}
+
+	warnUnconsumableStreams(model, cfg)
 
 	// collect operations
 	opColl, err := collectOperationDefinitions(model, parseOptions)
@@ -396,6 +399,21 @@ func assignWithResponseTypeNames(operations []OperationDefinition, tracker *Type
 		}
 		statusesWithHeaders(op.Response.Successes)
 		statusesWithHeaders(op.Response.Errors)
+	}
+}
+
+// assignStreamMethodNames pre-computes each streaming sibling's method name,
+// registering it on the TypeTracker so collisions with declared schemas or
+// other operations resolve before the templates run. Mutates in place.
+func assignStreamMethodNames(operations []OperationDefinition, tracker *TypeTracker) {
+	for i := range operations {
+		op := &operations[i]
+		if !op.Response.HasStream() {
+			continue
+		}
+		baseName := UppercaseFirstCharacter(op.ID) + "Stream"
+		op.StreamMethodName = tracker.generateUniqueName(baseName)
+		tracker.registerName(op.StreamMethodName)
 	}
 }
 

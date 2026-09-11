@@ -14,43 +14,46 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetOperationResponses(t *testing.T) {
-	loadOp := func(t *testing.T, contents []byte, path, method string) (*v3.Operation, ParseOptions) {
-		t.Helper()
-		doc, err := libopenapi.NewDocument(contents)
-		require.NoError(t, err)
-		model, errs := doc.BuildV3Model()
-		require.Empty(t, errs)
+// loadOperation builds a model from an inline spec and returns one operation
+// with ParseOptions wired to it.
+func loadOperation(t *testing.T, contents []byte, path, method string) (*v3.Operation, ParseOptions) {
+	t.Helper()
+	doc, err := libopenapi.NewDocument(contents)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
 
-		item := model.Model.Paths.PathItems.GetOrZero(path)
-		require.NotNil(t, item, "path %s not found", path)
+	item := model.Model.Paths.PathItems.GetOrZero(path)
+	require.NotNil(t, item, "path %s not found", path)
 
-		var op *v3.Operation
-		switch method {
-		case "get":
-			op = item.Get
-		case "post":
-			op = item.Post
-		case "put":
-			op = item.Put
-		case "delete":
-			op = item.Delete
-		}
-		require.NotNil(t, op, "operation %s %s not found", method, path)
-
-		opts := ParseOptions{
-			typeTracker: newTypeTracker(),
-			visited:     map[string]bool{},
-			model:       &model.Model,
-		}
-		return op, opts
+	var op *v3.Operation
+	switch method {
+	case "get":
+		op = item.Get
+	case "post":
+		op = item.Post
+	case "put":
+		op = item.Put
+	case "delete":
+		op = item.Delete
 	}
+	require.NotNil(t, op, "operation %s %s not found", method, path)
 
+	opts := ParseOptions{
+		typeTracker: newTypeTracker(),
+		visited:     map[string]bool{},
+		model:       &model.Model,
+	}
+	return op, opts
+}
+
+func TestGetOperationResponses(t *testing.T) {
 	t.Run("default response with content becomes 200 success when no explicit success documented", func(t *testing.T) {
 		contents := []byte(`
 openapi: "3.0.0"
@@ -72,7 +75,7 @@ paths:
                   message:
                     type: string
 `)
-		op, opts := loadOp(t, contents, "/ping", "get")
+		op, opts := loadOperation(t, contents, "/ping", "get")
 		res, _, err := getOperationResponses("ping", op.Responses, opts)
 		require.NoError(t, err)
 		require.NotNil(t, res)
@@ -124,7 +127,7 @@ paths:
                   message:
                     type: string
 `)
-		op, opts := loadOp(t, contents, "/ping", "get")
+		op, opts := loadOperation(t, contents, "/ping", "get")
 		res, _, err := getOperationResponses("ping", op.Responses, opts)
 		require.NoError(t, err)
 
@@ -151,7 +154,7 @@ paths:
         default:
           description: any
 `)
-		op, opts := loadOp(t, contents, "/ping", "get")
+		op, opts := loadOperation(t, contents, "/ping", "get")
 		res, _, err := getOperationResponses("ping", op.Responses, opts)
 		require.NoError(t, err)
 
@@ -178,7 +181,7 @@ paths:
           content:
             text/html: {}
 `)
-		op, opts := loadOp(t, contents, "/page", "get")
+		op, opts := loadOperation(t, contents, "/page", "get")
 		res, _, err := getOperationResponses("getPage", op.Responses, opts)
 		require.NoError(t, err)
 
@@ -211,7 +214,7 @@ paths:
                   message:
                     type: string
 `)
-		op, opts := loadOp(t, contents, "/ping", "get")
+		op, opts := loadOperation(t, contents, "/ping", "get")
 		res, typeDefs, err := getOperationResponses("ping", op.Responses, opts)
 		require.NoError(t, err)
 		require.NotNil(t, res.Success)
@@ -226,5 +229,222 @@ paths:
 		assert.Contains(t, names, "pingResponse")
 		assert.NotContains(t, names, "pingErrorResponse",
 			"when default is promoted to success, no parallel ErrorResponse type should be emitted")
+	})
+}
+
+func TestResponseDefinitionStreamAccessors(t *testing.T) {
+	sse := &StreamResponseDefinition{StatusCode: 200, ContentType: "text/event-stream", Framing: streamFramingSSE, ItemName: "Event"}
+	lines := &StreamResponseDefinition{StatusCode: 206, ContentType: "application/jsonl", Framing: streamFramingLines, ItemName: "Row"}
+
+	t.Run("without streams", func(t *testing.T) {
+		var def ResponseDefinition
+		assert.False(t, def.HasStream())
+		assert.Nil(t, def.PrimaryStream())
+		assert.Nil(t, def.StreamAt(200))
+	})
+
+	t.Run("with streams", func(t *testing.T) {
+		def := ResponseDefinition{Streams: []*StreamResponseDefinition{sse, lines}}
+
+		assert.True(t, def.HasStream())
+		// The lowest success status is what the sibling method streams.
+		assert.Same(t, sse, def.PrimaryStream())
+		assert.Same(t, lines, def.StreamAt(206))
+		assert.Nil(t, def.StreamAt(404))
+	})
+}
+
+func TestResponseBodySchema(t *testing.T) {
+	schema := base.CreateSchemaProxy(&base.Schema{Type: []string{"object"}})
+	itemSchema := base.CreateSchemaProxy(&base.Schema{Type: []string{"object"}})
+
+	tests := []struct {
+		name        string
+		content     *v3.MediaType
+		contentType string
+		expected    *base.SchemaProxy
+	}{
+		{name: "nil content", contentType: "application/json"},
+		{
+			name:        "schema wins when present",
+			content:     &v3.MediaType{Schema: schema, ItemSchema: itemSchema},
+			contentType: "text/event-stream",
+			expected:    schema,
+		},
+		{
+			name:        "itemSchema stands in for a sequential media type",
+			content:     &v3.MediaType{ItemSchema: itemSchema},
+			contentType: "text/event-stream",
+			expected:    itemSchema,
+		},
+		{
+			name:        "itemSchema is ignored for a buffered media type",
+			content:     &v3.MediaType{ItemSchema: itemSchema},
+			contentType: "application/json",
+		},
+		{
+			name:        "no schema at all",
+			content:     &v3.MediaType{},
+			contentType: "text/event-stream",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Same(t, tt.expected, responseBodySchema(tt.content, tt.contentType))
+		})
+	}
+}
+
+func TestGetOperationResponsesStreams(t *testing.T) {
+	const spec = `
+openapi: "3.2.0"
+info:
+  version: 1.0.0
+  title: Test
+paths:
+  /events:
+    get:
+      responses:
+        '200':
+          description: sequential only
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Event'
+  /chat:
+    get:
+      responses:
+        '200':
+          description: buffered and sequential together
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Completion'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Event'
+  /feed:
+    get:
+      responses:
+        default:
+          description: sequential under default only
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Event'
+  /items:
+    get:
+      responses:
+        '200':
+          description: itemSchema without a whole-body schema
+          content:
+            application/jsonl:
+              itemSchema:
+                $ref: '#/components/schemas/Event'
+  /users:
+    get:
+      responses:
+        '200':
+          description: buffered only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Completion'
+components:
+  schemas:
+    Event:
+      type: object
+      properties:
+        seq:
+          type: integer
+    Completion:
+      type: object
+      properties:
+        text:
+          type: string
+`
+
+	streamingOptions := func(opts ParseOptions) ParseOptions {
+		opts.ClientStreaming = true
+		return opts
+	}
+
+	t.Run("a sequential-only response is recorded and marks the selected media type", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/events", "get")
+		def, _, err := getOperationResponses("GetEvents", op.Responses, streamingOptions(opts))
+		require.NoError(t, err)
+
+		require.True(t, def.HasStream())
+		require.Len(t, def.Streams, 1)
+		assert.Equal(t, 200, def.Streams[0].StatusCode)
+		assert.Equal(t, "text/event-stream", def.Streams[0].ContentType)
+		assert.Equal(t, streamFramingSSE, def.Streams[0].Framing)
+		assert.Equal(t, "Event", def.Streams[0].ItemName)
+
+		// The primary method selected the sequential media type, so it buffers
+		// and blocks - which is what IsStream exists to signal.
+		assert.True(t, def.Success.IsStream)
+		assert.True(t, def.Success.IsRaw, "the whole-body type stays []byte for handler generation")
+	})
+
+	t.Run("a buffered alternative keeps the primary response and still records the stream", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/chat", "get")
+		def, _, err := getOperationResponses("Chat", op.Responses, streamingOptions(opts))
+		require.NoError(t, err)
+
+		require.Len(t, def.Streams, 1)
+		assert.Equal(t, "text/event-stream", def.Streams[0].ContentType)
+		assert.Equal(t, "Event", def.Streams[0].ItemName)
+
+		// JSON is what the primary method returns, so it never blocks.
+		assert.Equal(t, "application/json", def.Success.ContentType)
+		assert.False(t, def.Success.IsStream)
+		assert.False(t, def.Success.IsRaw)
+	})
+
+	t.Run("a default response standing in as the success is recorded", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/feed", "get")
+		def, _, err := getOperationResponses("Feed", op.Responses, streamingOptions(opts))
+		require.NoError(t, err)
+
+		require.Len(t, def.Streams, 1)
+		assert.Equal(t, 200, def.Streams[0].StatusCode)
+		assert.Equal(t, "Event", def.Streams[0].ItemName)
+	})
+
+	t.Run("itemSchema alone still counts as content", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/items", "get")
+		def, _, err := getOperationResponses("Items", op.Responses, streamingOptions(opts))
+		require.NoError(t, err)
+
+		require.Len(t, def.Streams, 1)
+		assert.Equal(t, streamFramingLines, def.Streams[0].Framing)
+		assert.Equal(t, "Event", def.Streams[0].ItemName)
+		assert.NotEqual(t, "struct{}", def.Success.ResponseName, "the response must not be mistaken for empty")
+	})
+
+	t.Run("a buffered-only response records nothing", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/users", "get")
+		def, _, err := getOperationResponses("ListUsers", op.Responses, streamingOptions(opts))
+		require.NoError(t, err)
+
+		assert.False(t, def.HasStream())
+		assert.False(t, def.Success.IsStream)
+	})
+
+	t.Run("detection is off by default", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/events", "get")
+		def, types, err := getOperationResponses("GetEvents", op.Responses, opts)
+		require.NoError(t, err)
+
+		assert.False(t, def.HasStream(), "no stream definitions without the flag")
+		for _, td := range types {
+			assert.NotContains(t, td.Name, "ResponseItem", "no per-frame item types without the flag")
+		}
+
+		// IsStream is media-type derived, so it holds either way - the MCP tool
+		// template relies on it regardless of the flag.
+		assert.True(t, def.Success.IsStream)
 	})
 }

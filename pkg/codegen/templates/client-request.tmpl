@@ -1,0 +1,81 @@
+{{/*
+Copyright 2025 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- /*
+Defines "requestParams": the body/query encoding maps and the
+runtime.RequestOptionsParameters literal. Shared by client.tmpl and
+client-stream.tmpl, in its own file so overriding either does not shadow it -
+same reasoning as client-with-response-decode.tmpl.
+
+Inputs (caller's dict):
+  op     - an OperationDefinition
+  stream - optional *StreamResponseDefinition; sets Stream to its media type,
+           which marks the request and supplies Accept.
+
+Declares reqParams in the caller's scope, plus bodyEncoding / queryEncoding
+where needed. Emits nothing on its own.
+*/ -}}
+
+{{- define "requestParams" }}{{- $op := .op }}{{- $stream := .stream }}
+    {{- if and $op.Body $op.Body.Encoding }}
+        bodyEncoding := make(map[string]runtime.FieldEncoding)
+        {{- range $key, $value := $op.Body.Encoding }}
+            bodyEncoding["{{escapeGoString $key}}"] = runtime.FieldEncoding{
+                ContentType: "{{escapeGoString $value.ContentType}}",
+                Style:       "{{escapeGoString $value.Style}}",
+                {{- if ne $value.Explode nil }}
+                Explode: &[]bool{ {{$value.Explode}} }[0],
+                {{- end }}
+            }
+        {{- end }}
+    {{- end }}
+    {{- $hasQueryParams := false -}}
+    {{- if and $op.Query $op.Query.Encoding }}
+        {{- range $key, $value := $op.Query.Encoding }}
+            {{- /* Include encoding if: style is non-default (not form or empty), OR explode=false (non-default for query) */ -}}
+            {{- $hasNonDefaultExplode := and (ne $value.Explode nil) (eq (deref $value.Explode) false) -}}
+            {{- $hasNonDefaultStyle := and $value.Style (ne $value.Style "form") -}}
+            {{ if and (not $hasQueryParams) (or $hasNonDefaultStyle $hasNonDefaultExplode) }}
+                {{ $hasQueryParams = true }}
+            {{ end }}
+        {{- end }}
+        {{- if $hasQueryParams }}
+            queryEncoding := map[string]runtime.QueryEncoding{
+                {{- range $key, $value := $op.Query.Encoding }}
+                    {{- /* Include encoding if: style is non-default (not form or empty), OR explode=false (non-default for query) */ -}}
+                    {{- $hasNonDefaultExplode := and (ne $value.Explode nil) (eq (deref $value.Explode) false) -}}
+                    {{- $hasNonDefaultStyle := and $value.Style (ne $value.Style "form") -}}
+                    {{- if or $hasNonDefaultStyle $hasNonDefaultExplode }}
+                        "{{$key}}": {Style:"{{if $value.Style}}{{$value.Style}}{{else}}form{{end}}", {{- if ne $value.Explode nil }}Explode: &[]bool{ {{deref $value.Explode}} }[0],{{- end }}},
+                    {{- end }}
+                {{- end }}
+            }
+        {{- end }}
+    {{- end }}
+    reqParams := runtime.RequestOptionsParameters{
+        RequestURL:  c.apiClient.GetBaseURL() + "{{escapeGoString $op.Path}}",
+        Method:  "{{$op.Method}}",{{- if $stream }}
+        Stream: "{{escapeGoString $stream.ContentType}}",{{- end }}{{- if $op.HasRequestOptions }}
+        Options: options,{{- end}}{{- if $op.Body }}
+        ContentType: "{{$op.Body.ContentType}}",{{- end }}
+        {{- if and $op.Body $op.Body.Encoding }}
+        BodyEncoding: bodyEncoding,
+        {{- end }}
+        {{- if $hasQueryParams }}
+        QueryEncoding: queryEncoding,
+        {{- end }}
+    }
+{{- end }}

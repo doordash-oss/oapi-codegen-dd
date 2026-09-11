@@ -373,6 +373,8 @@ func collectRefFromProxy(proxy any, refSet map[string]bool, model *v3high.Docume
 		if v.Content != nil {
 			for _, mediaType := range v.Content.FromOldest() {
 				collectSchemaProxy(mediaType.Schema, refSet, model)
+				// itemSchema (OpenAPI 3.2) may be the only reference to a component.
+				collectSchemaProxy(mediaType.ItemSchema, refSet, model)
 			}
 		}
 
@@ -380,6 +382,8 @@ func collectRefFromProxy(proxy any, refSet map[string]bool, model *v3high.Docume
 		if v.Content != nil {
 			for _, mediaType := range v.Content.FromOldest() {
 				collectSchemaProxy(mediaType.Schema, refSet, model)
+				// itemSchema (OpenAPI 3.2) may be the only reference to a component.
+				collectSchemaProxy(mediaType.ItemSchema, refSet, model)
 			}
 		}
 
@@ -387,6 +391,8 @@ func collectRefFromProxy(proxy any, refSet map[string]bool, model *v3high.Docume
 		if v.Content != nil {
 			for _, mediaType := range v.Content.FromOldest() {
 				collectSchemaProxy(mediaType.Schema, refSet, model)
+				// itemSchema (OpenAPI 3.2) may be the only reference to a component.
+				collectSchemaProxy(mediaType.ItemSchema, refSet, model)
 			}
 		}
 		if v.Headers != nil {
@@ -400,6 +406,8 @@ func collectRefFromProxy(proxy any, refSet map[string]bool, model *v3high.Docume
 		if v.Content != nil {
 			for _, mediaType := range v.Content.FromOldest() {
 				collectSchemaProxy(mediaType.Schema, refSet, model)
+				// itemSchema (OpenAPI 3.2) may be the only reference to a component.
+				collectSchemaProxy(mediaType.ItemSchema, refSet, model)
 			}
 		}
 	}

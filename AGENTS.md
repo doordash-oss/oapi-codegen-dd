@@ -143,6 +143,18 @@ Central registry for managing type names and references:
 - When a response type has error mapping, it cannot be an alias (aliases don't support methods)
 - Response schemas are processed similarly to component schemas but with different SpecLocation
 
+### Streaming (sequential) responses
+- Opt-in via `generate.client-streaming: true`. With it off, `collectStreamResponses` returns early and output is byte-identical to before the feature existed - verified by A/B generating against the previous binary
+- Detection is a separate pass (`collectStreamResponses` in `pkg/codegen/streaming.go`) over *all* media types at a status, not just the one the primary pass selected. So an operation declaring both `application/json` and `text/event-stream` keeps its JSON method and gains a stream one; the generator never picks a winner and no overlay is needed
+- Results land in `ResponseDefinition.Streams []*StreamResponseDefinition`, a parallel field. `All` / `Success` / `Error` / `Successes` / `Errors` and every `ResponseContentDefinition` keep their exact previous contents, which is what keeps handler/server generation untouched
+- `ResponseContentDefinition.IsStream` means only "the media type the primary method selected is sequential", used so the MCP tool template can refuse instead of blocking forever
+- The per-frame type comes from OpenAPI 3.2 `itemSchema` when present, else `schema`. `streamItemType` reuses an already-generated schema when the primary pass walked the same one, otherwise the same nested types get registered twice under different names
+- `prune.go` must walk `mediaType.ItemSchema`; a component reachable only through `itemSchema` is otherwise pruned and generation emits an undefined type
+- The body/query encoding maps and the `RequestOptionsParameters` literal come from `define "requestParams"` in `templates/client-request.tmpl`, shared by `client.tmpl` and `client-stream.tmpl`. `client-with-response.tmpl` deliberately still builds its own, narrower literal - it has never emitted encoding maps, and switching it over would change existing output
+- Sibling methods live in `templates/client-stream.tmpl`. Names are precomputed by `assignStreamMethodNames` through the TypeTracker: `<ID>Stream` collides readily (lichess ships both `StreamGame` and `BoardGameStream`)
+- `warnUnconsumableStreams` logs affected operations when the flag is off, so the flag is discoverable. It scans media type names only, independent of the detection pass, because the warning has to work precisely when detection is switched off
+- The client marks the request via `RequestOptionsParameters.Stream`, and `runtime.Client.ExecuteRequest` skips buffering only for a marked request whose 2xx response has a sequential Content-Type
+
 ### Union types (oneOf/anyOf)
 - Union types are generated as structs with pointer fields for each variant
 - Use `ContainsUnions()` method on schemas to check if they contain union elements

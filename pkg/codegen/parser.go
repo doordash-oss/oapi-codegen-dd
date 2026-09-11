@@ -70,6 +70,11 @@ type ParseOptions struct {
 	AdditionalTags         []string
 	SkipValidation         bool
 
+	// ClientStreaming gates sequential-response detection. Off means no
+	// per-frame item types and an empty ResponseDefinition.Streams, so output
+	// is bit-for-bit what it was before streaming support existed.
+	ClientStreaming bool
+
 	// ErrorMapping maps response type names to the field that should be used
 	// for the Error() method. When a response type has error mapping configured,
 	// it cannot be an alias (aliases don't support methods).
@@ -210,6 +215,10 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		assignWithResponseTypeNames(p.ctx.Operations, p.ctx.TypeTracker)
 	}
 
+	if p.cfg.Generate.ClientStreaming {
+		assignStreamMethodNames(p.ctx.Operations, p.ctx.TypeTracker)
+	}
+
 	if p.cfg.Generate.Client || p.cfg.Generate.ClientWithResponse {
 		opsCtx := &TplOperationsContext{
 			Operations: p.ctx.Operations,
@@ -226,6 +235,9 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		}
 		if p.cfg.Generate.ClientWithResponse {
 			tmpls = append(tmpls, "client-with-response")
+		}
+		if p.cfg.Generate.ClientStreaming {
+			tmpls = append(tmpls, "client-stream")
 		}
 		for _, tmpl := range tmpls {
 			out, err := p.ParseTemplates([]string{tmpl + ".tmpl"}, opsCtx)

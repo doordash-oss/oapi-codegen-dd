@@ -70,6 +70,7 @@ nav:
   - 'Overlays': 'overlays.md'
   - 'Server Generation': 'server-generation.md'
   - 'MCP Server': 'mcp-server.md'
+  - 'Streaming': 'streaming.md'
   - 'Validation': 'validation.md'
   - 'Union Types': 'union-types.md'
   - 'Additional Properties': 'additional-properties.md'
