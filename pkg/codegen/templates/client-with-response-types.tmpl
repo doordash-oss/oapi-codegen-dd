@@ -24,6 +24,7 @@ imports / package decl - those come from the surrounding file.
 {{ define "client-with-response-types" }}
 {{- $args := . -}}
 {{- $operations := $args.operations -}}
+{{- $config := $args.config -}}
 
 {{- range $operations }}{{ $op := . }}
 {{- range $rcd := $op.Response.Successes }}
@@ -53,6 +54,13 @@ type {{$op.WithResponseTypeName}} struct {
         {{- if and (ne $rcd.ResponseName "struct{}") (not $rcd.IsRaw) (ne $rcd.NameTag "") }}
     {{$rcd.NameTag}}{{$rcd.StatusCode}} *{{$rcd.ResponseName}}
         {{- end }}
+        {{- /* Populated by the streaming sibling, never by the same call as
+               the buffered body field. */ -}}
+        {{- if $config.Generate.ClientStreaming }}
+        {{- with $op.Response.StreamAt $rcd.StatusCode }}
+    Stream{{.StatusCode}} *runtime.Stream[{{.ItemName}}]
+        {{- end }}
+        {{- end }}
         {{- if gt (len $rcd.Headers) 0 }}
     Headers{{$rcd.StatusCode}} *{{ index $op.HeaderTypeNames $rcd.StatusCode }}
         {{- end }}
@@ -70,4 +78,4 @@ type {{$op.WithResponseTypeName}} struct {
 {{ end }}{{- /* end range operations */ -}}
 {{ end -}}
 
-{{ template "client-with-response-types" dict "operations" .Operations }}
+{{ template "client-with-response-types" dict "operations" .Operations "config" .Config }}

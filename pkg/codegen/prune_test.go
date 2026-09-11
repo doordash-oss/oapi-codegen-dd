@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindReferences(t *testing.T) {
@@ -426,6 +427,36 @@ func TestPruneDefaultResponseHeaders(t *testing.T) {
 
 		_, hasUnusedSchema := model.Model.Components.Schemas.Get("UnusedSchema")
 		assert.False(t, hasUnusedSchema, "UnusedSchema should be pruned - it's not referenced anywhere")
+	})
+}
+
+func TestPruneItemSchemaRefs(t *testing.T) {
+	// itemSchema (OpenAPI 3.2) describes one item of a sequential body. A
+	// component reached only through it must survive pruning, otherwise
+	// generation emits an undefined type.
+	t.Run("schemas referenced only by itemSchema should not be pruned", func(t *testing.T) {
+		contents, err := os.ReadFile("testdata/prune-item-schema-refs.yml")
+		require.NoError(t, err)
+
+		doc, err := LoadDocumentFromContents(contents)
+		require.NoError(t, err)
+
+		model, err := doc.BuildV3Model()
+		require.NoError(t, err)
+
+		assert.Equal(t, 6, model.Model.Components.Schemas.Len())
+
+		require.NoError(t, pruneSchema(&model.Model))
+
+		// One per position that collectRefFromProxy walks.
+		for _, name := range []string{"ParamItem", "BodyItem", "ResponseItem", "HeaderItem", "DefaultItem"} {
+			_, ok := model.Model.Components.Schemas.Get(name)
+			assert.True(t, ok, "%s is referenced by an itemSchema and should not be pruned", name)
+		}
+
+		// Guards against the assertions above passing because nothing is pruned.
+		_, ok := model.Model.Components.Schemas.Get("UnusedItem")
+		assert.False(t, ok, "UnusedItem is referenced by nothing and should be pruned")
 	})
 }
 

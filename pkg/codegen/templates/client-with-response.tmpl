@@ -54,6 +54,9 @@ func NewDefault{{$clientName}}(baseURL string, opts ...runtime.APIClientOption) 
 type {{$clientName}}Interface interface {
     {{- range $operations }}{{ $op := . }}
     {{$op.ID}}WithResponse(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{ end }}, reqEditors ...runtime.RequestEditorFn) (*{{$op.WithResponseTypeName}}, error)
+    {{- if and $config.Generate.ClientStreaming $op.Response.HasStream }}
+    {{$op.StreamMethodName}}WithResponse(ctx context.Context{{- if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{ end }}, reqEditors ...runtime.RequestEditorFn) (*{{$op.WithResponseTypeName}}, error)
+    {{- end }}
     {{- end }}
 }
 {{- end }}

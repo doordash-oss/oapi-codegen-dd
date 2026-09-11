@@ -1,0 +1,71 @@
+openapi: 3.2.0
+info:
+  title: itemSchema references
+  version: 1.0.0
+paths:
+  /stream:
+    post:
+      operationId: stream
+      parameters:
+        - name: cursor
+          in: query
+          content:
+            application/jsonl:
+              itemSchema:
+                $ref: '#/components/schemas/ParamItem'
+      requestBody:
+        content:
+          application/x-ndjson:
+            itemSchema:
+              $ref: '#/components/schemas/BodyItem'
+      responses:
+        '200':
+          description: an event stream
+          headers:
+            X-Trailer:
+              content:
+                application/jsonl:
+                  itemSchema:
+                    $ref: '#/components/schemas/HeaderItem'
+          content:
+            text/event-stream:
+              itemSchema:
+                $ref: '#/components/schemas/ResponseItem'
+        default:
+          description: a fallback event stream
+          content:
+            text/event-stream:
+              itemSchema:
+                $ref: '#/components/schemas/DefaultItem'
+components:
+  schemas:
+    ParamItem:
+      type: object
+      properties:
+        cursor:
+          type: string
+    BodyItem:
+      type: object
+      properties:
+        payload:
+          type: string
+    ResponseItem:
+      type: object
+      properties:
+        seq:
+          type: integer
+    HeaderItem:
+      type: object
+      properties:
+        checksum:
+          type: string
+    DefaultItem:
+      type: object
+      properties:
+        reason:
+          type: string
+    UnusedItem:
+      type: object
+      properties:
+        nothing:
+          type: string

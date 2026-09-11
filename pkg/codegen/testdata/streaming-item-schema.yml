@@ -1,0 +1,35 @@
+openapi: 3.2.0
+info:
+  title: Streaming API with OpenAPI 3.2 item schemas
+  version: 1.0.0
+paths:
+  /chat:
+    post:
+      operationId: chat
+      responses:
+        '200':
+          description: A stream of completion chunks
+          content:
+            text/event-stream:
+              itemSchema:
+                $ref: '#/components/schemas/Chunk'
+  /inline:
+    get:
+      operationId: inlineItems
+      responses:
+        '200':
+          description: A stream of inline items
+          content:
+            application/jsonl:
+              itemSchema:
+                type: object
+                properties:
+                  token:
+                    type: string
+components:
+  schemas:
+    Chunk:
+      type: object
+      properties:
+        delta:
+          type: string

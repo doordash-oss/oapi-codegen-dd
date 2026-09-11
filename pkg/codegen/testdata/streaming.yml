@@ -1,0 +1,131 @@
+openapi: 3.0.3
+info:
+  title: Streaming API
+  version: 1.0.0
+paths:
+  /events:
+    get:
+      operationId: getEvents
+      summary: Subscribe to the event stream
+      responses:
+        '200':
+          description: An endless event stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
+  /logs:
+    get:
+      operationId: streamLogs
+      summary: Tail log records
+      responses:
+        '200':
+          description: Newline-delimited log records
+          content:
+            application/x-ndjson:
+              schema:
+                type: object
+                properties:
+                  level:
+                    type: string
+                  message:
+                    type: string
+  /raw:
+    get:
+      operationId: streamRaw
+      summary: Subscribe to an untyped event stream
+      responses:
+        '200':
+          description: An event stream with no per-item schema
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /chat:
+    post:
+      operationId: chat
+      summary: Answer with a document, or stream tokens when asked to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                stream:
+                  type: boolean
+      responses:
+        '200':
+          description: A whole completion, or a stream of chunks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Completion'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Chunk'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
+  /feed:
+    get:
+      operationId: feed
+      summary: A stream documented only under `default`
+      responses:
+        default:
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Event'
+  /users:
+    get:
+      operationId: listUsers
+      summary: A plain non-streaming operation
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+components:
+  schemas:
+    Event:
+      type: object
+      properties:
+        seq:
+          type: integer
+        payload:
+          type: string
+    Completion:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+    Chunk:
+      type: object
+      required: [delta]
+      properties:
+        delta:
+          type: string
+    ServiceError:
+      type: object
+      properties:
+        message:
+          type: string

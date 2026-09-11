@@ -37,6 +37,11 @@ type RequestOptionsParameters struct {
 	ContentType   string
 	BodyEncoding  map[string]FieldEncoding
 	QueryEncoding map[string]QueryEncoding
+
+	// Stream is the sequential response media type this operation expects,
+	// e.g. "text/event-stream". Non-empty marks the request so ExecuteRequest
+	// leaves the body unread, and supplies Accept when the caller has not.
+	Stream string
 }
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
@@ -51,6 +56,10 @@ type Response struct {
 	StatusCode int
 	Headers    http.Header
 	Raw        *http.Response
+
+	// Streaming is true when Content was left unread because the body frames a
+	// sequence of items. Raw.Body is still open and the consumer must close it.
+	Streaming bool
 }
 
 type APIClient interface {
@@ -99,6 +108,18 @@ func (c *Client) ExecuteRequest(ctx context.Context, req *http.Request, operatio
 
 	if resp == nil {
 		return nil, nil
+	}
+
+	// Return a sequential body unread. All three conditions matter: a server
+	// that ignored Accept and replied with JSON is still buffered, and error
+	// responses still reach the usual decode path.
+	if wantsStreamingResponse(ctx, req) && resp.StatusCode/100 == 2 && IsSequentialMediaType(resp.Header.Get("Content-Type")) {
+		return &Response{
+			StatusCode: resp.StatusCode,
+			Headers:    resp.Header,
+			Raw:        resp,
+			Streaming:  true,
+		}, nil
 	}
 
 	var bodyBytes []byte
@@ -170,6 +191,35 @@ func WithRequestEditorFn(fn RequestEditorFn) APIClientOption {
 		c.requestEditors = append(c.requestEditors, fn)
 		return nil
 	}
+}
+
+// streamingResponseKey marks a request whose response body must be returned
+// unread. Unexported so WithStreamingResponse is the only way to set it.
+type streamingResponseKey struct{}
+
+// WithStreamingResponse marks ctx so ExecuteRequest returns the response body
+// unread instead of buffering it into Response.Content. A custom APIClient
+// should honour it the same way.
+func WithStreamingResponse(ctx context.Context) context.Context {
+	return context.WithValue(ctx, streamingResponseKey{}, true)
+}
+
+// IsStreamingResponse reports whether ctx was marked by WithStreamingResponse.
+func IsStreamingResponse(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	marked, _ := ctx.Value(streamingResponseKey{}).(bool)
+	return marked
+}
+
+// wantsStreamingResponse checks both contexts, so the marker survives a custom
+// client that swaps one of them.
+func wantsStreamingResponse(ctx context.Context, req *http.Request) bool {
+	if IsStreamingResponse(ctx) {
+		return true
+	}
+	return req != nil && IsStreamingResponse(req.Context())
 }
 
 // createRequest creates a new POST request with the given URL, payload and headers.
@@ -280,6 +330,13 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 
 	httpHeaders.Set("Content-Type", contentType)
 	req.Header = httpHeaders
+
+	if params.Stream != "" {
+		if req.Header.Get("Accept") == "" {
+			req.Header.Set("Accept", params.Stream)
+		}
+		req = req.WithContext(WithStreamingResponse(req.Context()))
+	}
 
 	if bodyBytes != nil {
 		req.ContentLength = int64(len(bodyBytes))

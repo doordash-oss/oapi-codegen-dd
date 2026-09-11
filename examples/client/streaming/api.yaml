@@ -1,0 +1,141 @@
+openapi: 3.0.3
+info:
+  title: Streaming API
+  version: 1.0.0
+paths:
+  /chat:
+    post:
+      operationId: chat
+      summary: Answer with one document, or stream chunks when asked to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                stream:
+                  type: boolean
+      responses:
+        '200':
+          description: A whole completion, or a stream of chunks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Completion'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Chunk'
+  /events:
+    get:
+      operationId: getEvents
+      summary: Subscribe to an endless Server-Sent Events stream
+      responses:
+        '200':
+          description: One JSON payload per event frame
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '500':
+          description: The stream could not be opened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
+  /logs:
+    get:
+      operationId: streamLogs
+      summary: Tail newline-delimited log records
+      responses:
+        '200':
+          description: One JSON record per line
+          content:
+            application/x-ndjson:
+              schema:
+                type: object
+                required: [level, message, at]
+                properties:
+                  level:
+                    type: string
+                    enum: [debug, info, warn, error]
+                  message:
+                    type: string
+                  at:
+                    type: string
+                    format: date-time
+                  source:
+                    type: object
+                    required: [service]
+                    properties:
+                      service:
+                        type: string
+                      host:
+                        type: string
+components:
+  schemas:
+    Completion:
+      type: object
+      required: [id, text, usage]
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        usage:
+          $ref: '#/components/schemas/Usage'
+    Usage:
+      type: object
+      required: [promptTokens, completionTokens]
+      properties:
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+    Chunk:
+      type: object
+      required: [index, delta]
+      properties:
+        index:
+          type: integer
+        delta:
+          type: string
+        finishReason:
+          type: string
+          enum: [stop, length, content_filter]
+    Event:
+      type: object
+      required: [seq, type, createdAt, actor]
+      properties:
+        seq:
+          type: integer
+        type:
+          type: string
+          enum: [created, updated, deleted]
+        createdAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/Actor'
+        tags:
+          type: array
+          items:
+            type: string
+    Actor:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    ServiceError:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string

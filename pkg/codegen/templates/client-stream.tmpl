@@ -1,0 +1,160 @@
+{{/*
+Copyright 2026 DoorDash, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- template "header" $ }}
+
+{{- /*
+Streaming sibling methods, emitted when generate.client-streaming is true.
+
+The non-streaming methods are untouched, so an operation offering both
+`application/json` and `text/event-stream` exposes both shapes.
+*/ -}}
+
+{{ define "client-stream" }}
+{{- $args := . }}
+{{- $config := $args.config }}
+{{- $operations := $args.operations }}
+{{- $clientName := $config.Client.Name }}
+
+{{ range $operations }}{{ $op := . }}
+{{- if and $op.Response.HasStream $op.StreamMethodName }}
+{{- $stream := $op.Response.PrimaryStream }}
+{{- if $config.Generate.Client }}
+// {{$op.StreamMethodName}} consumes the {{$stream.ContentType}} response of
+// {{$op.ID}} as a live stream. The body is never buffered, so this works against
+// an endless stream. The caller must Close the returned stream.
+func (c *{{$clientName}}) {{$op.StreamMethodName}}(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{ end }}, reqEditors ...runtime.RequestEditorFn) (*runtime.Stream[{{$stream.ItemName}}], error) {
+    var err error
+    {{- template "requestParams" (dict "op" $op "stream" $stream) }}
+
+    req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %w", err)
+    }
+
+    resp, err := c.apiClient.ExecuteRequest(ctx, req, "{{ escapeGoString $op.Path }}")
+    if err != nil {
+        return nil, fmt.Errorf("error executing request: %w", err)
+    }
+
+    if resp.StatusCode != {{$stream.StatusCode}} {
+        {{ template "streamReleaseBody" }}
+        {{- template "streamStatusError" (dict "op" $op) }}
+    }
+
+    // Buffered at the streaming status means the server answered with another
+    // content type. Say so rather than return a stream that yields nothing.
+    if !resp.Streaming {
+        return nil, runtime.NewClientAPIError(
+            fmt.Errorf("expected a {{escapeGoString $stream.ContentType}} stream, got Content-Type %q", resp.Headers.Get("Content-Type")),
+            runtime.WithStatusCode(resp.StatusCode))
+    }
+
+    return runtime.{{ template "streamConstructor" $stream }}[{{$stream.ItemName}}](resp.Raw), nil
+}
+{{ end }}
+{{- if $config.Generate.ClientWithResponse }}
+// {{$op.StreamMethodName}}WithResponse is the envelope form: it populates
+// Stream{{$stream.StatusCode}} instead of the buffered body field.
+func (c *{{$clientName}}) {{$op.StreamMethodName}}WithResponse(ctx context.Context{{ if $op.HasRequestOptions }}, options *{{$op.ID | ucFirst}}RequestOptions{{ end }}, reqEditors ...runtime.RequestEditorFn) (*{{$op.WithResponseTypeName}}, error) {
+    var err error
+    {{- template "requestParams" (dict "op" $op "stream" $stream) }}
+
+    req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %w", err)
+    }
+
+    resp, err := c.apiClient.ExecuteRequest(ctx, req, "{{ escapeGoString $op.Path }}")
+    if err != nil {
+        return nil, fmt.Errorf("error executing request: %w", err)
+    }
+
+    out := &{{$op.WithResponseTypeName}}{
+        HTTPResponse: resp.Raw,
+        Body:         resp.Content,
+        StatusCode:   resp.StatusCode,
+    }
+
+    switch resp.StatusCode {
+    case {{$stream.StatusCode}}:
+        if !resp.Streaming {
+            return out, runtime.NewClientAPIError(
+                fmt.Errorf("expected a {{escapeGoString $stream.ContentType}} stream, got Content-Type %q", resp.Headers.Get("Content-Type")),
+                runtime.WithStatusCode(resp.StatusCode))
+        }
+        out.Stream{{$stream.StatusCode}} = runtime.{{ template "streamConstructor" $stream }}[{{$stream.ItemName}}](resp.Raw)
+        return out, nil
+    {{- range $rcd := $op.Response.Errors }}
+    case {{ $rcd.StatusCode }}:
+        {{- template "decodeBody" (dict "rcd" $rcd) }}
+        return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+    {{- end }}
+    default:
+        {{ template "streamReleaseBody" }}
+        return out, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+    }
+}
+{{ end }}
+{{- end }}
+{{- end }}{{- /* end range operations */ -}}
+{{ end -}}
+
+{{ template "client-stream" dict "config" .Config "operations" .Operations }}
+
+{{- /* A 2xx other than the streaming status arrives unbuffered, so release it. */ -}}
+{{- define "streamReleaseBody" }}
+        if resp.Raw != nil && resp.Raw.Body != nil {
+            _ = resp.Raw.Body.Close()
+        }
+{{- end }}
+
+{{- /* Decodes a documented error response, as the non-streaming method does. */ -}}
+{{- define "streamStatusError" }}{{- $op := .op }}
+        {{- with $op.Response.Error }}
+            {{- if .ResponseName }}
+        target := new({{ .ResponseName }})
+        if len(resp.Content) > 0 {
+            if err = json.Unmarshal(resp.Content, target); err != nil {
+                return nil, &runtime.ResponseDecodeError{
+                    StatusCode:    resp.StatusCode,
+                    ContentType:   resp.Headers.Get("Content-Type"),
+                    ContentLength: len(resp.Content),
+                    TargetType:    "{{ .ResponseName }}",
+                    Body:          resp.Content,
+                    Err:           err,
+                }
+            }
+        }
+        if errTarget, ok := any(*target).(error); ok {
+            return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
+        }
+        return nil, runtime.NewClientAPIError(fmt.Errorf("API error (status %d): %v", resp.StatusCode, *target),
+            runtime.WithStatusCode(resp.StatusCode))
+            {{- else }}
+        return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+            runtime.WithStatusCode(resp.StatusCode))
+            {{- end }}
+        {{- else }}
+        return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+            runtime.WithStatusCode(resp.StatusCode))
+        {{- end }}
+{{- end }}
+
+{{- /* The runtime constructor matching a stream's framing. */ -}}
+{{- define "streamConstructor" -}}
+{{- if eq .Framing "sse" -}}NewEventStream{{- else -}}NewLineStream{{- end -}}
+{{- end }}

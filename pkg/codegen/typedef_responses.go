@@ -17,7 +17,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 // ResponseDefinition describes a response.
@@ -36,6 +38,26 @@ type ResponseDefinition struct {
 	// motivation as Successes - the envelope populates `JSON4xx`/`JSON5xx`
 	// fields per documented status.
 	Errors []*ResponseContentDefinition
+
+	// Streams lists every sequential media type documented on a success
+	// response, in ascending status order. Populated independently of which
+	// media type the primary method selected, so an operation offering both
+	// `application/json` and `text/event-stream` appears here without
+	// displacing the JSON response.
+	Streams []*StreamResponseDefinition
+}
+
+// StreamResponseDefinition describes one sequential response. Kept separate from
+// ResponseContentDefinition so the primary method keeps its own media type and
+// Go types; only the streaming siblings read this.
+type StreamResponseDefinition struct {
+	StatusCode  int
+	ContentType string
+	// Framing is "sse" or "lines".
+	Framing string
+	// ItemName is the Go type of one frame, e.g. "Event", or "[]byte" when
+	// there is no per-item schema that can be JSON-decoded.
+	ItemName string
 }
 
 // ResponseContentDefinition describes Operation response.
@@ -60,6 +82,36 @@ type ResponseContentDefinition struct {
 	// IsRaw is true for unsupported content types (XML, form-urlencoded, etc.)
 	// that require the user to handle marshaling manually.
 	IsRaw bool
+
+	// IsStream is true when the media type the primary method selected is
+	// sequential. It does not change the primary method's shape; it lets
+	// callers that cannot stream (the MCP tool template) refuse instead of
+	// blocking forever.
+	IsStream bool
+}
+
+// HasStream reports whether streaming siblings can be generated.
+func (r ResponseDefinition) HasStream() bool {
+	return len(r.Streams) > 0
+}
+
+// PrimaryStream returns the sequential response at the lowest success status,
+// whose item type and media type the streaming sibling uses.
+func (r ResponseDefinition) PrimaryStream() *StreamResponseDefinition {
+	if len(r.Streams) == 0 {
+		return nil
+	}
+	return r.Streams[0]
+}
+
+// StreamAt returns the sequential response documented at a status, or nil.
+func (r ResponseDefinition) StreamAt(status int) *StreamResponseDefinition {
+	for _, sd := range r.Streams {
+		if sd.StatusCode == status {
+			return sd
+		}
+	}
+	return nil
 }
 
 func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
@@ -73,6 +125,13 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	)
 
 	all := make(map[int]*ResponseContentDefinition)
+
+	// Content of every documented success status, plus any schema the primary
+	// pass already generated for a sequential media type. Resolved into
+	// ResponseDefinition.Streams after the loop, so detection never depends on
+	// which media type the primary pass selected.
+	streamContents := make(map[int]*orderedmap.Map[string, *v3high.MediaType])
+	streamFallbacks := make(map[int]streamFallback)
 
 	// If responses is nil, create a default 204 No Content response
 	if responses == nil {
@@ -146,6 +205,10 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			continue
 		}
 
+		if isSuccess && response.Content != nil {
+			streamContents[status] = response.Content
+		}
+
 		// we need to set the error in response out of all error codes.
 		// so we pick the first one.
 		// TODO: consider having that in parse options.
@@ -172,7 +235,12 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			}
 		}
 
-		if content == nil || content.Schema == nil {
+		// A sequential media type may carry only `itemSchema` (OpenAPI 3.2) and
+		// leave `schema` unset. Fall back to it so the response still counts as
+		// having content; the whole-body type is []byte either way.
+		bodySchema := responseBodySchema(content, contentType)
+
+		if content == nil || bodySchema == nil {
 			if isSuccess {
 				successDefinition := &ResponseContentDefinition{
 					IsSuccess:    isSuccess,
@@ -209,12 +277,18 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			WithReference("").
 			WithPath(pathParts).
 			WithSpecLocation(SpecLocationResponse)
-		contentSchema, err := GenerateGoSchema(content.Schema, options)
+		contentSchema, err := GenerateGoSchema(bodySchema, options)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 		}
 		if contentSchema.IsZero() {
 			continue
+		}
+
+		// When the selected media type is itself sequential, remember the schema
+		// so the stream pass reuses it instead of walking it twice.
+		if _, isStream := streamFraming(contentType); isStream {
+			streamFallbacks[status] = streamFallback{proxy: bodySchema, schema: contentSchema}
 		}
 
 		// For raw content types (XML, YAML, etc.), override the schema to []byte
@@ -401,6 +475,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		// IsRaw is true for unsupported content types that require manual marshaling
 		// Use HasPrefix to handle content types with parameters (e.g., "text/html; charset=UTF-8")
 		isRaw := isRawContentType(contentType)
+		_, isStream := streamFraming(contentType)
 
 		rcd := &ResponseContentDefinition{
 			ResponseName: responseName,
@@ -413,6 +488,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			StatusCode:   status,
 			Headers:      headers,
 			IsRaw:        isRaw,
+			IsStream:     isStream,
 		}
 		all[status] = rcd
 	}
@@ -433,6 +509,9 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			all[200] = rcd
 			typeDefinitions = append(typeDefinitions, tds...)
 			defaultAsSuccess = true
+			// A `default` standing in as the success can be sequential too, so
+			// it has to reach the stream pass like any explicit status.
+			streamContents[200] = defaultResponse.Content
 		}
 	}
 
@@ -460,6 +539,12 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 	}
 
+	streams, streamTypes, err := collectStreamResponses(operationID, streamContents, streamFallbacks, options)
+	if err != nil {
+		return nil, nil, err
+	}
+	typeDefinitions = append(typeDefinitions, streamTypes...)
+
 	successes, errs := partitionResponses(all)
 	res := &ResponseDefinition{
 		SuccessStatusCode: successCode,
@@ -468,6 +553,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		All:               all,
 		Successes:         successes,
 		Errors:            errs,
+		Streams:           streams,
 	}
 
 	return res, typeDefinitions, nil
@@ -493,13 +579,15 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		contentVal    *v3high.MediaType
 	)
 
+	var bodySchema *base.SchemaProxy
 	if content != nil {
 		contentType, contentVal = content.Key(), content.Value()
-		if contentVal.Schema != nil {
-			ref = contentVal.Schema.GetReference()
+		bodySchema = responseBodySchema(contentVal, contentType)
+		if bodySchema != nil {
+			ref = bodySchema.GetReference()
 
 			opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
-			contentSchema, err = GenerateGoSchema(contentVal.Schema, opts)
+			contentSchema, err = GenerateGoSchema(bodySchema, opts)
 			if err != nil {
 				return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
 			}
@@ -516,6 +604,9 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 	if contentSchema.IsZero() {
 		return nil, nil, nil
 	}
+
+	var typeDefinitions []TypeDefinition
+	_, isStream := streamFraming(contentType)
 
 	// Coerce raw content types (XML, CSV, */*, etc.) to []byte. Mirrors the
 	// per-status path; without it, a `default` response with a non-JSON
@@ -548,7 +639,6 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 	if isRaw && options.typeTracker.Exists(responseName) {
 		responseName = options.typeTracker.generateUniqueName(responseName)
 	}
-	var typeDefinitions []TypeDefinition
 	td := TypeDefinition{
 		Name:           responseName,
 		Schema:         contentSchema,
@@ -580,6 +670,7 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		StatusCode:   status,
 		Headers:      headers,
 		IsRaw:        isRaw,
+		IsStream:     isStream,
 	}
 	return rcd, typeDefinitions, nil
 }
@@ -619,6 +710,22 @@ func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], op
 		res[hName] = hSchema
 	}
 	return res, nil
+}
+
+// responseBodySchema returns the schema describing a response body. For a
+// sequential media type, `itemSchema` stands in for a missing `schema` so the
+// response is not mistaken for having no content.
+func responseBodySchema(content *v3high.MediaType, contentType string) *base.SchemaProxy {
+	if content == nil {
+		return nil
+	}
+	if content.Schema != nil {
+		return content.Schema
+	}
+	if _, isStream := streamFraming(contentType); isStream {
+		return content.ItemSchema
+	}
+	return nil
 }
 
 // isRawContentType returns true for content types that require manual marshaling

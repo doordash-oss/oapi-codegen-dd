@@ -177,6 +177,47 @@ The four valid combinations:
 
 See [examples/responses/multiple/client-with-response/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-with-response/cfg.yaml){:target="_blank"} for envelope-only and [examples/responses/multiple/client-combined/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-combined/cfg.yaml){:target="_blank"} for the combined case.
 
+#### `generate.client-streaming`
+**Type:** `boolean` | **Default:** `false`
+
+Generate a `<Op>Stream` sibling for every operation that documents a sequential
+success response - `text/event-stream`, or the ndjson/jsonl family - returning a
+live `runtime.Stream[T]` over the per-frame type instead of buffering the body.
+
+```yaml
+generate:
+  client: true
+  client-streaming: true
+```
+
+The non-streaming methods keep their media type and their signatures, so an
+operation declaring both `application/json` and `text/event-stream` at one
+status exposes both shapes and the generator never has to pick a winner:
+
+```go
+func (c *Client) Chat(ctx, options, ...) (*ChatResponse, error)              // JSON
+func (c *Client) ChatStream(ctx, options, ...) (*runtime.Stream[Chunk], error) // SSE
+```
+
+Additive to [`generate.client`](#generateclient) and
+[`generate.client-with-response`](#generateclient-with-response): each mode gets
+the sibling it needs, so with the envelope client on you also get
+`<Op>StreamWithResponse` and a `Stream<status>` field next to `JSON<status>`.
+
+Off by default because the siblings add methods to the generated
+`ClientInterface`, which would otherwise break hand-written mocks on upgrade.
+With the flag off, generated output is byte-for-byte what it was before
+streaming support existed.
+
+So that the flag is not something you have to know about in advance, generation
+logs the operations it affects when the flag is off: a warning for those whose
+generated method will block because their only success media type is sequential,
+and an informational line for those that declare a sequential media type
+alongside a buffered one.
+
+See the [Streaming](streaming.md) page for how to consume a stream, and
+[examples/client/streaming](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/client/streaming/){:target="_blank"} for a full example.
+
 #### `generate.omit-description`
 **Type:** `boolean` | **Default:** `false`
 

@@ -165,6 +165,9 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			if other.Generate.ClientWithResponse {
 				o.Generate.ClientWithResponse = other.Generate.ClientWithResponse
 			}
+			if other.Generate.ClientStreaming {
+				o.Generate.ClientStreaming = other.Generate.ClientStreaming
+			}
 			if other.Generate.OmitDescription {
 				o.Generate.OmitDescription = other.Generate.OmitDescription
 			}
@@ -326,6 +329,16 @@ type GenerateOptions struct {
 	//
 	// Defaults to false.
 	ClientWithResponse bool `yaml:"client-with-response"`
+
+	// ClientStreaming adds a `<Op>Stream` sibling for every operation with a
+	// sequential success response (SSE, NDJSON), returning a live
+	// `runtime.Stream[T]`. Non-streaming methods keep their media type and
+	// signatures, so an operation offering both `application/json` and
+	// `text/event-stream` exposes both shapes.
+	//
+	// Off by default: the siblings add methods to the generated client
+	// interface, which would break hand-written mocks on upgrade.
+	ClientStreaming bool `yaml:"client-streaming"`
 
 	// Models specifies whether to generate model types. Defaults to true.
 	// Set to false when models are generated in a separate package.

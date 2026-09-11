@@ -47,6 +47,17 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+// closeTrackingBody records how many times the response body was closed.
+type closeTrackingBody struct {
+	io.Reader
+	closes int
+}
+
+func (b *closeTrackingBody) Close() error {
+	b.closes++
+	return nil
+}
+
 func TestClient_GetBaseURL(t *testing.T) {
 	client := &Client{baseURL: "https://foo.bar"}
 	assert.Equal(t, "https://foo.bar", client.GetBaseURL())
@@ -224,6 +235,152 @@ func TestClient_ExecuteRequest(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 		})
 	}
+}
+
+func TestClient_CreateRequest_streaming(t *testing.T) {
+	tests := []struct {
+		name           string
+		options        RequestOptions
+		stream         string
+		expectedAccept string
+		expectedMarked bool
+	}{
+		{
+			name:           "marks the request and advertises the media type",
+			stream:         "text/event-stream",
+			expectedAccept: "text/event-stream",
+			expectedMarked: true,
+		},
+		{
+			name:           "leaves a caller-supplied Accept alone",
+			options:        mockRequestOptions{header: map[string]string{"Accept": "application/json"}},
+			stream:         "text/event-stream",
+			expectedAccept: "application/json",
+			expectedMarked: true,
+		},
+		{
+			name:           "a non-streaming operation is untouched",
+			expectedAccept: "",
+			expectedMarked: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &Client{baseURL: "https://foo.bar"}
+			req, err := client.CreateRequest(context.Background(), RequestOptionsParameters{
+				Options:    tt.options,
+				RequestURL: "https://foo.bar/events",
+				Method:     http.MethodGet,
+				Stream:     tt.stream,
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedAccept, req.Header.Get("Accept"))
+			assert.Equal(t, tt.expectedMarked, IsStreamingResponse(req.Context()))
+		})
+	}
+}
+
+func TestClient_ExecuteRequest_streaming(t *testing.T) {
+	tests := []struct {
+		name              string
+		stream            string
+		callCtxOnly       bool
+		responseStatus    int
+		responseType      string
+		expectedStreaming bool
+	}{
+		{
+			name:              "a sequential success is handed back unread",
+			stream:            "text/event-stream",
+			responseStatus:    http.StatusOK,
+			responseType:      "text/event-stream",
+			expectedStreaming: true,
+		},
+		{
+			name:              "any 2xx counts, not just the documented one",
+			stream:            "text/event-stream",
+			responseStatus:    http.StatusAccepted,
+			responseType:      "text/event-stream; charset=utf-8",
+			expectedStreaming: true,
+		},
+		{
+			name:              "a marker on the call context alone is honoured",
+			callCtxOnly:       true,
+			responseStatus:    http.StatusOK,
+			responseType:      "application/x-ndjson",
+			expectedStreaming: true,
+		},
+		{
+			name:              "a non-sequential response is buffered",
+			stream:            "text/event-stream",
+			responseStatus:    http.StatusOK,
+			responseType:      "application/json",
+			expectedStreaming: false,
+		},
+		{
+			name:              "an error response is buffered",
+			stream:            "text/event-stream",
+			responseStatus:    http.StatusInternalServerError,
+			responseType:      "text/event-stream",
+			expectedStreaming: false,
+		},
+		{
+			name:              "an unmarked request is always buffered",
+			responseStatus:    http.StatusOK,
+			responseType:      "text/event-stream",
+			expectedStreaming: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := &closeTrackingBody{Reader: strings.NewReader(`{"status":"ok"}`)}
+			client := &Client{
+				baseURL: "https://foo.bar",
+				httpClient: &MockHttpRequestDoer{response: &http.Response{
+					StatusCode: tt.responseStatus,
+					Header:     http.Header{"Content-Type": []string{tt.responseType}},
+					Body:       body,
+				}},
+			}
+
+			ctx := context.Background()
+			req, err := client.CreateRequest(ctx, RequestOptionsParameters{
+				RequestURL: "https://foo.bar/events",
+				Method:     http.MethodGet,
+				Stream:     tt.stream,
+			})
+			require.NoError(t, err)
+			if tt.callCtxOnly {
+				ctx = WithStreamingResponse(ctx)
+			}
+
+			resp, err := client.ExecuteRequest(ctx, req, "/events")
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedStreaming, resp.Streaming)
+			if tt.expectedStreaming {
+				// The consumer owns the body, so it must still be open.
+				assert.Nil(t, resp.Content)
+				assert.Equal(t, 0, body.closes)
+				assert.Same(t, body, resp.Raw.Body)
+				return
+			}
+			assert.Equal(t, `{"status":"ok"}`, string(resp.Content))
+			assert.Equal(t, 1, body.closes)
+		})
+	}
+}
+
+func TestIsStreamingResponse(t *testing.T) {
+	// A nil context is a caller bug, but an exported helper should not panic.
+	var missingCtx context.Context
+	assert.False(t, IsStreamingResponse(missingCtx))
+	assert.False(t, IsStreamingResponse(context.Background()))
+	assert.True(t, IsStreamingResponse(WithStreamingResponse(context.Background())))
+	assert.False(t, wantsStreamingResponse(context.Background(), nil))
 }
 
 func TestNewAPIClient(t *testing.T) {
