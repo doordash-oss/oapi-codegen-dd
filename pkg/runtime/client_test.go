@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -467,4 +468,56 @@ func TestReplacePathPlaceholders(t *testing.T) {
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
+}
+
+func TestClientBinaryUpload(t *testing.T) {
+	for _, payload := range [][]byte{{0, 0xff, 'a', 'b', 'c'}, {}} {
+		t.Run(fmt.Sprintf("bytes=%d", len(payload)), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.Equal(t, payload, body)
+				assert.Equal(t, "application/octet-stream", r.Header.Get("Content-Type"))
+				assert.Equal(t, int64(len(payload)), r.ContentLength)
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			var file File
+			file.InitFromBytes(payload, "chunk")
+			client, err := NewAPIClient(server.URL)
+			require.NoError(t, err)
+			req, err := client.CreateRequest(context.Background(), RequestOptionsParameters{
+				RequestURL: server.URL, Method: http.MethodPatch, ContentType: "application/octet-stream",
+				Options: mockRequestOptions{body: &file},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, req.GetBody)
+			replay, err := req.GetBody()
+			require.NoError(t, err)
+			got, err := io.ReadAll(replay)
+			require.NoError(t, err)
+			require.NoError(t, replay.Close())
+			assert.Equal(t, payload, got)
+			resp, err := server.Client().Do(req)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+		})
+	}
+}
+
+func TestClientJSONFileKeepsJSONEncoding(t *testing.T) {
+	var file File
+	file.InitFromBytes([]byte("abc"), "chunk")
+	client, err := NewAPIClient("http://example.com")
+	require.NoError(t, err)
+	req, err := client.CreateRequest(context.Background(), RequestOptionsParameters{
+		RequestURL: "http://example.com", Method: http.MethodPost, ContentType: "application/json",
+		Options: mockRequestOptions{body: &file},
+	})
+	require.NoError(t, err)
+	body, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	require.NoError(t, req.Body.Close())
+	assert.Equal(t, `"YWJj"`, string(body))
 }

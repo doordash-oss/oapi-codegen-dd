@@ -311,8 +311,24 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 			}
 			bodyBytes = []byte(encodedPayload)
 		default:
-			// Default: treat as JSON
-			bodyBytes, err = json.Marshal(payload)
+			mediaType, _, _ := strings.Cut(ctLower, ";")
+			mediaType = strings.TrimSpace(mediaType)
+			if mediaType == "application/json" || strings.HasSuffix(mediaType, "+json") {
+				bodyBytes, err = json.Marshal(payload)
+			} else {
+				// A binary schema generates File. Its JSON marshaler encodes
+				// base64, which must not be used for a raw file body.
+				switch file := payload.(type) {
+				case File:
+					bodyBytes, err = file.Bytes()
+				case *File:
+					if file != nil {
+						bodyBytes, err = file.Bytes()
+					}
+				default:
+					bodyBytes, err = json.Marshal(payload)
+				}
+			}
 			if err != nil {
 				return nil, err
 			}
