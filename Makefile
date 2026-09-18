@@ -21,7 +21,7 @@ help:
 	@echo "    notice       regenerate NOTICE.txt with third-party licenses"
 
 $(GOBIN)/golangci-lint:
-	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
 .PHONY: tools
 tools: $(GOBIN)/golangci-lint
