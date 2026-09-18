@@ -58,7 +58,7 @@ tidy:
 
 tidy-ci:
 	# for the root module, explicitly run the step, to prevent recursive calls
-	tidied -verbose
+	go mod tidy -diff
 	# then, for all child modules, use a module-managed `Makefile`
 	git ls-files '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && make tidy-ci'
 
@@ -96,7 +96,7 @@ check-fmt:
 	# then, for all child modules, use a module-managed `Makefile`
 	git ls-files '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && make check-fmt'
 
-build-ci: check-fmt lint-ci gosec
+build-ci: check-fmt tidy-ci lint-ci gosec
 
 test-ci: test
 
