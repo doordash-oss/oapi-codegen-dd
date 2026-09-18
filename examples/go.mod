@@ -67,7 +67,7 @@ require (
 	github.com/gofiber/utils/v2 v2.0.6 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/gomarkdown/markdown v0.0.0-20240328165702-4d01890c35c0 // indirect
+	github.com/gomarkdown/markdown v0.0.0-20260411013819-759bbc3e3207 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grafana/pyroscope-go v1.2.7 // indirect
