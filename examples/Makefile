@@ -14,7 +14,7 @@ tidy:
 	go mod tidy
 
 tidy-ci:
-	tidied -verbose
+	go mod tidy -diff
 
 gosec:
 	# Exclude rules that are false positives for generated API code:
