@@ -21,7 +21,11 @@ help:
 	@echo "    notice       regenerate NOTICE.txt with third-party licenses"
 
 $(GOBIN)/golangci-lint:
-	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+	# GOTOOLCHAIN=auto only for this install: golangci-lint's own go.mod requires a
+	# newer Go than this project targets, and building the linter binary says nothing
+	# about the Go version this module supports. actions/setup-go v6+ exports
+	# GOTOOLCHAIN=local, which would otherwise make this install fail outright.
+	GOBIN=$(GOBIN) GOTOOLCHAIN=auto go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
 .PHONY: tools
 tools: $(GOBIN)/golangci-lint
