@@ -1,6 +1,72 @@
 {
-	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": [
-		"local>oapi-codegen/renovate-config"
-	]
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "semanticCommits": "enabled",
+  "dependencyDashboard": false,
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "packageRules": [
+    {
+      "description": "Link digest-pinned GitHub dependencies to the diff between the two commits",
+      "matchSourceUrls": [
+        "https://github.com/**/*"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "changelogUrl": "{{sourceUrl}}/compare/{{currentDigest}}..{{newDigest}}"
+    },
+    {
+      "description": "Only suggest updates that stay within the go directive, so a dependency bump never raises the minimum Go version consumers need",
+      "matchManagers": [
+        "gomod"
+      ],
+      "constraintsFiltering": "strict"
+    },
+    {
+      "description": "examples/ replaces the root module, so its go.sum goes stale whenever root dependencies move and `make generate` then fails. Updating both modules in one PR lets gomodTidy run across both.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "go modules"
+    },
+    {
+      "description": "Do not bump CI's Go toolchain on its own. Building only on a newer Go stops us verifying the minimum version go.mod declares, so a newer-only API could land unnoticed and break consumers.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "go"
+      ],
+      "enabled": false
+    },
+    {
+      "matchFileNames": [
+        "**/*.md"
+      ],
+      "semanticCommitType": "docs"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Track the golangci-lint version pinned in the Makefile's go install line",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "**/Makefile"
+      ],
+      "matchStrings": [
+        "go install github\\.com/golangci/golangci-lint/v2/cmd/golangci-lint@(?<currentValue>v[^\\s]+)"
+      ],
+      "depNameTemplate": "github.com/golangci/golangci-lint/v2",
+      "datasourceTemplate": "go"
+    }
+  ]
 }
