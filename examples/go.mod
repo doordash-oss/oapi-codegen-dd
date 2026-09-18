@@ -67,7 +67,7 @@ require (
 	github.com/gofiber/utils/v2 v2.0.6 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/gomarkdown/markdown v0.0.0-20240328165702-4d01890c35c0 // indirect
+	github.com/gomarkdown/markdown v0.0.0-20260411013819-759bbc3e3207 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grafana/pyroscope-go v1.2.7 // indirect
@@ -164,7 +164,7 @@ require (
 	golang.org/x/tools v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
-	google.golang.org/grpc v1.83.1 // indirect
+	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
