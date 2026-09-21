@@ -21,7 +21,11 @@ help:
 	@echo "    notice       regenerate NOTICE.txt with third-party licenses"
 
 $(GOBIN)/golangci-lint:
-	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	# GOTOOLCHAIN=auto only for this install: golangci-lint's own go.mod requires a
+	# newer Go than this project targets, and building the linter binary says nothing
+	# about the Go version this module supports. actions/setup-go v6+ exports
+	# GOTOOLCHAIN=local, which would otherwise make this install fail outright.
+	GOBIN=$(GOBIN) GOTOOLCHAIN=auto go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
 .PHONY: tools
 tools: $(GOBIN)/golangci-lint
@@ -58,7 +62,7 @@ tidy:
 
 tidy-ci:
 	# for the root module, explicitly run the step, to prevent recursive calls
-	tidied -verbose
+	go mod tidy -diff
 	# then, for all child modules, use a module-managed `Makefile`
 	git ls-files '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && make tidy-ci'
 
@@ -96,7 +100,7 @@ check-fmt:
 	# then, for all child modules, use a module-managed `Makefile`
 	git ls-files '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && make check-fmt'
 
-build-ci: check-fmt lint-ci gosec
+build-ci: check-fmt tidy-ci lint-ci gosec
 
 test-ci: test
 
