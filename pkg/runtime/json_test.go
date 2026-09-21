@@ -559,3 +559,17 @@ func TestDecodeJSONBody(t *testing.T) {
 		assert.Contains(t, err.Error(), "count")
 	})
 }
+
+func TestAsMapScalarHeaders(t *testing.T) {
+	headers := struct {
+		Offset   int64  `json:"Upload-Offset"`
+		Complete bool   `json:"Upload-Complete"`
+		Token    string `json:"Authorization"`
+		Optional *int64 `json:"Optional,omitempty"`
+	}{Offset: 9007199254740993, Complete: true, Token: "Bearer example"}
+	got, err := AsMap[string](headers)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"Upload-Offset": "9007199254740993", "Upload-Complete": "true", "Authorization": "Bearer example",
+	}, got)
+}
