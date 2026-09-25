@@ -2,9 +2,6 @@
 package: example2
 output:
   use-single-file: false
-error-mapping:
-  Error: message
-  UpdateClientErrorResponse: code
 generate:
   client: true
   omit-description: true

@@ -337,6 +337,57 @@ res1 := res0[0]
 return res1`
 		assert.Equal(t, expected, res)
 	})
+
+	t.Run("path inside a two-variant union", func(t *testing.T) {
+		typ, typeSchemaMap := unionErrorType(GoSchema{UnionElements: []UnionElement{
+			{TypeName: "NotFound"},
+			{TypeName: "string", Schema: GoSchema{GoType: "string"}},
+		}})
+		res := typ.GetErrorResponse(map[string]string{"ResError": "message"}, "e", typeSchemaMap)
+		expected := `res0 := e.ResError_OneOf
+if res0 == nil { return "unknown error" }
+res1 := *res0
+switch res2 := res1.Value().(type) {
+case NotFound:
+res3 := res2.Message
+return res3
+}
+return "unknown error"`
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("path inside a discriminated union", func(t *testing.T) {
+		typ, typeSchemaMap := unionErrorType(GoSchema{
+			UnionElements: []UnionElement{{TypeName: "NotFound"}, {TypeName: "Conflict"}, {TypeName: "Gone"}},
+			Discriminator: &Discriminator{
+				Property: "_tag",
+				Mapping:  map[string]string{"NotFound": "NotFound", "Conflict": "Conflict", "Gone": "Gone"},
+			},
+		})
+		res := typ.GetErrorResponse(map[string]string{"ResError": "message"}, "e", typeSchemaMap)
+		expected := `res0 := e.ResError_OneOf
+if res0 == nil { return "unknown error" }
+res1 := *res0
+res2, _ := res1.ValueByDiscriminator()
+switch res3 := res2.(type) {
+case NotFound:
+res4 := res3.Message
+return res4
+case Conflict:
+res5 := res3.Message
+return res5
+}
+return "unknown error"`
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("union without a discriminator and more than two variants", func(t *testing.T) {
+		typ, typeSchemaMap := unionErrorType(GoSchema{
+			UnionElements: []UnionElement{{TypeName: "NotFound"}, {TypeName: "Conflict"}, {TypeName: "Gone"}},
+		})
+		res := typ.GetErrorResponse(map[string]string{"ResError": "message"}, "e", typeSchemaMap)
+		assert.Equal(t, `return "unknown error"`, res)
+	})
 }
 
 func TestTypeDefinition_GetErrorConstructor(t *testing.T) {
@@ -346,6 +397,15 @@ func TestTypeDefinition_GetErrorConstructor(t *testing.T) {
 			Schema: GoSchema{},
 		}
 		res := typ.GetErrorConstructor(map[string]string{}, map[string]GoSchema{})
+		assert.Equal(t, "", res)
+	})
+
+	t.Run("path inside a union - returns empty", func(t *testing.T) {
+		typ, typeSchemaMap := unionErrorType(GoSchema{UnionElements: []UnionElement{
+			{TypeName: "NotFound"},
+			{TypeName: "Conflict"},
+		}})
+		res := typ.GetErrorConstructor(map[string]string{"ResError": "message"}, typeSchemaMap)
 		assert.Equal(t, "", res)
 	})
 

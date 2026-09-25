@@ -1,0 +1,129 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Error Mapping for union error types
+paths:
+  /widgets/{id}:
+    get:
+      operationId: getWidget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "404":
+          description: An error object or a bare string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WidgetError"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "409":
+          description: Tagged union with more than two variants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderError"
+
+  /carts/{id}:
+    get:
+      operationId: getCart
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "500":
+          description: Union nested under an envelope field
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartError"
+
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+
+    NotFound:
+      type: object
+      required: [_tag, message]
+      properties:
+        _tag:
+          type: string
+        message:
+          type: string
+
+    Conflict:
+      type: object
+      required: [_tag, message]
+      properties:
+        _tag:
+          type: string
+        message:
+          type: string
+
+    Gone:
+      type: object
+      required: [_tag]
+      properties:
+        _tag:
+          type: string
+        since:
+          type: string
+
+    WidgetError:
+      anyOf:
+        - $ref: "#/components/schemas/NotFound"
+        - type: string
+
+    OrderError:
+      oneOf:
+        - $ref: "#/components/schemas/NotFound"
+        - $ref: "#/components/schemas/Conflict"
+        - $ref: "#/components/schemas/Gone"
+      discriminator:
+        propertyName: _tag
+
+    CartError:
+      type: object
+      properties:
+        error:
+          oneOf:
+            - $ref: "#/components/schemas/NotFound"
+            - $ref: "#/components/schemas/Gone"

@@ -65,7 +65,6 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
 
 {{define "handle-validation-error"}}
 {{- $op := .Op -}}
-{{- $config := .Config -}}
 {{- /* Determine error type name: use underlying type for aliases, response name otherwise */ -}}
 {{- $errorTypeName := "" -}}
 {{- if $op.Response.Error -}}
@@ -75,7 +74,7 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
         {{- $errorTypeName = $op.Response.Error.ResponseName -}}
     {{- end -}}
 {{- end -}}
-{{- $hasTypedError := and $errorTypeName (index $config.ErrorMapping $errorTypeName) -}}
+{{- $hasTypedError := and $errorTypeName (index .ErrorConstructors $errorTypeName) -}}
     // Validate request
     if err := opts.Validate(); err != nil {
         {{- if $hasTypedError }}
@@ -124,7 +123,8 @@ if err != nil {
         {{- $errorTypeName = $op.Response.Error.ResponseName -}}
     {{- end -}}
 {{- end -}}
-{{- $hasTypedError := and $errorTypeName (index $config.ErrorMapping $errorTypeName) -}}
+{{- /* Union error types map Error() but have no constructor, so they use the generic error */ -}}
+{{- $hasTypedError := and $errorTypeName (index $.ErrorConstructors $errorTypeName) -}}
 // {{ $op.ID | ucFirst }} handles {{ $op.Method }} {{ $op.Path }}
 func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
@@ -519,7 +519,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 
 {{- if $validateRequest }}
 {{- if $op.HasRequestOptions }}
-    {{template "handle-validation-error" (dict "Op" $op "Config" $config)}}
+    {{template "handle-validation-error" (dict "Op" $op "ErrorConstructors" $.ErrorConstructors)}}
 {{- end }}
 {{- end }}
 

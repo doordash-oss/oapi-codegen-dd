@@ -1,0 +1,214 @@
+openapi: 3.0.0
+info:
+  title: error-mapping entries across error shapes
+  version: 1.0.0
+paths:
+  /gadgets:
+    get:
+      operationId: getGadget
+      parameters:
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '404':
+          description: plain struct error
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlainError'}
+  /widgets:
+    get:
+      operationId: getWidget
+      parameters:
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '404':
+          description: two-variant union error
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UnionError'}
+  /tagged:
+    get:
+      operationId: getTagged
+      parameters:
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '409':
+          description: discriminated union error with more than two variants
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaggedError'}
+  /untagged:
+    get:
+      operationId: getUntagged
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '409':
+          description: union error with more than two variants and no discriminator
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UntaggedError'}
+  /unmatched:
+    get:
+      operationId: getUnmatched
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '410':
+          description: union error whose variants lack the mapped field
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UnmatchedError'}
+  /recursive:
+    get:
+      operationId: getRecursive
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '500':
+          description: union error that contains itself
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Node'}
+  /envelope:
+    get:
+      operationId: getEnvelope
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '502':
+          description: union nested under an envelope field
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EnvelopeError'}
+  /things:
+    get:
+      operationId: getThing
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '400':
+          description: error behind a component alias
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AliasedError'}
+  /nested:
+    get:
+      operationId: getNested
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '500':
+          description: nested error
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NestedError'}
+components:
+  schemas:
+    Gadget:
+      type: object
+      properties:
+        id: {type: string}
+    PlainError:
+      type: object
+      required: [message]
+      properties:
+        message: {type: string}
+    ErrorVariant:
+      type: object
+      required: [_tag, message]
+      properties:
+        _tag: {type: string}
+        message: {type: string}
+    NotFound:
+      type: object
+      required: [_tag, message]
+      properties:
+        _tag: {type: string}
+        message: {type: string}
+    Conflict:
+      type: object
+      required: [_tag, message]
+      properties:
+        _tag: {type: string}
+        message: {type: string}
+    Gone:
+      type: object
+      required: [_tag]
+      properties:
+        _tag: {type: string}
+        since: {type: string}
+    UnionError:
+      anyOf:
+        - $ref: '#/components/schemas/ErrorVariant'
+        - type: string
+    TaggedError:
+      oneOf:
+        - $ref: '#/components/schemas/NotFound'
+        - $ref: '#/components/schemas/Conflict'
+        - $ref: '#/components/schemas/Gone'
+      discriminator:
+        propertyName: _tag
+    UntaggedError:
+      oneOf:
+        - $ref: '#/components/schemas/NotFound'
+        - $ref: '#/components/schemas/Conflict'
+        - $ref: '#/components/schemas/Gone'
+    UnmatchedError:
+      anyOf:
+        - $ref: '#/components/schemas/Gone'
+        - type: string
+    Node:
+      oneOf:
+        - $ref: '#/components/schemas/Gone'
+        - $ref: '#/components/schemas/Node'
+    EnvelopeError:
+      type: object
+      properties:
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/NotFound'
+            - $ref: '#/components/schemas/Gone'
+    AliasedError:
+      $ref: '#/components/schemas/BaseError'
+    BaseError:
+      type: object
+      properties:
+        message: {type: string}
+    NestedError:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/BaseError'
