@@ -4,7 +4,6 @@ package example3
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
@@ -59,13 +58,11 @@ func (c *Client) GetUserSingle(ctx context.Context, reqEditors ...runtime.Reques
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUserSingleResponse)
-
-		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		// Handle empty response body gracefully
 		if len(bodyBytes) == 0 {
 			return target, nil
 		}
-		if err = json.Unmarshal(bodyBytes, target); err != nil {
+		if err = runtime.UnmarshalForm(bodyBytes, target); err != nil {
 			return nil, &runtime.ResponseDecodeError{
 				StatusCode:    resp.StatusCode,
 				ContentType:   resp.Headers.Get("Content-Type"),
@@ -104,13 +101,11 @@ func (c *Client) GetUserUnion1(ctx context.Context, reqEditors ...runtime.Reques
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUserUnion1Response)
-
-		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		// Handle empty response body gracefully
 		if len(bodyBytes) == 0 {
 			return target, nil
 		}
-		if err = json.Unmarshal(bodyBytes, target); err != nil {
+		if err = runtime.UnmarshalForm(bodyBytes, target); err != nil {
 			return nil, &runtime.ResponseDecodeError{
 				StatusCode:    resp.StatusCode,
 				ContentType:   resp.Headers.Get("Content-Type"),
@@ -149,13 +144,11 @@ func (c *Client) GetUserUnion2(ctx context.Context, reqEditors ...runtime.Reques
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUserUnion2Response)
-
-		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		// Handle empty response body gracefully
 		if len(bodyBytes) == 0 {
 			return target, nil
 		}
-		if err = json.Unmarshal(bodyBytes, target); err != nil {
+		if err = runtime.UnmarshalForm(bodyBytes, target); err != nil {
 			return nil, &runtime.ResponseDecodeError{
 				StatusCode:    resp.StatusCode,
 				ContentType:   resp.Headers.Get("Content-Type"),
@@ -194,13 +187,11 @@ func (c *Client) GetUserUnion3(ctx context.Context, reqEditors ...runtime.Reques
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		target := new(GetUserUnion3Response)
-
-		bodyBytes, err = runtime.ConvertFormFields(bodyBytes)
 		// Handle empty response body gracefully
 		if len(bodyBytes) == 0 {
 			return target, nil
 		}
-		if err = json.Unmarshal(bodyBytes, target); err != nil {
+		if err = runtime.UnmarshalForm(bodyBytes, target); err != nil {
 			return nil, &runtime.ResponseDecodeError{
 				StatusCode:    resp.StatusCode,
 				ContentType:   resp.Headers.Get("Content-Type"),

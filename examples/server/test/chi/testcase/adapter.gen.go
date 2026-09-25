@@ -668,17 +668,7 @@ func (a *HTTPAdapter) SubmitContactForm(w http.ResponseWriter, r *http.Request) 
 		})
 		return
 	}
-	jsonBytes, err := runtime.ConvertFormFields(formBytes)
-	if err != nil {
-		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
-			Kind:        OapiErrorKindDecode,
-			OperationID: "SubmitContactForm",
-			Message:     err.Error(),
-			Err:         err,
-		})
-		return
-	}
-	if err := json.Unmarshal(jsonBytes, &body); err != nil {
+	if err := runtime.UnmarshalForm(formBytes, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "SubmitContactForm",
@@ -916,17 +906,7 @@ func (a *HTTPAdapter) GetOAuthToken(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	jsonBytes, err := runtime.ConvertFormFields(formBytes)
-	if err != nil {
-		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
-			Kind:        OapiErrorKindDecode,
-			OperationID: "GetOAuthToken",
-			Message:     err.Error(),
-			Err:         err,
-		})
-		return
-	}
-	if err := json.Unmarshal(jsonBytes, &body); err != nil {
+	if err := runtime.UnmarshalForm(formBytes, &body); err != nil {
 		a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
 			Kind:        OapiErrorKindDecode,
 			OperationID: "GetOAuthToken",

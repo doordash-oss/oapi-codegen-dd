@@ -38,24 +38,12 @@ Expected names in the surrounding scope:
 {{- else }}
         out.{{$field}} = new({{$rcd.ResponseName}})
         bodyBytes := resp.Content
-        {{- if eq $rcd.NameTag "Formdata" }}
         if len(bodyBytes) > 0 {
-            converted, convErr := runtime.ConvertFormFields(bodyBytes)
-            if convErr != nil {
-                return out, &runtime.ResponseDecodeError{
-                    StatusCode:    resp.StatusCode,
-                    ContentType:   resp.Headers.Get("Content-Type"),
-                    ContentLength: len(bodyBytes),
-                    TargetType:    "{{$rcd.ResponseName}}",
-                    Body:          bodyBytes,
-                    Err:           convErr,
-                }
-            }
-            bodyBytes = converted
-        }
-        {{- end }}
-        if len(bodyBytes) > 0 {
+            {{- if eq $rcd.NameTag "Formdata" }}
+            if err := runtime.UnmarshalForm(bodyBytes, out.{{$field}}); err != nil {
+            {{- else }}
             if err := json.Unmarshal(bodyBytes, out.{{$field}}); err != nil {
+            {{- end }}
                 return out, &runtime.ResponseDecodeError{
                     StatusCode:    resp.StatusCode,
                     ContentType:   resp.Headers.Get("Content-Type"),

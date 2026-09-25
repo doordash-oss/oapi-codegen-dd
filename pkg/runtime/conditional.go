@@ -13,6 +13,7 @@ package runtime
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 )
 
 // Conditional represents a JSON Schema if/then/else result.
@@ -154,4 +155,8 @@ func (c *Conditional[T, E]) Validate() error {
 	}
 
 	return nil
+}
+
+func (*Conditional[T, E]) formMembers() []reflect.Type {
+	return []reflect.Type{reflect.TypeFor[T](), reflect.TypeFor[E]()}
 }
