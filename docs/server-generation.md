@@ -590,6 +590,8 @@ func (s *Service) CreateUser(ctx context.Context, opts *CreateUserOpts) (*Create
 
 The `HTTPAdapter` automatically detects typed errors and uses the appropriate status code from your OpenAPI spec.
 
+Union (`oneOf`/`anyOf`) error types get an `Error()` method but no constructor, since a message alone doesn't say which variant to build. For operations that return them, the adapter reports parse, decode, and validation failures as `OapiHandlerError`.
+
 ## Examples
 
 Complete examples for each framework are available in the repository:

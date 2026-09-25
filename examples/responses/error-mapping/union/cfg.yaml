@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../../configuration-schema.json
+package: gen
+generate:
+  client: true
+error-mapping:
+  WidgetError: message
+  OrderError: message
+  CartError: error.message
+  # Broken on purpose to show the generation-time warning: NotFound is a union variant, not an error response type.
+  NotFound: message
