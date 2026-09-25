@@ -11,7 +11,6 @@
 package codegen
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -21,12 +20,6 @@ import (
 
 // unknownErrorReturn is the Error() statement used when a mapped value is absent at runtime.
 const unknownErrorReturn = `return "unknown error"`
-
-var (
-	errNoErrorMappingPath    = errors.New("no error-mapping path")
-	errUnionVariantUnknown   = errors.New("its oneOf/anyOf union has more than two variants and no discriminator, so the decoded variant is unknown")
-	errNoUnionVariantHasPath = errors.New("neither does any variant of its oneOf/anyOf union")
-)
 
 // errorPathSegment represents a parsed segment of an error mapping path.
 type errorPathSegment struct {
