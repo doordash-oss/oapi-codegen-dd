@@ -180,14 +180,22 @@ func typeFormString(t reflect.Type, s string, depth int) any {
 	return s
 }
 
-// typeFormUnion types v for the first member it decodes into, and the union's own fields over that.
+// typeFormUnion types v for the first member it decodes into and validates as, else the first it decodes into, and the union's own fields over that.
 func typeFormUnion(shape *formShape, v any, depth int) any {
-	var typed any
+	var typed, fallback any
 	for _, member := range shape.members {
-		if candidate := typeFormValue(member, v, depth+1); decodesAs(member, candidate) {
+		candidate := typeFormValue(member, v, depth+1)
+		decodes, valid := decodesAs(member, candidate)
+		if decodes && valid {
 			typed = candidate
 			break
 		}
+		if decodes && fallback == nil {
+			fallback = candidate
+		}
+	}
+	if typed == nil {
+		typed = fallback
 	}
 	if typed == nil {
 		typed = guessFormValue(v)
@@ -205,12 +213,20 @@ func typeFormUnion(shape *formShape, v any, depth int) any {
 	return typed
 }
 
-func decodesAs(t reflect.Type, v any) bool {
+// decodesAs reports whether v decodes into t, and whether the result passes t's Validate if it has one.
+func decodesAs(t reflect.Type, v any) (decodes, valid bool) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		return false
+		return false, false
 	}
-	return json.Unmarshal(b, reflect.New(t).Interface()) == nil
+	target := reflect.New(t).Interface()
+	if json.Unmarshal(b, target) != nil {
+		return false, false
+	}
+	if validator, ok := target.(Validator); ok {
+		return true, validator.Validate() == nil
+	}
+	return true, true
 }
 
 func formShapeOf(t reflect.Type) *formShape {

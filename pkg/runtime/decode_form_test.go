@@ -13,6 +13,7 @@ package runtime
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -250,6 +251,29 @@ func (f *formOddAccessors) AsTwo() (string, string)      { return "", "" }
 func (f *formOddAccessors) UnmarshalJSON(b []byte) error { return f.union.UnmarshalJSON(b) }
 func (f *formOddAccessors) Marshal() json.RawMessage     { return f.union }
 
+// formEmail and formPhone decode from any object; only validation tells them apart.
+type formEmail struct {
+	Email string `json:"email"`
+}
+
+func (e formEmail) Validate() error {
+	if !strings.Contains(e.Email, "@") {
+		return assert.AnError
+	}
+	return nil
+}
+
+type formPhone struct {
+	Phone string `json:"phone"`
+}
+
+func (p formPhone) Validate() error {
+	if p.Phone == "" {
+		return assert.AnError
+	}
+	return nil
+}
+
 func TestUnmarshalForm(t *testing.T) {
 	decode := func(t *testing.T, form string) formBody {
 		t.Helper()
@@ -371,6 +395,16 @@ func TestTypeFormValue(t *testing.T) {
 	t.Run("a union no member fits is guessed", func(t *testing.T) {
 		assert.Equal(t, []any{int64(1)}, typeFormValue(reflect.TypeFor[Either[int64, bool]](), []any{"1"}, 0))
 	})
+
+	t.Run("a union takes the member that validates", func(t *testing.T) {
+		typed := typeFormValue(reflect.TypeFor[Either[formEmail, formPhone]](), map[string]any{"phone": "4155551234"}, 0)
+		assert.Equal(t, map[string]any{"phone": "4155551234"}, typed)
+	})
+
+	t.Run("a union no member validates takes the first it decodes into", func(t *testing.T) {
+		typed := typeFormValue(reflect.TypeFor[Either[formEmail, formPhone]](), map[string]any{"email": "123"}, 0)
+		assert.Equal(t, map[string]any{"email": "123"}, typed)
+	})
 }
 
 func TestFormShapeOf(t *testing.T) {
@@ -431,7 +465,17 @@ func TestFormShapeOf(t *testing.T) {
 }
 
 func TestDecodesAs(t *testing.T) {
-	assert.True(t, decodesAs(reflect.TypeFor[int64](), int64(1)))
-	assert.False(t, decodesAs(reflect.TypeFor[int64](), "x"))
-	assert.False(t, decodesAs(reflect.TypeFor[int64](), make(chan int)))
+	decodes, valid := decodesAs(reflect.TypeFor[int64](), int64(1))
+	assert.True(t, decodes)
+	assert.True(t, valid)
+
+	decodes, _ = decodesAs(reflect.TypeFor[int64](), "x")
+	assert.False(t, decodes)
+
+	decodes, _ = decodesAs(reflect.TypeFor[int64](), make(chan int))
+	assert.False(t, decodes)
+
+	decodes, valid = decodesAs(reflect.TypeFor[formPhone](), map[string]any{})
+	assert.True(t, decodes)
+	assert.False(t, valid)
 }
