@@ -161,6 +161,10 @@ func (t *Either[A, B]) Validate() error {
 	return nil
 }
 
+func (*Either[A, B]) formMembers() []reflect.Type {
+	return []reflect.Type{reflect.TypeFor[A](), reflect.TypeFor[B]()}
+}
+
 type JSONNonZero interface {
 	JSONNonZero() bool
 }
@@ -185,19 +189,6 @@ func isNonZero[T any](v T) bool {
 		return x
 	case string:
 		return x != ""
-	case int, int8, int16, int32, int64:
-		return x != 0
-	case uint, uint8, uint16, uint32, uint64, uintptr:
-		return x != 0
-	case float32, float64:
-		return x != 0
-
-	// pointers to common primitives
-	case *bool, *string,
-		*int, *int8, *int16, *int32, *int64,
-		*uint, *uint8, *uint16, *uint32, *uint64, *uintptr,
-		*float32, *float64:
-		return x != nil
 
 	// common “any”-shaped collections
 	case []byte:
@@ -208,6 +199,7 @@ func isNonZero[T any](v T) bool {
 		return len(x) > 0
 
 	default:
+		// Numbers and pointers too: a multi-type case would leave x an any, where x != 0 only matches int(0).
 		return !reflect.ValueOf(v).IsZero()
 	}
 }

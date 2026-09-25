@@ -79,29 +79,29 @@ func ConvertFormFields(resp []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error parsing form-encoded body: %w", err)
 	}
 
-	data := decodeFormData(values)
+	data := decodeFormData(values, convertFormStringValue)
 	return json.Marshal(data)
 }
 
 // decodeFormData decodes URL-encoded form data into a nested map structure.
 // It handles deepObject encoding (e.g., "obj[key][nested]=value") and converts
-// string values to appropriate types (bool, number, etc.).
-func decodeFormData(values url.Values) map[string]any {
+// each string value with conv.
+func decodeFormData(values url.Values, conv func(string) any) map[string]any {
 	result := make(map[string]any)
 
 	for key, vals := range values {
 		// Check if this is a deepObject encoded key (contains brackets)
 		if strings.Contains(key, "[") {
-			setNestedValue(result, key, vals)
+			setNestedValue(result, key, vals, conv)
 		} else {
 			// Simple key-value pair
 			if len(vals) == 1 {
-				result[key] = convertFormStringValue(vals[0])
+				result[key] = conv(vals[0])
 			} else {
 				// Multiple values for the same key (array)
 				converted := make([]any, len(vals))
 				for i, v := range vals {
-					converted[i] = convertFormStringValue(v)
+					converted[i] = conv(v)
 				}
 				result[key] = converted
 			}
@@ -113,7 +113,7 @@ func decodeFormData(values url.Values) map[string]any {
 
 // setNestedValue sets a value in a nested map structure based on a deepObject encoded key.
 // Example: "obj[key][0][nested]=value" sets result["obj"]["key"][0]["nested"] = value
-func setNestedValue(result map[string]any, key string, values []string) {
+func setNestedValue(result map[string]any, key string, values []string, conv func(string) any) {
 	// Parse the key to extract the path
 	// Example: "flow_data[subscription_update_confirm][items][0][id]"
 	// becomes ["flow_data", "subscription_update_confirm", "items", "0", "id"]
@@ -132,7 +132,7 @@ func setNestedValue(result map[string]any, key string, values []string) {
 
 		idx := mustFormAtoi(parts[1])
 		arr = ensureArraySize(arr, idx, false)
-		arr[idx] = convertFormValues(values)
+		arr[idx] = convertFormValues(values, conv)
 		result[parts[0]] = arr
 		return
 	}
@@ -161,7 +161,7 @@ func setNestedValue(result map[string]any, key string, values []string) {
 			if i+2 == len(parts) {
 				// This is the final value - just set it in the array
 				arr = ensureArraySize(arr, idx, false)
-				arr[idx] = convertFormValues(values)
+				arr[idx] = convertFormValues(values, conv)
 				current[part] = arr
 				return
 			}
@@ -191,7 +191,7 @@ func setNestedValue(result map[string]any, key string, values []string) {
 
 	// Set the final value
 	lastPart := parts[len(parts)-1]
-	current[lastPart] = convertFormValues(values)
+	current[lastPart] = convertFormValues(values, conv)
 }
 
 // ensureArraySize grows the array to accommodate the given index.
@@ -208,15 +208,15 @@ func ensureArraySize(arr []any, idx int, useMap bool) []any {
 	return arr
 }
 
-// convertFormValues converts form values to appropriate types.
+// convertFormValues converts form values with conv.
 // Returns a single value if there's only one, or a slice if there are multiple.
-func convertFormValues(values []string) any {
+func convertFormValues(values []string, conv func(string) any) any {
 	if len(values) == 1 {
-		return convertFormStringValue(values[0])
+		return conv(values[0])
 	}
 	converted := make([]any, len(values))
 	for i, v := range values {
-		converted[i] = convertFormStringValue(v)
+		converted[i] = conv(v)
 	}
 	return converted
 }

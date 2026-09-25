@@ -11,10 +11,18 @@
 package runtime
 
 import (
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+type nonZeroHook bool
+
+func (h nonZeroHook) JSONNonZero() bool {
+	return bool(h)
+}
 
 func TestNewEitherFromA(t *testing.T) {
 	res := NewEitherFromA[string, int]("test")
@@ -42,6 +50,9 @@ func TestEither_Value(t *testing.T) {
 
 	res = NewEitherFromB[string, int](10)
 	assert.Equal(t, 10, res.Value())
+
+	res = Either[string, int]{}
+	assert.Nil(t, res.Value())
 }
 
 func TestEither_Unmarshal(t *testing.T) {
@@ -59,6 +70,11 @@ func TestEither_Unmarshal(t *testing.T) {
 			name:     "int",
 			input:    []byte(`10`),
 			expected: NewEitherFromB[string, int](10),
+		},
+		{
+			name:     "null",
+			input:    []byte(`null`),
+			expected: Either[string, int]{},
 		},
 	}
 
@@ -99,6 +115,11 @@ func TestEither_MarshalJSON_with_wrapper(t *testing.T) {
 			name:     "name",
 			input:    NameOrID{Either: NewEitherFromB[IDWrapper, NameWrapper](NameWrapper{Name: "test"})},
 			expected: []byte(`{"name":"test"}`),
+		},
+		{
+			name:     "unset",
+			input:    NameOrID{},
+			expected: []byte(`null`),
 		},
 	}
 
@@ -185,6 +206,21 @@ func TestEither_Validate(t *testing.T) {
 
 		err := either.Validate()
 		assert.NoError(t, err) // Should pass because only A is validated
+	})
+
+	t.Run("fails validation for invalid B variant", func(t *testing.T) {
+		either := NewEitherFromB[string, ValidatableStruct](ValidatableStruct{})
+		assert.Error(t, either.Validate())
+	})
+
+	t.Run("passes A variant that is not a Validator", func(t *testing.T) {
+		either := NewEitherFromA[string, ValidatableStruct]("test")
+		assert.NoError(t, either.Validate())
+	})
+
+	t.Run("returns nil when neither is active", func(t *testing.T) {
+		var either Either[ValidatableStruct, string]
+		assert.NoError(t, either.Validate())
 	})
 }
 
@@ -357,4 +393,51 @@ func TestEither_UnmarshalJSON_ValidationOnlyDisambiguation(t *testing.T) {
 		assert.Equal(t, "", either.B.Email)
 		assert.Equal(t, 28, either.B.Age)
 	})
+
+	t.Run("prefers A when only A validates", func(t *testing.T) {
+		data := []byte(`{"name":"","email":"","age":25}`)
+		var either Either[UpdateUserRequest, CreateUserRequest]
+
+		err := either.UnmarshalJSON(data)
+		assert.NoError(t, err)
+		assert.True(t, either.IsA(), "should choose UpdateUserRequest because it validates")
+	})
+}
+
+func TestEither_UnmarshalJSON_FailsBoth(t *testing.T) {
+	var either Either[string, int]
+	assert.ErrorIs(t, either.UnmarshalJSON([]byte(`[1,2,3]`)), ErrFailedToUnmarshalAsAOrB)
+}
+
+func TestEither_FormMembers(t *testing.T) {
+	assert.Equal(t, []reflect.Type{reflect.TypeFor[int64](), reflect.TypeFor[string]()}, new(Either[int64, string]).formMembers())
+}
+
+func TestIsNonZero(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    any
+		expected bool
+	}{
+		{"nil", nil, false},
+		{"JSONNonZero hook", nonZeroHook(true), true},
+		{"IsZero hook", time.Time{}, false},
+		{"bool", true, true},
+		{"string", "", false},
+		{"int", int64(0), false},
+		{"uint", uint(0), false},
+		{"float", 0.0, false},
+		{"nil pointer", (*int)(nil), false},
+		{"pointer", new(int), true},
+		{"bytes", []byte{}, false},
+		{"slice", []any{1}, true},
+		{"map", map[string]any{}, false},
+		{"struct", struct{ A int }{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isNonZero(tt.value))
+		})
+	}
 }
