@@ -6,5 +6,7 @@ error-mapping:
   WidgetError: message
   OrderError: message
   CartError: error.message
+  # An inline error schema is named after its operation: <OperationId>ErrorResponse.
+  GetPaymentErrorResponse: message
   # Broken on purpose to show the generation-time warning: NotFound is a union variant, not an error response type.
   NotFound: message

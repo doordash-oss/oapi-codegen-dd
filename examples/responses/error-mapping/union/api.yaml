@@ -72,6 +72,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/CartError"
 
+  /payments/{id}:
+    get:
+      operationId: getPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "422":
+          description: Inline anyOf with a discriminator
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: "#/components/schemas/NotFound"
+                  - $ref: "#/components/schemas/Conflict"
+                  - $ref: "#/components/schemas/Gone"
+                discriminator:
+                  propertyName: _tag
+                  mapping:
+                    not_found: "#/components/schemas/NotFound"
+                    conflict: "#/components/schemas/Conflict"
+                    gone: "#/components/schemas/Gone"
+
 components:
   schemas:
     Item:

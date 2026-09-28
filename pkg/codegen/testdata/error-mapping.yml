@@ -135,6 +135,51 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/NestedError'}
+  /tri:
+    get:
+      operationId: getTri
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '409':
+          description: inline anyOf error with more than two variants and a discriminator
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/NotFound'
+                  - $ref: '#/components/schemas/Conflict'
+                  - $ref: '#/components/schemas/Gone'
+                discriminator:
+                  propertyName: _tag
+                  mapping:
+                    not_found: '#/components/schemas/NotFound'
+                    conflict: '#/components/schemas/Conflict'
+                    gone: '#/components/schemas/Gone'
+  /dup:
+    get:
+      operationId: getDup
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Gadget'}
+        '409':
+          description: inline anyOf error that lists one variant twice, with a discriminator
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/NotFound'
+                  - $ref: '#/components/schemas/NotFound'
+                discriminator:
+                  propertyName: _tag
+                  mapping:
+                    not_found: '#/components/schemas/NotFound'
 components:
   schemas:
     Gadget:
