@@ -983,94 +983,9 @@ components:
 }
 
 func TestAnyOfDiscriminator(t *testing.T) {
-	srcDoc, err := LoadDocumentFromContents([]byte(`
-openapi: 3.1.0
-info: {title: Test, version: 1.0.0}
-paths:
-  /refs:
-    get:
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                anyOf:
-                  - $ref: '#/components/schemas/A'
-                  - $ref: '#/components/schemas/B'
-                  - $ref: '#/components/schemas/C'
-                discriminator:
-                  propertyName: kind
-                  mapping:
-                    a: '#/components/schemas/A'
-                    b: '#/components/schemas/B'
-                    c: '#/components/schemas/C'
-  /with-one-of:
-    get:
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                anyOf:
-                  - $ref: '#/components/schemas/A'
-                  - $ref: '#/components/schemas/B'
-                oneOf:
-                  - $ref: '#/components/schemas/B'
-                  - $ref: '#/components/schemas/C'
-                discriminator:
-                  propertyName: kind
-  /untagged-inline:
-    get:
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                anyOf:
-                  - type: object
-                    properties:
-                      kind: {type: string}
-                      size: {type: integer}
-                  - type: object
-                    properties:
-                      kind: {type: string}
-                      name: {type: string}
-                discriminator:
-                  propertyName: kind
-                  mapping:
-                    a: '#/components/schemas/A'
-                    b: '#/components/schemas/B'
-  /single:
-    get:
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                anyOf:
-                  - $ref: '#/components/schemas/A'
-                  - type: 'null'
-                discriminator:
-                  propertyName: kind
-components:
-  schemas:
-    A:
-      type: object
-      properties:
-        kind: {type: string, enum: [a]}
-    B:
-      type: object
-      properties:
-        kind: {type: string, enum: [b]}
-    C:
-      type: object
-      properties:
-        kind: {type: string, enum: [c]}
-`))
+	contents, err := os.ReadFile("testdata/anyof-discriminator.yml")
+	require.NoError(t, err)
+	srcDoc, err := LoadDocumentFromContents(contents)
 	require.NoError(t, err)
 	v3Model, err := srcDoc.BuildV3Model()
 	require.NoError(t, err)
