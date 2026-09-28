@@ -16,8 +16,9 @@ limitations under the License.
 {{define "server-main"}}
 {{- $config := .Config -}}
 {{- $server := .ServerOptions -}}
-{{- /* Types prefix: when models-package-alias is set, types are in a separate package */ -}}
-{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
+{{- /* Types prefix: when the handler is generated into its own package, seen here via
+       generate.handler.handler-package-alias */ -}}
+{{- $modelsAlias := $config.Generate.Handler.HandlerPackageAlias -}}
 {{- $typesPrefix := "handler." -}}
 {{- if $modelsAlias -}}
 {{- $typesPrefix = printf "%s." $modelsAlias -}}

@@ -15,7 +15,7 @@ limitations under the License.
 */}}
 {{- define "decode-error" -}}
 {{- if .HasTypedError }}
-        a.errHandler.HandleError(w, r, {{ .Op.Response.Error.StatusCode }}, New{{ .ErrorTypeName }}(err.Error()))
+        a.errHandler.HandleError(w, r, {{ .Op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ .ErrorTypeName }}(err.Error()))
 {{- else }}
         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
             Kind:        OapiErrorKindDecode,
@@ -31,7 +31,8 @@ limitations under the License.
 {{- $validateRequest := $config.Generate.Handler.Validation.Request -}}
 {{- $validateResponse := $config.Generate.Handler.Validation.Response -}}
 {{- $multipartMaxMemory := $config.Generate.Handler.MultipartMaxMemory -}}
-{{- /* Adapter is always generated in the same package as models, so no prefix needed */ -}}
+{{- /* Model type references below go through modelType/modelsPrefix, which are
+       no-ops unless generate.handler.models-package is set. */ -}}
 {{- template "handler-header" $ }}
 
 // {{ $serviceName }}Interface defines the service interface for business logic.
@@ -78,7 +79,7 @@ func NewHTTPAdapter(svc {{ $serviceName }}Interface, errHandler OapiErrorHandler
     // Validate request
     if err := opts.Validate(); err != nil {
         {{- if $hasTypedError }}
-        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
         {{- else }}
         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
             Kind:        OapiErrorKindValidation,
@@ -102,7 +103,7 @@ if err != nil {
     {{- end }}
     {{- if $op.Response.Error }}
         {{- if not (or $op.Response.Error.Schema.DefineViaAlias $op.Response.Error.Schema.IsAnyType) }}
-            var errResp *{{ $op.Response.Error.ResponseName }}
+            var errResp *{{ modelType $op.Response.Error.ResponseName }}
             if errors.As(err, &errResp) {
                 code = {{ $op.Response.Error.StatusCode }}
             }
@@ -135,7 +136,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 
 {{ if $op.PathParams }}
     // Parse path parameters
-    pathParams := &{{ $op.PathParams.Name }}{}
+    pathParams := &{{ modelType $op.PathParams.Name }}{}
     {{- range $op.PathParams.Schema.Properties }}
         {{- $paramVar := printf "pathParam%s" .GoName }}
         {{ $paramVar }}Str := {{template "get-path-param" .JsonFieldName}}
@@ -148,17 +149,17 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
         {{/* String-based enum type - use type conversion */}}
             {{- if .IsPointerType }}
-        {{ $paramVar }} := {{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+        {{ $paramVar }} := {{ modelType .Schema.TypeDecl }}({{ $paramVar }}Str)
         pathParams.{{ .GoName }} = &{{ $paramVar }}
             {{- else }}
-        pathParams.{{ .GoName }} = {{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+        pathParams.{{ .GoName }} = {{ modelType .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- end }}
         {{- else }}
             {{/* Other types (int, uuid.UUID, etc.) - use ParseString with format hint */}}
-            {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
+            {{ $paramVar }}, err := runtime.ParseString[{{ modelType .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
             if err != nil {
                 {{- if $hasTypedError }}
-                a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                 {{- else }}
                 a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                     Kind:          OapiErrorKindParse,
@@ -182,17 +183,17 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 {{- end }}
 {{- if $op.Query }}
     // Parse query parameters
-    queryParams := &{{ $op.Query.Name }}{}
+    queryParams := &{{ modelType $op.Query.Name }}{}
     query := r.URL.Query()
     {{- range $op.Query.Params }}
         {{- $paramVar := printf "queryParam%s" .GoName }}
         {{- if .IsJson }}
             {{/* JSON-encoded query param: parse as JSON */}}
             if {{ $paramVar }}Str := query.Get("{{ escapeGoString .ParamName }}"); {{ $paramVar }}Str != "" {
-                var {{ $paramVar }} {{ .Schema.TypeDecl }}
+                var {{ $paramVar }} {{ modelType .Schema.TypeDecl }}
                 if err := json.Unmarshal([]byte({{ $paramVar }}Str), &{{ $paramVar }}); err != nil {
                     {{- if $hasTypedError }}
-                    a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(fmt.Sprintf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %v", err)))
+                    a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(fmt.Sprintf("invalid JSON for parameter {{ escapeGoString .ParamName }}: %v", err)))
                     {{- else }}
                     a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                         Kind:        OapiErrorKindDecode,
@@ -220,10 +221,10 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         result[i] = &values[i]
                     }
                     {{- else }}
-                    parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
+                    parsed, err := runtime.ParseStringSlice[{{ modelType .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
                     if err != nil {
                         {{- if $hasTypedError }}
-                        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                         {{- else }}
                         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                             Kind:          OapiErrorKindParse,
@@ -236,7 +237,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         {{- end }}
                         return
                     }
-                    result := make({{ .Schema.GoType }}, len(parsed))
+                    result := make({{ modelType .Schema.GoType }}, len(parsed))
                     for i := range parsed {
                         result[i] = &parsed[i]
                     }
@@ -246,16 +247,16 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     queryParams.{{ .GoName }} = values
                 {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
                     {{/* String-based enum array - convert each element */}}
-                    result := make([]{{ .Schema.ArrayType.TypeDecl }}, len(values))
+                    result := make([]{{ modelType .Schema.ArrayType.TypeDecl }}, len(values))
                     for i, v := range values {
-                        result[i] = {{ .Schema.ArrayType.TypeDecl }}(v)
+                        result[i] = {{ modelType .Schema.ArrayType.TypeDecl }}(v)
                     }
                     queryParams.{{ .GoName }} = result
                 {{- else }}
-                    parsed, err := runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
+                    parsed, err := runtime.ParseStringSlice[{{ modelType .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
                     if err != nil {
                         {{- if $hasTypedError }}
-                        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                         {{- else }}
                         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                             Kind:          OapiErrorKindParse,
@@ -277,12 +278,12 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 {{ $paramVar }} := {{ $paramVar }}Str
             {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
                 {{/* String-based enum type - use type conversion */}}
-                {{ $paramVar }} := {{ .Schema.TypeDecl }}({{ $paramVar }}Str)
+                {{ $paramVar }} := {{ modelType .Schema.TypeDecl }}({{ $paramVar }}Str)
             {{- else }}
-                {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
+                {{ $paramVar }}, err := runtime.ParseString[{{ modelType .Schema.TypeDecl }}]({{ $paramVar }}Str{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
                 if err != nil {
                     {{- if $hasTypedError }}
-                    a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                    a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                     {{- else }}
                     a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                         Kind:          OapiErrorKindParse,
@@ -309,7 +310,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
 {{- if $op.Header }}
 
     // Parse header parameters
-    headerParams := &{{ $op.Header.TypeDef.Name }}{}
+    headerParams := &{{ modelType $op.Header.TypeDef.Name }}{}
     headers := r.Header
     {{- range $op.Header.Params }}
     {{- $paramVar := printf "headerParam%s" .GoName }}
@@ -318,12 +319,12 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{ $paramVar }} := headerValues[0]
         {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
             {{/* String-based enum type - use type conversion */}}
-            {{ $paramVar }} := {{ .Schema.TypeDecl }}(headerValues[0])
+            {{ $paramVar }} := {{ modelType .Schema.TypeDecl }}(headerValues[0])
         {{- else }}
-            {{ $paramVar }}, err := runtime.ParseString[{{ .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
+            {{ $paramVar }}, err := runtime.ParseString[{{ modelType .Schema.TypeDecl }}](headerValues[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }})
             if err != nil {
                 {{- if $hasTypedError }}
-                a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                 {{- else }}
                 a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                     Kind:          OapiErrorKindParse,
@@ -350,7 +351,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     // Parse request body
     defer r.Body.Close()
     {{- if or (eq $op.Body.ContentType "application/json") (hasSuffix $op.Body.ContentType "+json") }}
-    var body {{ $op.Body.Name }}
+    var body {{ modelType $op.Body.Name }}
     {{- if $op.Body.Required }}
     if err := a.jsonBodyDecoder(r.Body, &body); err != nil {
         {{- template "decode-error" dict "Op" $op "HasTypedError" $hasTypedError "ErrorTypeName" $errorTypeName }}
@@ -371,11 +372,11 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     }
     {{- end }}
     {{- else if eq $op.Body.ContentType "application/x-www-form-urlencoded" }}
-    var body {{ $op.Body.Name }}
+    var body {{ modelType $op.Body.Name }}
     formBytes, err := io.ReadAll(r.Body)
     if err != nil {
         {{- if $hasTypedError }}
-        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
         {{- else }}
         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
             Kind:        OapiErrorKindDecode,
@@ -388,7 +389,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
     }
     if err := runtime.UnmarshalForm(formBytes, &body); err != nil {
         {{- if $hasTypedError }}
-        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
         {{- else }}
         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
             Kind:        OapiErrorKindDecode,
@@ -405,7 +406,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             bodyBytes, err := io.ReadAll(r.Body)
             if err != nil {
                 {{- if $hasTypedError }}
-                a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                 {{- else }}
                 a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                     Kind:        OapiErrorKindDecode,
@@ -416,7 +417,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 {{- end }}
                 return
             }
-            body := {{ $op.Body.Name }}(string(bodyBytes))
+            body := {{ modelType $op.Body.Name }}(string(bodyBytes))
             opts.Body = &body
         {{- else }}
         // text/plain body with non-string schema - skip body parsing
@@ -426,7 +427,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
         r.Body = http.MaxBytesReader(w, r.Body, {{ $multipartMaxMemory }} << 20)
         if err := r.ParseMultipartForm({{ $multipartMaxMemory }} << 20); err != nil { // #nosec G120 -- body is bounded by MaxBytesReader above
             {{- if $hasTypedError }}
-            a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+            a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
             {{- else }}
             a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                 Kind:        OapiErrorKindDecode,
@@ -437,7 +438,7 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
             {{- end }}
             return
         }
-        var body {{ $op.Body.Name }}
+        var body {{ modelType $op.Body.Name }}
         {{- range $op.Body.Schema.Properties }}
             {{- if .IsFile }}
                 if fileHeaders := r.MultipartForm.File["{{ .JsonFieldName }}"]; len(fileHeaders) > 0 {
@@ -452,20 +453,20 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
                     {{/* String-based enum array - convert each element */}}
                     {
-                        result := make([]{{ .Schema.ArrayType.TypeDecl }}, len(values))
+                        result := make([]{{ modelType .Schema.ArrayType.TypeDecl }}, len(values))
                         for i, v := range values {
-                            result[i] = {{ .Schema.ArrayType.TypeDecl }}(v)
+                            result[i] = {{ modelType .Schema.ArrayType.TypeDecl }}(v)
                         }
                         body.{{ .GoName }} = result
                     }
                     {{- else }}
-                    body.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
+                    body.{{ .GoName }}, _ = runtime.ParseStringSlice[{{ modelType .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
                     {{- end }}
                     {{- else if or (hasPrefix .Schema.TypeDecl "map[") .Schema.HasAdditionalProperties }}
                     {{/* Complex type (struct, map) - parse as JSON */}}
                     if err := json.Unmarshal([]byte(values[0]), &body.{{ .GoName }}); err != nil {
                         {{- if $hasTypedError }}
-                        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, New{{ $errorTypeName }}(err.Error()))
+                        a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
                         {{- else }}
                         a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
                             Kind:        OapiErrorKindDecode,
@@ -486,13 +487,13 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                     {{- else if and (eq .Schema.GoType "string") (ne .Schema.TypeDecl "string") }}
                     {{/* String-based enum type - use type conversion */}}
                     {{- if .IsPointerType }}
-                    { v := {{ .Schema.TypeDecl }}(values[0]); body.{{ .GoName }} = &v }
+                    { v := {{ modelType .Schema.TypeDecl }}(values[0]); body.{{ .GoName }} = &v }
                     {{- else }}
-                    body.{{ .GoName }} = {{ .Schema.TypeDecl }}(values[0])
+                    body.{{ .GoName }} = {{ modelType .Schema.TypeDecl }}(values[0])
                     {{- end }}
                     {{- else }}
                     {{/* Primitive types (bool, int, int64, float64, uuid.UUID, etc.) - use ParseString */}}
-                    if v, err := runtime.ParseString[{{ .Schema.TypeDecl }}](values[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }}); err == nil {
+                    if v, err := runtime.ParseString[{{ modelType .Schema.TypeDecl }}](values[0]{{- if .Schema.Format }}, "{{ escapeGoString .Schema.Format }}"{{- end }}); err == nil {
                         body.{{ .GoName }}{{ if .IsPointerType }} = &v{{ else }} = v{{ end }}
                     }
                     {{- end }}

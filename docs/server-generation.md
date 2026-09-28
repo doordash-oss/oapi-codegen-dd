@@ -122,17 +122,70 @@ generate:
     name: "UserAPI"  # Generates UserAPIInterface
 ```
 
-### `generate.handler.models-package-alias`
+### `generate.handler.models-package`
 
-When models are in a separate package, prefix types with this alias.
+When models are generated separately (`generate.models: false`) into a
+different package from the handler, this tells the handler where to find
+them. Every model type reference in the generated handler is qualified with
+`alias`, and its import is added automatically - no `additional-imports`
+entry needed.
 
 ```yaml
 generate:
-  models: false  # Don't generate models here
+  models: false  # models were generated separately, see below
   handler:
     kind: chi
-    models-package-alias: types  # Use types.User instead of User
+    models-package:
+      path: example.com/myapp/models    # Go import path
+      alias: models                     # optional, defaults to "models"
 ```
+
+```yaml
+# models.cfg.yaml - run this first
+package: models
+output: {directory: models, filename: models.gen.go}
+generate: {models: true}
+```
+
+```yaml
+# server.cfg.yaml - run this second
+package: server
+output: {directory: server, filename: server.gen.go}
+generate:
+  models: false
+  handler:
+    kind: chi
+    models-package: {path: example.com/myapp/models}
+    service: {}
+```
+
+Both runs must be given the same spec, the same `filter`, and the same
+`error-mapping` (if any) - the handler run needs to compute the exact same
+type names the models run produced, without generating them itself.
+
+### `generate.handler.handler-package-alias`
+
+Unrelated to models-package above: this is for when `service.go` (the
+scaffold) is generated into its own package, separate from the handler code
+itself. It qualifies handler-owned symbols like `ServiceInterface` and
+`<Op>ServiceRequestOptions` as seen from `service.go`.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    handler-package-alias: server  # service.go references server.ServiceInterface
+    output:
+      directory: service
+      package: service  # service.go lives here, handler code elsewhere
+    service: {}
+```
+
+!!! note "Renamed from `models-package-alias`"
+    This option used to be called `models-package-alias`, which was
+    misleading - it never referred to a package containing models, only to
+    the package holding the generated handler. `models-package-alias` still
+    works as a deprecated fallback.
 
 ### `generate.handler.validation`
 

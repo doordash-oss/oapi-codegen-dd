@@ -294,9 +294,18 @@
           "enum": ["beego", "chi", "echo", "echo-v5", "fasthttp", "fiber", "gin", "goframe", "go-zero", "gorilla-mux", "hertz", "iris", "kratos", "std-http"],
           "description": "Router/framework to generate for. Required."
         },
+        "models-package": {
+          "$ref": "#/definitions/ModelsPackage",
+          "description": "Package that model types live in, when generated separately from the handler (generate.models: false) into a different package. Model type references in the generated handler are qualified with its alias, and its import is added automatically. Requires generate.models: false."
+        },
+        "handler-package-alias": {
+          "type": "string",
+          "description": "Package alias used to reference the generated handler code from the service scaffold (service.go), when the scaffold is generated into its own package. Example: 'server' produces 'server.ServiceInterface' in service.go. Does not affect model type references - use models-package for that."
+        },
         "models-package-alias": {
           "type": "string",
-          "description": "Package alias to prefix model types with. Used when models are generated separately (generate.models: false). Example: 'types' will generate 'types.User' instead of 'User'."
+          "description": "Deprecated: use handler-package-alias. Despite the name, this is not the package models live in - it's the package the generated handler itself is in, as seen from service.go. Kept as a fallback: if handler-package-alias is unset, this value is used.",
+          "deprecated": true
         },
         "multipart-max-memory": {
           "type": "integer",
@@ -324,6 +333,22 @@
         }
       },
       "required": ["kind"]
+    },
+    "ModelsPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Package that model types are generated into, for handler code that is generated separately and needs to reference them.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Go import path of the models package. Required."
+        },
+        "alias": {
+          "type": "string",
+          "description": "Identifier used to qualify model type references in the generated handler. Defaults to the last path segment of path."
+        }
+      },
+      "required": ["path"]
     },
     "ScaffoldOutput": {
       "type": "object",

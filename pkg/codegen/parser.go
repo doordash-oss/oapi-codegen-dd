@@ -186,6 +186,16 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 	withHeader := !useSingleFile
 	typeSchemaMap := buildTypeSchemaMap(p.ctx)
 
+	// Bind the real models-package qualifier now that typeSchemaMap - the
+	// set of type names the models run would emit for this spec - is known.
+	// A nil/empty alias keeps modelType/modelsPrefix as no-ops, so output is
+	// unchanged when models-package isn't configured.
+	var modelsPackageAlias string
+	if p.cfg.Generate.Handler != nil && p.cfg.Generate.Handler.ModelsPackage != nil {
+		modelsPackageAlias = p.cfg.Generate.Handler.ModelsPackage.Alias
+	}
+	p.tpl.Funcs(newModelsQualifier(modelsPackageAlias, typeSchemaMap).funcMap())
+
 	// Only generate models if Models is not explicitly false
 	shouldGenerateModels := p.cfg.Generate == nil || p.cfg.Generate.Models == nil || *p.cfg.Generate.Models
 	if useSingleFile {
