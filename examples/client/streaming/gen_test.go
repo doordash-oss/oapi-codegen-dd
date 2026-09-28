@@ -14,19 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// httpClientAdapter adapts http.Client to runtime.HttpRequestDoer.
-type httpClientAdapter struct {
-	client *http.Client
-}
-
-func (a *httpClientAdapter) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return a.client.Do(req)
-}
-
 // newClient points a generated client at srv.
 func newClient(t *testing.T, srv *httptest.Server) *Client {
 	t.Helper()
-	client, err := NewDefaultClient(srv.URL, runtime.WithHTTPClient(&httpClientAdapter{client: srv.Client()}))
+	client, err := NewDefaultClient(srv.URL, runtime.WithStdHTTPClient(srv.Client()))
 	require.NoError(t, err)
 	return client
 }

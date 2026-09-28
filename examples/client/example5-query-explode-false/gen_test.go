@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// httpClientAdapter wraps http.Client to implement runtime.HttpRequestDoer
-type httpClientAdapter struct {
-	client *http.Client
-}
-
-func (a *httpClientAdapter) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return a.client.Do(req.WithContext(ctx))
-}
-
 func TestQueryExplodeFalse(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -63,8 +54,7 @@ func TestQueryExplodeFalse(t *testing.T) {
 			}))
 			defer server.Close()
 
-			httpClient := &httpClientAdapter{client: server.Client()}
-			apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithHTTPClient(httpClient))
+			apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithStdHTTPClient(server.Client()))
 			require.NoError(t, err)
 
 			client := example5.NewClient(apiClient)

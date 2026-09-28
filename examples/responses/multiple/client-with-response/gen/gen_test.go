@@ -1,7 +1,6 @@
 package gen
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,17 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// httpDoer adapts *http.Client to runtime.HttpRequestDoer (which takes ctx as
-// its first argument).
-type httpDoer struct{ c *http.Client }
-
-func (d httpDoer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
-	return d.c.Do(req)
-}
-
 func newClient(t *testing.T, srv *httptest.Server) *Client {
 	t.Helper()
-	c, err := NewDefaultClient(srv.URL, runtime.WithHTTPClient(httpDoer{srv.Client()}))
+	c, err := NewDefaultClient(srv.URL, runtime.WithStdHTTPClient(srv.Client()))
 	require.NoError(t, err)
 	return c
 }
