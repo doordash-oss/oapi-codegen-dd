@@ -982,6 +982,136 @@ components:
 	})
 }
 
+func TestAnyOfDiscriminator(t *testing.T) {
+	srcDoc, err := LoadDocumentFromContents([]byte(`
+openapi: 3.1.0
+info: {title: Test, version: 1.0.0}
+paths:
+  /refs:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/A'
+                  - $ref: '#/components/schemas/B'
+                  - $ref: '#/components/schemas/C'
+                discriminator:
+                  propertyName: kind
+                  mapping:
+                    a: '#/components/schemas/A'
+                    b: '#/components/schemas/B'
+                    c: '#/components/schemas/C'
+  /with-one-of:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/A'
+                  - $ref: '#/components/schemas/B'
+                oneOf:
+                  - $ref: '#/components/schemas/B'
+                  - $ref: '#/components/schemas/C'
+                discriminator:
+                  propertyName: kind
+  /untagged-inline:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      kind: {type: string}
+                      size: {type: integer}
+                  - type: object
+                    properties:
+                      kind: {type: string}
+                      name: {type: string}
+                discriminator:
+                  propertyName: kind
+                  mapping:
+                    a: '#/components/schemas/A'
+                    b: '#/components/schemas/B'
+  /single:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/A'
+                  - type: 'null'
+                discriminator:
+                  propertyName: kind
+components:
+  schemas:
+    A:
+      type: object
+      properties:
+        kind: {type: string, enum: [a]}
+    B:
+      type: object
+      properties:
+        kind: {type: string, enum: [b]}
+    C:
+      type: object
+      properties:
+        kind: {type: string, enum: [c]}
+`))
+	require.NoError(t, err)
+	v3Model, err := srcDoc.BuildV3Model()
+	require.NoError(t, err)
+
+	// generate returns the response schema under "" and each additional type under its name.
+	generate := func(t *testing.T, path string) map[string]GoSchema {
+		t.Helper()
+		res, err := GenerateGoSchema(getOperationResponse(t, v3Model.Model, path, "get"), ParseOptions{typeTracker: newTypeTracker()}.WithPath([]string{"Res"}))
+		require.NoError(t, err)
+		types := map[string]GoSchema{"": res}
+		for _, td := range res.AdditionalTypes {
+			types[td.Name] = td.Schema
+		}
+		return types
+	}
+
+	t.Run("anyOf takes the discriminator", func(t *testing.T) {
+		union := generate(t, "/refs")["Res_AnyOf"]
+		require.NotNil(t, union.Discriminator)
+		assert.Equal(t, map[string]string{"a": "A", "b": "B", "c": "C"}, union.Discriminator.Mapping)
+	})
+
+	t.Run("a oneOf next to it keeps the discriminator", func(t *testing.T) {
+		types := generate(t, "/with-one-of")
+		assert.Nil(t, types["Res_AnyOf"].Discriminator)
+		assert.NotNil(t, types["Res_OneOf"].Discriminator)
+	})
+
+	t.Run("untagged inline variants keep generating without it", func(t *testing.T) {
+		union := generate(t, "/untagged-inline")["Res_AnyOf"]
+		assert.Len(t, union.UnionElements, 2)
+		assert.Nil(t, union.Discriminator)
+	})
+
+	t.Run("a single variant still collapses to its type", func(t *testing.T) {
+		types := generate(t, "/single")
+		assert.Equal(t, "A", types[""].GoType)
+		assert.NotContains(t, types, "Res_AnyOf")
+	})
+}
+
 func TestIfThenElse(t *testing.T) {
 	contents, err := os.ReadFile("testdata/if-then-else.yml")
 	require.NoError(t, err)

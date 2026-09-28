@@ -597,6 +597,8 @@ error-mapping:
   UpdateClientErrorResponseJSON: arrayField[].code
 ```
 
+Each key names an error response type: the component name when the response references a component, or `<OperationId>ErrorResponse` when the error schema is defined inline in the operation.
+
 When configured, the response type will have:
 
 1. **`Error() string` method** - Returns the value from the specified field path
@@ -678,7 +680,7 @@ func (s WidgetError) Error() string {
 }
 ```
 
-A union with more than two variants needs a `discriminator` so the decoded variant is known; without one, the entry is skipped with a warning. No constructor is generated for union error types, because a message alone doesn't say which variant to build, so generated server handlers use the generic error response for them.
+A union that doesn't have exactly two variants needs a `discriminator` so the decoded variant is known; without one, the entry is skipped with a warning. On an `anyOf`, the discriminator is only used when every variant is a `$ref` or declares its own discriminator value. No constructor is generated for union error types, because a message alone doesn't say which variant to build, so generated server handlers use the generic error response for them.
 
 See [examples/responses/error-mapping/union](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/error-mapping/union){:target="_blank"} for a complete example.
 

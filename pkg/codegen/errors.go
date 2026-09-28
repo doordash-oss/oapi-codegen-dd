@@ -38,6 +38,6 @@ var (
 	ErrInvalidAdditionalTag                      = errors.New("invalid additional tag name: must not be empty or contain spaces, quotes, or colons")
 
 	errNoErrorMappingPath    = errors.New("no error-mapping path")
-	errUnionVariantUnknown   = errors.New("its oneOf/anyOf union has more than two variants and no discriminator, so the decoded variant is unknown")
+	errUnionVariantUnknown   = errors.New("its oneOf/anyOf union has neither exactly two variants nor a discriminator that maps them, so the decoded variant is unknown")
 	errNoUnionVariantHasPath = errors.New("neither does any variant of its oneOf/anyOf union")
 )

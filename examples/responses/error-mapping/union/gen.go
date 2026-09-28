@@ -39,6 +39,8 @@ type ClientInterface interface {
 	GetOrder(ctx context.Context, options *GetOrderRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetOrderResponse, error)
 
 	GetCart(ctx context.Context, options *GetCartRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetCartResponse, error)
+
+	GetPayment(ctx context.Context, options *GetPaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetPaymentResponse, error)
 }
 
 func (c *Client) GetWidget(ctx context.Context, options *GetWidgetRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetWidgetResponse, error) {
@@ -227,6 +229,68 @@ func (c *Client) GetCart(ctx context.Context, options *GetCartRequestOptions, re
 	return responseParser(ctx, resp)
 }
 
+func (c *Client) GetPayment(ctx context.Context, options *GetPaymentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetPaymentResponse, error) {
+	var err error
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL: c.apiClient.GetBaseURL() + "/payments/{id}",
+		Method:     "GET",
+		Options:    options,
+	}
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	responseParser := func(ctx context.Context, resp *runtime.Response) (*GetPaymentResponse, error) {
+		bodyBytes := resp.Content
+		if resp.StatusCode != 200 {
+			target := new(GetPaymentErrorResponse)
+			// Handle empty error response body gracefully - skip unmarshal if no content
+			if len(bodyBytes) > 0 {
+				if err = json.Unmarshal(bodyBytes, target); err != nil {
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "GetPaymentErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
+				}
+			}
+			// Return error with (possibly empty) target
+			if errTarget, ok := any(*target).(error); ok {
+				return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
+			}
+			return nil, runtime.NewClientAPIError(fmt.Errorf("API error (status %d): %v", resp.StatusCode, *target),
+				runtime.WithStatusCode(resp.StatusCode))
+		}
+		target := new(GetPaymentResponse)
+		// Handle empty response body gracefully
+		if len(bodyBytes) == 0 {
+			return target, nil
+		}
+		if err = json.Unmarshal(bodyBytes, target); err != nil {
+			return nil, &runtime.ResponseDecodeError{
+				StatusCode:    resp.StatusCode,
+				ContentType:   resp.Headers.Get("Content-Type"),
+				ContentLength: len(bodyBytes),
+				TargetType:    "GetPaymentResponse",
+				Body:          bodyBytes,
+				Err:           err,
+			}
+		}
+		return target, nil
+	}
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/payments/{id}")
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+	return responseParser(ctx, resp)
+}
+
 var _ ClientInterface = (*Client)(nil)
 
 // GetWidgetRequestOptions is the options needed to make a request to GetWidget.
@@ -361,6 +425,50 @@ func (o *GetCartRequestOptions) GetHeader() (map[string]string, error) {
 	return nil, nil
 }
 
+// GetPaymentRequestOptions is the options needed to make a request to GetPayment.
+type GetPaymentRequestOptions struct {
+	PathParams *GetPaymentPath
+}
+
+// Validate validates all the fields in the options.
+// Use it if fields validation was not run.
+func (o *GetPaymentRequestOptions) Validate() error {
+	var errors runtime.ValidationErrors
+
+	if o.PathParams != nil {
+		if v, ok := any(o.PathParams).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append("PathParams", err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return errors
+}
+
+// GetPathParams returns the path params as a map.
+func (o *GetPaymentRequestOptions) GetPathParams() (map[string]any, error) {
+	return runtime.AsMap[any](o.PathParams)
+}
+
+// GetQuery returns the query params as a map.
+func (o *GetPaymentRequestOptions) GetQuery() (map[string]any, error) {
+	return nil, nil
+}
+
+// GetBody returns the payload in any type that can be marshalled to JSON by the client.
+func (o *GetPaymentRequestOptions) GetBody() any {
+	return nil
+}
+
+// GetHeader returns the headers as a map.
+func (o *GetPaymentRequestOptions) GetHeader() (map[string]string, error) {
+	return nil, nil
+}
+
 type GetWidgetPath struct {
 	ID string `json:"id" validate:"required"`
 }
@@ -385,6 +493,14 @@ func (g GetCartPath) Validate() error {
 	return runtime.ConvertValidatorError(typesValidator.Struct(g))
 }
 
+type GetPaymentPath struct {
+	ID string `json:"id" validate:"required"`
+}
+
+func (g GetPaymentPath) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(g))
+}
+
 type GetWidgetResponse = Item
 
 type GetWidgetErrorResponse = WidgetError
@@ -396,6 +512,64 @@ type GetOrderErrorResponse = OrderError
 type GetCartResponse = Item
 
 type GetCartErrorResponse = CartError
+
+type GetPaymentResponse = Item
+
+type GetPaymentErrorResponse struct {
+	GetPayment_ErrorResponse_AnyOf *GetPayment_ErrorResponse_AnyOf `json:"-"`
+}
+
+func (r GetPaymentErrorResponse) Error() string {
+	res0 := r.GetPayment_ErrorResponse_AnyOf
+	if res0 == nil {
+		return "unknown error"
+	}
+	res1 := *res0
+	res2, _ := res1.ValueByDiscriminator()
+	switch res3 := res2.(type) {
+	case NotFound:
+		res4 := res3.Message
+		return res4
+	case Conflict:
+		res5 := res3.Message
+		return res5
+	}
+	return "unknown error"
+}
+
+func (g GetPaymentErrorResponse) MarshalJSON() ([]byte, error) {
+	var parts []json.RawMessage
+
+	{
+		b, err := runtime.MarshalJSON(g.GetPayment_ErrorResponse_AnyOf)
+		if err != nil {
+			return nil, fmt.Errorf("GetPayment_ErrorResponse_AnyOf marshal: %w", err)
+		}
+		parts = append(parts, b)
+	}
+
+	return runtime.CoalesceOrMerge(parts...)
+}
+
+func (g *GetPaymentErrorResponse) UnmarshalJSON(data []byte) error {
+	trim := bytes.TrimSpace(data)
+	if bytes.Equal(trim, []byte("null")) {
+		return nil
+	}
+	if len(trim) == 0 {
+		return fmt.Errorf("empty JSON input")
+	}
+
+	if g.GetPayment_ErrorResponse_AnyOf == nil {
+		g.GetPayment_ErrorResponse_AnyOf = &GetPayment_ErrorResponse_AnyOf{}
+	}
+
+	if err := runtime.UnmarshalJSON(data, g.GetPayment_ErrorResponse_AnyOf); err != nil {
+		return fmt.Errorf("GetPayment_ErrorResponse_AnyOf unmarshal: %w", err)
+	}
+
+	return nil
+}
 
 type Item struct {
 	ID *string `json:"id,omitempty"`
@@ -860,6 +1034,175 @@ func (c *CartError_Error_OneOf) Validate() error {
 		}
 	}
 	return nil
+}
+
+type GetPayment_ErrorResponse_AnyOf struct {
+	union json.RawMessage
+}
+
+func (g *GetPayment_ErrorResponse_AnyOf) Validate() error {
+	// NOTE: Validation is not supported for unions with more than 2 elements.
+	// Validating would require unmarshaling against each possible type, which is inefficient.
+	// Use AsValidated<Type>() methods to validate after retrieving the specific type.
+	return nil
+}
+
+// Raw returns the union data inside the GetPayment_ErrorResponse_AnyOf as bytes
+func (g *GetPayment_ErrorResponse_AnyOf) Raw() json.RawMessage {
+	return g.union
+}
+
+// AsNotFound returns the union data inside the GetPayment_ErrorResponse_AnyOf as a NotFound
+func (g *GetPayment_ErrorResponse_AnyOf) AsNotFound() (NotFound, error) {
+	return runtime.UnmarshalAs[NotFound](g.union)
+}
+
+// AsValidatedNotFound returns the union data inside the GetPayment_ErrorResponse_AnyOf as a validated NotFound
+func (g *GetPayment_ErrorResponse_AnyOf) AsValidatedNotFound() (NotFound, error) {
+	val, err := g.AsNotFound()
+	if err != nil {
+		var zero NotFound
+		return zero, err
+	}
+	if err := g.validateNotFound(val); err != nil {
+		var zero NotFound
+		return zero, err
+	}
+	return val, nil
+}
+
+// FromNotFound overwrites any union data inside the GetPayment_ErrorResponse_AnyOf as the provided NotFound
+func (g *GetPayment_ErrorResponse_AnyOf) FromNotFound(val NotFound) error {
+	// Validate before storing
+	if err := g.validateNotFound(val); err != nil {
+		return err
+	}
+	bts, err := json.Marshal(val)
+	g.union = bts
+	return err
+}
+
+// AsConflict returns the union data inside the GetPayment_ErrorResponse_AnyOf as a Conflict
+func (g *GetPayment_ErrorResponse_AnyOf) AsConflict() (Conflict, error) {
+	return runtime.UnmarshalAs[Conflict](g.union)
+}
+
+// AsValidatedConflict returns the union data inside the GetPayment_ErrorResponse_AnyOf as a validated Conflict
+func (g *GetPayment_ErrorResponse_AnyOf) AsValidatedConflict() (Conflict, error) {
+	val, err := g.AsConflict()
+	if err != nil {
+		var zero Conflict
+		return zero, err
+	}
+	if err := g.validateConflict(val); err != nil {
+		var zero Conflict
+		return zero, err
+	}
+	return val, nil
+}
+
+// FromConflict overwrites any union data inside the GetPayment_ErrorResponse_AnyOf as the provided Conflict
+func (g *GetPayment_ErrorResponse_AnyOf) FromConflict(val Conflict) error {
+	// Validate before storing
+	if err := g.validateConflict(val); err != nil {
+		return err
+	}
+	bts, err := json.Marshal(val)
+	g.union = bts
+	return err
+}
+
+// AsGone returns the union data inside the GetPayment_ErrorResponse_AnyOf as a Gone
+func (g *GetPayment_ErrorResponse_AnyOf) AsGone() (Gone, error) {
+	return runtime.UnmarshalAs[Gone](g.union)
+}
+
+// AsValidatedGone returns the union data inside the GetPayment_ErrorResponse_AnyOf as a validated Gone
+func (g *GetPayment_ErrorResponse_AnyOf) AsValidatedGone() (Gone, error) {
+	val, err := g.AsGone()
+	if err != nil {
+		var zero Gone
+		return zero, err
+	}
+	if err := g.validateGone(val); err != nil {
+		var zero Gone
+		return zero, err
+	}
+	return val, nil
+}
+
+// FromGone overwrites any union data inside the GetPayment_ErrorResponse_AnyOf as the provided Gone
+func (g *GetPayment_ErrorResponse_AnyOf) FromGone(val Gone) error {
+	// Validate before storing
+	if err := g.validateGone(val); err != nil {
+		return err
+	}
+	bts, err := json.Marshal(val)
+	g.union = bts
+	return err
+}
+
+// validateNotFound validates a NotFound value
+func (g *GetPayment_ErrorResponse_AnyOf) validateNotFound(val NotFound) error {
+	if v, ok := any(val).(runtime.Validator); ok {
+		return v.Validate()
+	}
+	return nil
+}
+
+// validateConflict validates a Conflict value
+func (g *GetPayment_ErrorResponse_AnyOf) validateConflict(val Conflict) error {
+	if v, ok := any(val).(runtime.Validator); ok {
+		return v.Validate()
+	}
+	return nil
+}
+
+// validateGone validates a Gone value
+func (g *GetPayment_ErrorResponse_AnyOf) validateGone(val Gone) error {
+	if v, ok := any(val).(runtime.Validator); ok {
+		return v.Validate()
+	}
+	return nil
+}
+
+func (g GetPayment_ErrorResponse_AnyOf) discriminator(data []byte) (string, error) {
+	var discriminator struct {
+		Value string `json:"_tag"`
+	}
+	if err := json.Unmarshal(data, &discriminator); err != nil {
+		return "", err
+	}
+	return discriminator.Value, nil
+}
+
+func (g GetPayment_ErrorResponse_AnyOf) ValueByDiscriminator() (any, error) {
+	discriminator, err := g.discriminator(g.union)
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "conflict":
+		return g.AsConflict()
+	case "gone":
+		return g.AsGone()
+	case "not_found":
+		return g.AsNotFound()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (g GetPayment_ErrorResponse_AnyOf) MarshalJSON() ([]byte, error) {
+	bts, err := g.union.MarshalJSON()
+
+	return bts, err
+}
+
+func (g *GetPayment_ErrorResponse_AnyOf) UnmarshalJSON(bts []byte) error {
+	err := g.union.UnmarshalJSON(bts)
+
+	return err
 }
 
 var typesValidator *validator.Validate

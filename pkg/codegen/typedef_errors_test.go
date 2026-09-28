@@ -40,6 +40,9 @@ func TestApplicableErrorMapping(t *testing.T) {
 			"ErrorVariant":   "message",
 			"AliasedError":   "message",
 			"NestedError":    "error.mesage",
+			// Inline error schemas are named after their operation.
+			"GetTriErrorResponse": "message",
+			"GetDupErrorResponse": "message",
 		},
 	}
 
@@ -71,7 +74,40 @@ func TestApplicableErrorMapping(t *testing.T) {
 		assert.Contains(t, code, "res2, _ := res1.ValueByDiscriminator()")
 		assert.Contains(t, code, "res2 := res1.EnvelopeError_Error_OneOf")
 
-		for _, name := range []string{"UnionError", "TaggedError", "EnvelopeError"} {
+		// An inline anyOf takes its discriminator too, whatever the variant count.
+		assert.Contains(t, code, `func (r GetTriErrorResponse) Error() string {
+	res0 := r.GetTri_ErrorResponse_AnyOf
+	if res0 == nil {
+		return "unknown error"
+	}
+	res1 := *res0
+	res2, _ := res1.ValueByDiscriminator()
+	switch res3 := res2.(type) {
+	case NotFound:
+		res4 := res3.Message
+		return res4
+	case Conflict:
+		res5 := res3.Message
+		return res5
+	}
+	return "unknown error"
+}`)
+		assert.Contains(t, code, `func (r GetDupErrorResponse) Error() string {
+	res0 := r.GetDup_ErrorResponse_AnyOf
+	if res0 == nil {
+		return "unknown error"
+	}
+	res1 := *res0
+	res2, _ := res1.ValueByDiscriminator()
+	switch res3 := res2.(type) {
+	case NotFound:
+		res4 := res3.Message
+		return res4
+	}
+	return "unknown error"
+}`)
+
+		for _, name := range []string{"UnionError", "TaggedError", "EnvelopeError", "GetTriErrorResponse", "GetDupErrorResponse"} {
 			assert.NotContains(t, warnings, "type="+name+" ")
 			// A message alone does not say which variant to build, so neither the
 			// constructor nor a server adapter call to it may exist.
@@ -85,7 +121,7 @@ func TestApplicableErrorMapping(t *testing.T) {
 			typeName string
 			want     string
 		}{
-			{typeName: "UntaggedError", want: "more than two variants and no discriminator"},
+			{typeName: "UntaggedError", want: "neither exactly two variants nor a discriminator that maps them"},
 			{typeName: "UnmatchedError", want: "neither does any variant of its oneOf/anyOf union"},
 			{typeName: "Node", want: "neither does any variant of its oneOf/anyOf union"},
 			{typeName: "ErrorVariant", want: "no error response type has this name"},
@@ -107,7 +143,7 @@ func TestApplicableErrorMapping(t *testing.T) {
 	})
 
 	t.Run("caller's mapping is left intact", func(t *testing.T) {
-		assert.Len(t, cfg.ErrorMapping, 10)
+		assert.Len(t, cfg.ErrorMapping, 12)
 	})
 }
 

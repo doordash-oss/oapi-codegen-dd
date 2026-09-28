@@ -363,6 +363,34 @@ func extractDiscriminatorFromProperties(schema *base.Schema, discriminatorProp s
 	return propSchema.Enum[0].Value
 }
 
+// usableDiscriminator returns discriminator if it names each of at least two non-null elements.
+// Otherwise generateUnion would stop collapsing a lone element, or fail on an untagged inline one.
+func usableDiscriminator(elements []*base.SchemaProxy, discriminator *base.Discriminator) *base.Discriminator {
+	if discriminator == nil {
+		return nil
+	}
+
+	named := 0
+	for _, element := range elements {
+		if element == nil {
+			continue
+		}
+		schema := element.Schema()
+		if schema == nil || (len(schema.Type) == 1 && slices.Contains(schema.Type, "null")) {
+			continue
+		}
+		if element.GetReference() == "" && extractDiscriminatorValue(element, discriminator.PropertyName) == "" {
+			return nil
+		}
+		named++
+	}
+
+	if named < 2 {
+		return nil
+	}
+	return discriminator
+}
+
 // generateUnionFromTypes creates a union GoSchema from a list of OpenAPI type strings.
 // This handles OpenAPI 3.1 type arrays like ["string", "number"].
 func generateUnionFromTypes(types []string, schema *base.Schema, constraints Constraints, options ParseOptions) (GoSchema, error) {
