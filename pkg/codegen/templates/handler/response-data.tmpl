@@ -15,12 +15,12 @@ limitations under the License.
 */}}
 {{- $config := .Config -}}
 {{- $operations := .Operations -}}
-{{- /* Response data is generated in the same package as models, so no prefix needed */ -}}
+{{- /* $bodyType below goes through modelType, a no-op unless generate.handler.models-package is set. */ -}}
 {{- template "response-data-header" $ }}
 
 {{ range $operations }}{{ $op := . }}
 {{- if $op.Response.Success }}
-{{- $bodyType := $op.Response.Success.ResponseName -}}
+{{- $bodyType := modelType $op.Response.Success.ResponseName -}}
 {{- $isRawResponse := $op.Response.Success.IsRaw }}
 // {{ $op.ID | ucFirst }}ResponseData wraps the success response with optional headers and status override.
 {{- $isByteSlice := eq $op.Response.Success.Schema.GoType "[]byte" }}

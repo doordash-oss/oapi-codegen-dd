@@ -28,7 +28,8 @@
 ### Handler/Server generation config
 - `generate.handler.kind` - Router framework: `chi`, `echo`, `fiber`, `gin`, `std-http` (required)
 - `generate.handler.name` - Service interface name (default: "Service")
-- `generate.handler.models-package-alias` - Prefix for model types when models are in separate package
+- `generate.handler.models-package` - `{path, alias}` of the models package when `generate.models: false` and models live in a different package from the handler; qualifies model type references in the handler and adds the import automatically
+- `generate.handler.handler-package-alias` - Alias used by the service scaffold (`service.go`) to reference the generated handler, when the scaffold is in its own package. Replaces the misleadingly named `models-package-alias` (still works as a deprecated fallback) - neither of these affects model type references, use `models-package` for that
 - `generate.handler.validation.request/response` - Enable request/response validation in handlers
 - `generate.handler.output.directory/package` - Output for scaffold files (service.go, middleware.go)
 - `generate.handler.middleware: {}` - Enable middleware.go generation

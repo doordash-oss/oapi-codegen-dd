@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{- /* Service options are generated in the same package as models, so no prefix needed */ -}}
+{{- /* Field types below go through modelType, a no-op unless generate.handler.models-package is set. */ -}}
 {{- template "header" $ }}
 
 {{range .Operations}}{{$op := .}}
@@ -24,19 +24,19 @@ limitations under the License.
 // {{$op.ID | ucFirst}}ServiceRequestOptions holds all parameters for the {{$op.ID}} operation.
 type {{$op.ID | ucFirst}}ServiceRequestOptions struct {
     {{ if $op.PathParams }}
-    PathParams *{{$op.PathParams.Name}}
+    PathParams *{{modelType $op.PathParams.Name}}
     {{end -}}
 
     {{- if $op.Query -}}
-    Query *{{$op.Query.Name}}
+    Query *{{modelType $op.Query.Name}}
     {{ end -}}
 
     {{- if and $op.Body (ne $op.Body.NameTag "Raw") -}}
-    Body *{{$op.Body.Name}}
+    Body *{{modelType $op.Body.Name}}
     {{ end -}}
 
     {{- if $op.Header -}}
-    Header *{{$op.Header.Name}}
+    Header *{{modelType $op.Header.Name}}
     {{ end -}}
     // RawRequest provides access to the underlying HTTP request for custom content type handling.
     RawRequest *http.Request

@@ -47,6 +47,12 @@ var TemplateFunctions = template.FuncMap{
 	"filterOmitEmpty": filterOmitEmpty,
 	"deref":           derefBool,
 	"replace":         strings.ReplaceAll,
+
+	// modelType and modelsPrefix are stubs so templates referencing them
+	// parse. Parser.Parse overrides both with the real modelsQualifier once
+	// the models-package alias (if any) is known - see parser_models_package.go.
+	"modelType":    func(s string) string { return s },
+	"modelsPrefix": func() string { return "" },
 }
 
 // uppercaseFirstCharacter Uppercases the first character in a string.

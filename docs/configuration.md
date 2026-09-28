@@ -338,20 +338,56 @@ generate:
     name: "APIService"
 ```
 
-#### `generate.handler.models-package-alias`
-**Type:** `string` | **Default:** `""`
+#### `generate.handler.models-package`
+**Type:** `object` (`path`, `alias`) | **Default:** none
 
-Package alias to prefix model types with. Used when models are generated in a separate package (`generate.models: false`).
+Package that model types live in, when they're generated separately
+(`generate.models: false`) into a different package from the handler.
+`path` is the Go import path (required); `alias` is the identifier used to
+qualify model type references and defaults to the last segment of `path`.
+Every model type reference in the generated handler is qualified, and the
+import is added automatically.
 
 ```yaml
 generate:
   models: false
   handler:
     kind: chi
-    models-package-alias: types
+    models-package:
+      path: example.com/myapp/models
+      alias: models  # optional
 ```
 
-This generates `types.User` instead of `User` in the handler code.
+This generates `models.User` instead of `User` in the handler code. Both the
+models run and the handler run must use the same spec, `filter`, and
+`error-mapping`. See [Server Generation](server-generation.md#generatehandlermodels-package)
+for the full two-step setup.
+
+#### `generate.handler.handler-package-alias`
+**Type:** `string` | **Default:** `""`
+
+Package alias used to reference the generated handler code from the service
+scaffold (`service.go`), when the scaffold is generated into its own
+package. Unrelated to `models-package` above - this qualifies handler-owned
+symbols (`ServiceInterface`, `<Op>ServiceRequestOptions`), not model types.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    handler-package-alias: server
+```
+
+This generates `server.ServiceInterface` instead of `ServiceInterface` in
+`service.go`.
+
+#### `generate.handler.models-package-alias`
+**Type:** `string` | **Default:** `""`
+
+**Deprecated:** use `handler-package-alias`. Despite the name, this was
+never the package models live in - it's the package the generated handler
+itself is in, as seen from `service.go`. Kept as a fallback: if
+`handler-package-alias` is unset, this value is used.
 
 #### `generate.handler.multipart-max-memory`
 **Type:** `integer` | **Default:** `32`

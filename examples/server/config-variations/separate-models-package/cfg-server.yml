@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../../configuration-schema.json
+# The counterpart of diff-package-single-file: instead of moving only
+# service.go into its own package, this moves the whole handler (models
+# stay in "models", the handler and its adapter/router/service.go all live
+# in "server"). See https://github.com/doordash-oss/oapi-codegen-dd/issues/146
+package: server
+output:
+  directory: server
+  use-single-file: true
+  filename: server.gen.go
+generate:
+  models: false
+  handler:
+    kind: chi
+    models-package:
+      path: "github.com/doordash-oss/oapi-codegen-dd/v3/examples/server/config-variations/separate-models-package/models"
+    service: {}
+    output:
+      overwrite: true

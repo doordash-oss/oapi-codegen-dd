@@ -18,11 +18,14 @@ limitations under the License.
 {{- $serviceName := $config.Generate.Handler.Name -}}
 {{- $receiver := $serviceName | fst | lower -}}
 {{- $packageName := .PackageName -}}
-{{- /* Models prefix: when using models-package-alias, model types need prefix */ -}}
-{{- $modelsAlias := $config.Generate.Handler.ModelsPackageAlias -}}
-{{- $modelsPrefix := "" -}}
-{{- if $modelsAlias -}}
-{{- $modelsPrefix = printf "%s." $modelsAlias -}}
+{{- /* Handler prefix: handler-owned symbols (ServiceInterface, XServiceRequestOptions,
+       XResponseData) need this when the handler is generated into its own package,
+       seen here via generate.handler.handler-package-alias. Model body types below go
+       through modelType instead - see generate.handler.models-package. */ -}}
+{{- $handlerAlias := $config.Generate.Handler.HandlerPackageAlias -}}
+{{- $handlerPrefix := "" -}}
+{{- if $handlerAlias -}}
+{{- $handlerPrefix = printf "%s." $handlerAlias -}}
 {{- end -}}
 // Package {{ $packageName }} This file is generated ONCE as a starting point and will NOT be overwritten.
 // Modify it freely to add your business logic.
@@ -46,8 +49,8 @@ func New{{ $serviceName }}() *{{ $serviceName }} {
 	return &{{ $serviceName }}{}
 }
 
-// Ensure {{ $serviceName }} implements {{ $modelsPrefix }}{{ $serviceName }}Interface.
-var _ {{ $modelsPrefix }}{{ $serviceName }}Interface = (*{{ $serviceName }})(nil)
+// Ensure {{ $serviceName }} implements {{ $handlerPrefix }}{{ $serviceName }}Interface.
+var _ {{ $handlerPrefix }}{{ $serviceName }}Interface = (*{{ $serviceName }})(nil)
 
 {{- range $operations }}{{ $op := . }}
 
@@ -56,18 +59,18 @@ var _ {{ $modelsPrefix }}{{ $serviceName }}Interface = (*{{ $serviceName }})(nil
 {{ toGoComment $op.Summary "" }}
 {{- end }}
 {{- if $op.HasRequestOptions }}
-func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opts *{{ $handlerPrefix }}{{ $op.ID | ucFirst }}ServiceRequestOptions) ({{ if $op.Response.Success }}*{{ $handlerPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
 	{{- if $op.Response.Success.IsRaw }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
+	return {{ $handlerPrefix }}New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
 	{{- else }}
-	{{- $bodyType := $op.Response.Success.ResponseName -}}
+	{{- $bodyType := modelType $op.Response.Success.ResponseName -}}
 	{{- if eq $bodyType "struct{}" }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(nil), nil
+	return {{ $handlerPrefix }}New{{ $op.ID | ucFirst }}ResponseData(nil), nil
 	{{- else }}
-	{{- if $modelsPrefix }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
+	{{- if and (not $config.Generate.Handler.ModelsPackage) $handlerPrefix }}{{ $bodyType = printf "%s%s" $handlerPrefix $bodyType }}{{ end }}
+	return {{ $handlerPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
 	{{- end }}
 	{{- end }}
 	{{- else }}
@@ -75,18 +78,18 @@ func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context, opt
 	{{- end }}
 }
 {{- else }}
-func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $modelsPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
+func ({{ $receiver }} *{{ $serviceName }}) {{ $op.ID }}(ctx context.Context) ({{ if $op.Response.Success }}*{{ $handlerPrefix }}{{ $op.ID | ucFirst }}ResponseData, error{{ else }}error{{ end }}) {
 	// TODO: Implement your business logic here
 	{{- if $op.Response.Success }}
 	{{- if $op.Response.Success.IsRaw }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
+	return {{ $handlerPrefix }}New{{ $op.ID | ucFirst }}ResponseData([]byte("TODO: marshal response")), nil
 	{{- else }}
-	{{- $bodyType := $op.Response.Success.ResponseName -}}
+	{{- $bodyType := modelType $op.Response.Success.ResponseName -}}
 	{{- if eq $bodyType "struct{}" }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(nil), nil
+	return {{ $handlerPrefix }}New{{ $op.ID | ucFirst }}ResponseData(nil), nil
 	{{- else }}
-	{{- if $modelsPrefix }}{{ $bodyType = printf "%s%s" $modelsPrefix $bodyType }}{{ end }}
-	return {{ $modelsPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
+	{{- if and (not $config.Generate.Handler.ModelsPackage) $handlerPrefix }}{{ $bodyType = printf "%s%s" $handlerPrefix $bodyType }}{{ end }}
+	return {{ $handlerPrefix }}New{{ $op.ID | ucFirst }}ResponseData(new({{ $bodyType }})), nil
 	{{- end }}
 	{{- end }}
 	{{- else }}
