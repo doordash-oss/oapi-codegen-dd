@@ -471,6 +471,41 @@ func TestNewAPIClient_default_doer(t *testing.T) {
 	assert.True(t, traced.Load())
 }
 
+func TestWithBaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		opts     []APIClientOption
+		expected string
+	}{
+		{
+			name:     "overrides the constructor argument",
+			baseURL:  "https://api.example.com",
+			opts:     []APIClientOption{WithBaseURL("https://staging.example.com/")},
+			expected: "https://staging.example.com",
+		},
+		{
+			name:     "the last one wins",
+			baseURL:  "https://api.example.com",
+			opts:     []APIClientOption{WithBaseURL("https://staging.example.com"), WithBaseURL("https://dev.example.com")},
+			expected: "https://dev.example.com",
+		},
+		{
+			name:     "sets the base URL when the constructor argument is empty",
+			opts:     []APIClientOption{WithBaseURL("https://api.example.com")},
+			expected: "https://api.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewAPIClient(tt.baseURL, tt.opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, client.GetBaseURL())
+		})
+	}
+}
+
 func TestWithHTTPClient(t *testing.T) {
 	mockDoer := &MockHttpRequestDoer{}
 	client := &Client{}

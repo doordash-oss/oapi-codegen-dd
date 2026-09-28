@@ -190,6 +190,15 @@ func NewAPIClient(baseURL string, opts ...APIClientOption) (*Client, error) {
 	return res, nil
 }
 
+// WithBaseURL overrides the baseURL passed to NewAPIClient. Options apply in
+// order, so the last WithBaseURL wins.
+func WithBaseURL(baseURL string) APIClientOption {
+	return func(c *Client) error {
+		c.baseURL = strings.TrimSuffix(baseURL, "/")
+		return nil
+	}
+}
+
 // WithHTTPClient allows overriding the default Doer, which sends requests
 // with http.DefaultClient. A nil doer falls back to the default. For a plain
 // *http.Client, use WithStdHTTPClient.
