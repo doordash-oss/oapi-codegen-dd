@@ -15,7 +15,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/http/httptrace"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -384,22 +387,41 @@ func TestIsStreamingResponse(t *testing.T) {
 }
 
 func TestNewAPIClient(t *testing.T) {
+	mockDoer := &MockHttpRequestDoer{}
+	defaultDoer := httpClientDoer{client: http.DefaultClient}
+
 	tests := []struct {
-		name        string
-		baseURL     string
-		opts        []APIClientOption
-		expectError bool
+		name         string
+		baseURL      string
+		opts         []APIClientOption
+		expectedDoer HttpRequestDoer
+		expectError  bool
 	}{
 		{
-			name:        "creates client with valid base URL",
-			baseURL:     "https://api.example.com",
-			expectError: false,
+			name:         "creates client with valid base URL",
+			baseURL:      "https://api.example.com",
+			expectedDoer: defaultDoer,
+			expectError:  false,
 		},
 		{
-			name:        "creates client with multiple options",
+			name:         "creates client with multiple options",
+			baseURL:      "https://api.example.com",
+			opts:         []APIClientOption{WithHTTPClient(mockDoer)},
+			expectedDoer: mockDoer,
+			expectError:  false,
+		},
+		{
+			name:         "falls back to the default doer when given nil",
+			baseURL:      "https://api.example.com",
+			opts:         []APIClientOption{WithHTTPClient(nil)},
+			expectedDoer: defaultDoer,
+			expectError:  false,
+		},
+		{
+			name:        "returns an option error",
 			baseURL:     "https://api.example.com",
-			opts:        []APIClientOption{WithHTTPClient(&MockHttpRequestDoer{})},
-			expectError: false,
+			opts:        []APIClientOption{func(*Client) error { return fmt.Errorf("bad option") }},
+			expectError: true,
 		},
 	}
 
@@ -412,8 +434,41 @@ func TestNewAPIClient(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, strings.TrimSuffix(tt.baseURL, "/"), client.baseURL)
+			assert.Equal(t, tt.expectedDoer, client.httpClient)
 		})
 	}
+}
+
+func TestNewAPIClient_default_doer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer srv.Close()
+
+	// Editors can only swap the request context in place, so the doer must send req as is.
+	var traced atomic.Bool
+	editor := func(_ context.Context, req *http.Request) error {
+		trace := &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { traced.Store(true) }}
+		*req = *req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+		return nil
+	}
+
+	client, err := NewAPIClient(srv.URL, WithRequestEditorFn(editor))
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	req, err := client.CreateRequest(ctx, RequestOptionsParameters{
+		RequestURL: client.GetBaseURL() + "/status",
+		Method:     http.MethodGet,
+	})
+	require.NoError(t, err)
+
+	resp, err := client.ExecuteRequest(ctx, req, "/status")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, `{"status":"ok"}`, string(resp.Content))
+	assert.True(t, traced.Load())
 }
 
 func TestWithHTTPClient(t *testing.T) {
