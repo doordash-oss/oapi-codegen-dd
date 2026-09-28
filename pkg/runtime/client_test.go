@@ -480,6 +480,37 @@ func TestWithHTTPClient(t *testing.T) {
 	assert.Equal(t, mockDoer, client.httpClient)
 }
 
+func TestWithStdHTTPClient(t *testing.T) {
+	custom := &http.Client{}
+
+	tests := []struct {
+		name           string
+		client         *http.Client
+		expectedClient *http.Client
+	}{
+		{
+			name:           "sends requests with the given client",
+			client:         custom,
+			expectedClient: custom,
+		},
+		{
+			name:           "falls back to the default client when given nil",
+			expectedClient: http.DefaultClient,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewAPIClient("https://api.example.com", WithStdHTTPClient(tt.client))
+			require.NoError(t, err)
+
+			doer, ok := client.httpClient.(httpClientDoer)
+			require.True(t, ok)
+			assert.Same(t, tt.expectedClient, doer.client)
+		})
+	}
+}
+
 func TestWithRequestEditorFn(t *testing.T) {
 	editor := func(ctx context.Context, req *http.Request) error { return nil }
 	client := &Client{}

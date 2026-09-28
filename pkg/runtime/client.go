@@ -191,12 +191,23 @@ func NewAPIClient(baseURL string, opts ...APIClientOption) (*Client, error) {
 }
 
 // WithHTTPClient allows overriding the default Doer, which sends requests
-// with http.DefaultClient. A nil doer falls back to the default.
+// with http.DefaultClient. A nil doer falls back to the default. For a plain
+// *http.Client, use WithStdHTTPClient.
 func WithHTTPClient(doer HttpRequestDoer) APIClientOption {
 	return func(c *Client) error {
 		c.httpClient = doer
 		return nil
 	}
+}
+
+// WithStdHTTPClient sends requests with client. Unlike WithHTTPClient it takes
+// a plain *http.Client, which does not implement HttpRequestDoer. A nil client
+// falls back to the default.
+func WithStdHTTPClient(client *http.Client) APIClientOption {
+	if client == nil {
+		return WithHTTPClient(nil)
+	}
+	return WithHTTPClient(httpClientDoer{client: client})
 }
 
 // WithRequestEditorFn allows setting up a callback function, which will be

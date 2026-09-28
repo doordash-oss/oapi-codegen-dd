@@ -66,7 +66,7 @@ func TestClientReturnsVariantMessage(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := NewDefaultClient(srv.URL, runtime.WithHTTPClient(httpDoer{client: srv.Client()}))
+	client, err := NewDefaultClient(srv.URL, runtime.WithStdHTTPClient(srv.Client()))
 	require.NoError(t, err)
 
 	_, err = client.GetWidget(context.Background(), &GetWidgetRequestOptions{PathParams: &GetWidgetPath{ID: "w1"}})
@@ -82,12 +82,4 @@ func decode[T any](t *testing.T, body string) T {
 	var v T
 	require.NoError(t, json.Unmarshal([]byte(body), &v))
 	return v
-}
-
-type httpDoer struct {
-	client *http.Client
-}
-
-func (d httpDoer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
-	return d.client.Do(req)
 }

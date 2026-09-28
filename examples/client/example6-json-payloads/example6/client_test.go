@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// httpClientAdapter adapts http.Client to runtime.HTTPRequestDoer
-type httpClientAdapter struct {
-	client *http.Client
-}
-
-func (a *httpClientAdapter) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return a.client.Do(req)
-}
-
 func TestUpdateUser_NilResponseBody(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -77,8 +68,7 @@ func TestUpdateUser_NilResponseBody(t *testing.T) {
 			}))
 			defer server.Close()
 
-			httpClient := &httpClientAdapter{client: server.Client()}
-			apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithHTTPClient(httpClient))
+			apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithStdHTTPClient(server.Client()))
 			require.NoError(t, err)
 
 			client := NewClient(apiClient)
@@ -151,8 +141,7 @@ func TestUpdateUser_ErrorResponse(t *testing.T) {
 			}))
 			defer server.Close()
 
-			httpClient := &httpClientAdapter{client: server.Client()}
-			apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithHTTPClient(httpClient))
+			apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithStdHTTPClient(server.Client()))
 			require.NoError(t, err)
 
 			client := NewClient(apiClient)
@@ -185,8 +174,7 @@ func TestUpdateUser_RequestBodyEncoding(t *testing.T) {
 	}))
 	defer server.Close()
 
-	httpClient := &httpClientAdapter{client: server.Client()}
-	apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithHTTPClient(httpClient))
+	apiClient, err := runtime.NewAPIClient(server.URL, runtime.WithStdHTTPClient(server.Client()))
 	require.NoError(t, err)
 
 	client := NewClient(apiClient)
