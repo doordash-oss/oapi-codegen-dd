@@ -51,6 +51,17 @@ type HttpRequestDoer interface {
 	Do(context context.Context, req *http.Request) (*http.Response, error)
 }
 
+// httpClientDoer adapts *http.Client to HttpRequestDoer.
+type httpClientDoer struct {
+	client *http.Client
+}
+
+// Do sends req under its own context, which CreateRequest derives from ctx.
+// Swapping ctx back in would drop whatever request editors attached to it.
+func (d httpClientDoer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
+	return d.client.Do(req)
+}
+
 type Response struct {
 	Content    []byte
 	StatusCode int
@@ -172,11 +183,15 @@ func NewAPIClient(baseURL string, opts ...APIClientOption) (*Client, error) {
 		}
 	}
 
+	if res.httpClient == nil {
+		res.httpClient = httpClientDoer{client: http.DefaultClient}
+	}
+
 	return res, nil
 }
 
-// WithHTTPClient allows overriding the default Doer, which is
-// automatically created using http.Client.
+// WithHTTPClient allows overriding the default Doer, which sends requests
+// with http.DefaultClient. A nil doer falls back to the default.
 func WithHTTPClient(doer HttpRequestDoer) APIClientOption {
 	return func(c *Client) error {
 		c.httpClient = doer
