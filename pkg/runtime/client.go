@@ -51,9 +51,13 @@ type HttpRequestDoer interface {
 	Do(context context.Context, req *http.Request) (*http.Response, error)
 }
 
-// httpClientDoer adapts *http.Client to HttpRequestDoer.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// httpClientDoer adapts an HTTPClient to HttpRequestDoer.
 type httpClientDoer struct {
-	client *http.Client
+	client HTTPClient
 }
 
 // Do sends req under its own context, which CreateRequest derives from ctx.
@@ -209,11 +213,13 @@ func WithHTTPClient(doer HttpRequestDoer) APIClientOption {
 	}
 }
 
-// WithStdHTTPClient sends requests with client. Unlike WithHTTPClient it takes
-// a plain *http.Client, which does not implement HttpRequestDoer. A nil client
-// falls back to the default.
-func WithStdHTTPClient(client *http.Client) APIClientOption {
+// WithStdHTTPClient sends requests with client. A nil client falls back to the default.
+func WithStdHTTPClient(client HTTPClient) APIClientOption {
+	// A nil *http.Client boxed into HTTPClient isn't itself a nil interface.
 	if client == nil {
+		return WithHTTPClient(nil)
+	}
+	if c, ok := client.(*http.Client); ok && c == nil {
 		return WithHTTPClient(nil)
 	}
 	return WithHTTPClient(httpClientDoer{client: client})
