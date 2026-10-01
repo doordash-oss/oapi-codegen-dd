@@ -46,6 +46,15 @@ func (m *MockHttpRequestDoer) Do(_ context.Context, _ *http.Request) (*http.Resp
 	return m.response, m.err
 }
 
+type MockPlainHTTPClient struct {
+	response *http.Response
+	err      error
+}
+
+func (m *MockPlainHTTPClient) Do(_ *http.Request) (*http.Response, error) {
+	return m.response, m.err
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }
@@ -517,19 +526,30 @@ func TestWithHTTPClient(t *testing.T) {
 
 func TestWithStdHTTPClient(t *testing.T) {
 	custom := &http.Client{}
+	plain := &MockPlainHTTPClient{}
 
 	tests := []struct {
 		name           string
-		client         *http.Client
-		expectedClient *http.Client
+		client         HTTPClient
+		expectedClient HTTPClient
 	}{
 		{
-			name:           "sends requests with the given client",
+			name:           "sends requests with the given *http.Client",
 			client:         custom,
 			expectedClient: custom,
 		},
 		{
-			name:           "falls back to the default client when given nil",
+			name:           "sends requests with a plain Do-only client",
+			client:         plain,
+			expectedClient: plain,
+		},
+		{
+			name:           "falls back to the default client when given a nil interface",
+			expectedClient: http.DefaultClient,
+		},
+		{
+			name:           "falls back to the default client when given a nil *http.Client",
+			client:         (*http.Client)(nil),
 			expectedClient: http.DefaultClient,
 		},
 	}
