@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProperty_GoTypeDef(t *testing.T) {
@@ -87,6 +88,58 @@ func TestProperty_GoTypeDef(t *testing.T) {
 			assert.Equal(t, tt.want, p.GoTypeDef())
 		})
 	}
+}
+
+func TestProperty_OmitsNil(t *testing.T) {
+	tests := []struct {
+		name        string
+		goType      string
+		constraints Constraints
+		want        bool
+	}{
+		{
+			name:        "optional pointer",
+			goType:      "string",
+			constraints: Constraints{Nullable: ptr(true)},
+			want:        true,
+		},
+		{
+			name:        "required nullable pointer",
+			goType:      "string",
+			constraints: Constraints{Nullable: ptr(true), RequiredKey: true},
+		},
+		{
+			name:        "required value",
+			goType:      "string",
+			constraints: Constraints{Required: ptr(true), RequiredKey: true},
+		},
+		{
+			name:        "optional slice is no pointer",
+			goType:      "[]string",
+			constraints: Constraints{Nullable: ptr(true)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := Property{Schema: GoSchema{GoType: tt.goType}, Constraints: tt.constraints}
+			assert.Equal(t, tt.want, p.OmitsNil())
+		})
+	}
+}
+
+func TestGenFieldsFromProperties_RequiredKey(t *testing.T) {
+	fields := genFieldsFromProperties([]Property{
+		{
+			GoName:        "UpdatedAt",
+			JsonFieldName: "updated_at",
+			Schema:        GoSchema{GoType: "time.Time"},
+			Constraints:   Constraints{Nullable: ptr(true), RequiredKey: true},
+		},
+	}, ParseOptions{AdditionalTags: []string{"yaml"}})
+
+	require.Len(t, fields, 1)
+	assert.Contains(t, fields[0], "UpdatedAt *time.Time`json:\"updated_at\" yaml:\"updated_at\"`")
 }
 
 func TestGenFieldsFromProperties_AdditionalTags(t *testing.T) {

@@ -36,4 +36,11 @@ var (
 	ErrServerHandlerPackageRequired              = errors.New("server handler-package is required when server generation is enabled")
 	ErrServerRequiresService                     = errors.New("server generation requires service generation: add 'service: {}' to handler config")
 	ErrInvalidAdditionalTag                      = errors.New("invalid additional tag name: must not be empty or contain spaces, quotes, or colons")
+	ErrModelsPackageRequiresModelsFalse          = errors.New("generate.handler.models-package requires generate.models: false")
+	ErrModelsPackagePathRequired                 = errors.New("generate.handler.models-package.path is required")
+	ErrConflictingPackageAlias                   = errors.New("generate.handler.handler-package-alias and the deprecated models-package-alias are both set to different values")
+
+	errNoErrorMappingPath    = errors.New("no error-mapping path")
+	errUnionVariantUnknown   = errors.New("its oneOf/anyOf union has neither exactly two variants nor a discriminator that maps them, so the decoded variant is unknown")
+	errNoUnionVariantHasPath = errors.New("neither does any variant of its oneOf/anyOf union")
 )

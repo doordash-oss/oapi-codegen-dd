@@ -67,3 +67,35 @@ func (v ValidationError) Validate() error {
 func (s ValidationError) Error() string {
 	return "unmapped client error"
 }
+
+type NotFoundError struct {
+	ID string `json:"id" validate:"required"`
+}
+
+func (n NotFoundError) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(n))
+}
+
+func (s NotFoundError) Error() string {
+	return "unmapped client error"
+}
+
+type ServiceError struct {
+	Message string `json:"message" validate:"required"`
+}
+
+func (s ServiceError) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(s))
+}
+
+func (s ServiceError) Error() string {
+	return "unmapped client error"
+}
+
+type Health struct {
+	Status string `json:"status" validate:"required"`
+}
+
+func (h Health) Validate() error {
+	return runtime.ConvertValidatorError(typesValidator.Struct(h))
+}

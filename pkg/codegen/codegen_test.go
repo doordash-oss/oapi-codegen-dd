@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -105,6 +106,36 @@ func TestExtPropGoTypeSkipOptionalPointer(t *testing.T) {
 
 	// Check that the extension has no effect on required fields
 	assert.Contains(t, code, "RequiredField          string  `json:\"requiredField\" validate:\"required\"`")
+}
+
+func TestRequiredNullableProperties(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output:      &Output{UseSingleFile: true},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "required-nullable.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// field matches a struct field whatever its column padding. The tag ends at the name, so no omitempty.
+	field := func(name, goType, jsonTag string) string {
+		return `(?m)^\s*` + name + `\s+` + regexp.QuoteMeta(goType) + `\s+` + regexp.QuoteMeta("`json:\""+jsonTag+`"`)
+	}
+
+	assert.Regexp(t, field("UpdatedAt", "*time.Time", "updated_at"), code,
+		"anyOf with null is a pointer that writes nil as null")
+	assert.Regexp(t, field("Owner", "*Owner", "owner"), code, "so is oneOf listing null first")
+	assert.Regexp(t, field("Nickname", "*string", "nickname"), code, "a type list with null keeps the key too")
+	assert.Regexp(t, field("Tags", "[]string", "tags"), code, "an empty slice keeps the key as well")
+
+	assert.Regexp(t, field("ID", "*string", "id,omitempty"), code, "readOnly counts as optional")
+	assert.Regexp(t, field("Pet", "Item_Pet", "pet"), code, "a union of two types decodes null itself")
+	assert.Regexp(t, field("Note", "*string", "note,omitempty"), code, "an optional property is still left out")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
 }
 
 func TestNumericSchemaNames(t *testing.T) {
@@ -421,6 +452,38 @@ func TestAssignWithResponseTypeNames(t *testing.T) {
 		_, has202 := ops[0].HeaderTypeNames[202]
 		assert.False(t, has202, "202 has no spec headers, so no Headers202 type should be reserved")
 		assert.Equal(t, "UploadDocumentResp422Headers", ops[0].HeaderTypeNames[422])
+	})
+
+	t.Run("ranges and default get header type names apart from the code they stand in at", func(t *testing.T) {
+		tracker := newTypeTracker()
+		retryAfter := map[string]GoSchema{"Retry-After": {GoType: "string"}}
+		badRequest := &ResponseContentDefinition{StatusCode: 400, Headers: retryAfter}
+		// 4XX stands in at 400, like the exact code next to it.
+		clientErr := &ResponseContentDefinition{StatusCode: 400, StatusRange: 4, Headers: retryAfter}
+		fallback := &ResponseContentDefinition{StatusCode: 500, IsDefault: true, Headers: retryAfter}
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				All:          map[int]*ResponseContentDefinition{400: clientErr, 500: fallback},
+				Errors:       []*ResponseContentDefinition{badRequest},
+				StatusRanges: []*ResponseContentDefinition{clientErr},
+				Default:      fallback,
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		op := ops[0]
+		assert.Equal(t, "UploadDocumentResp400Headers", op.HeaderTypeName(badRequest))
+		assert.Equal(t, "UploadDocumentResp4XXHeaders", op.HeaderTypeName(clientErr))
+		assert.Equal(t, "UploadDocumentRespDefaultHeaders", op.HeaderTypeName(fallback))
+
+		// The exact 400 keeps its name; default keeps the name it had at 500
+		// for the deprecated alias.
+		assert.Equal(t, map[int]string{
+			400: "UploadDocumentResp400Headers",
+			500: "UploadDocumentResp500Headers",
+		}, op.HeaderTypeNames)
 	})
 
 	t.Run("colliding wrapper name is disambiguated against existing tracker entries", func(t *testing.T) {
@@ -1005,4 +1068,40 @@ func TestOptionalRequestBodyToleratesAnEmptyBody(t *testing.T) {
 
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
+}
+
+// A query array declared with a named type, a referenced component parameter or schema,
+// reads every value and parses it by the items, as an inline array does.
+func TestReferencedArrayQueryParams(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output:      &Output{UseSingleFile: true},
+		Generate: &GenerateOptions{
+			Handler: &HandlerOptions{Kind: "chi"},
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "referenced-array-query-params.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	for _, name := range []string{"term", "score", "tag", "id", "inline"} {
+		assert.Contains(t, code, `if values, ok := query["`+name+`"]; ok {`)
+	}
+	assert.NotContains(t, code, "runtime.ParseString[", "no array is parsed as a single value")
+
+	assert.Contains(t, code, "queryParams.Term = values", "a component parameter")
+	assert.Contains(t, code, "result := make([]*int, len(parsed))", "nullable items behind an alias")
+	assert.Contains(t, code, "queryParams.Tag = values", "a component parameter referencing a schema")
+	assert.Contains(t, code, "parsed, err := runtime.ParseStringSlice[int64](values", "a schema referenced inline")
+
+	// An alias has no Validate() of its own, so the parameters struct checks its items.
+	assert.Contains(t, code, "for i, item := range s.Term {")
+	assert.Contains(t, code, "for i, item := range s.Score {")
+	// A defined type keeps validating itself, maxItems included.
+	assert.Contains(t, code, "if v, ok := any(s.Tag).(runtime.Validator); ok && v != nil {")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
 }

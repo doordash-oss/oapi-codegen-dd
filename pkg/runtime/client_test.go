@@ -16,7 +16,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,6 +43,15 @@ type MockHttpRequestDoer struct {
 }
 
 func (m *MockHttpRequestDoer) Do(_ context.Context, _ *http.Request) (*http.Response, error) {
+	return m.response, m.err
+}
+
+type MockPlainHTTPClient struct {
+	response *http.Response
+	err      error
+}
+
+func (m *MockPlainHTTPClient) Do(_ *http.Request) (*http.Response, error) {
 	return m.response, m.err
 }
 
@@ -385,22 +396,41 @@ func TestIsStreamingResponse(t *testing.T) {
 }
 
 func TestNewAPIClient(t *testing.T) {
+	mockDoer := &MockHttpRequestDoer{}
+	defaultDoer := httpClientDoer{client: http.DefaultClient}
+
 	tests := []struct {
-		name        string
-		baseURL     string
-		opts        []APIClientOption
-		expectError bool
+		name         string
+		baseURL      string
+		opts         []APIClientOption
+		expectedDoer HttpRequestDoer
+		expectError  bool
 	}{
 		{
-			name:        "creates client with valid base URL",
-			baseURL:     "https://api.example.com",
-			expectError: false,
+			name:         "creates client with valid base URL",
+			baseURL:      "https://api.example.com",
+			expectedDoer: defaultDoer,
+			expectError:  false,
 		},
 		{
-			name:        "creates client with multiple options",
+			name:         "creates client with multiple options",
+			baseURL:      "https://api.example.com",
+			opts:         []APIClientOption{WithHTTPClient(mockDoer)},
+			expectedDoer: mockDoer,
+			expectError:  false,
+		},
+		{
+			name:         "falls back to the default doer when given nil",
+			baseURL:      "https://api.example.com",
+			opts:         []APIClientOption{WithHTTPClient(nil)},
+			expectedDoer: defaultDoer,
+			expectError:  false,
+		},
+		{
+			name:        "returns an option error",
 			baseURL:     "https://api.example.com",
-			opts:        []APIClientOption{WithHTTPClient(&MockHttpRequestDoer{})},
-			expectError: false,
+			opts:        []APIClientOption{func(*Client) error { return fmt.Errorf("bad option") }},
+			expectError: true,
 		},
 	}
 
@@ -413,6 +443,74 @@ func TestNewAPIClient(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, strings.TrimSuffix(tt.baseURL, "/"), client.baseURL)
+			assert.Equal(t, tt.expectedDoer, client.httpClient)
+		})
+	}
+}
+
+func TestNewAPIClient_default_doer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer srv.Close()
+
+	// Editors can only swap the request context in place, so the doer must send req as is.
+	var traced atomic.Bool
+	editor := func(_ context.Context, req *http.Request) error {
+		trace := &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { traced.Store(true) }}
+		*req = *req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+		return nil
+	}
+
+	client, err := NewAPIClient(srv.URL, WithRequestEditorFn(editor))
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	req, err := client.CreateRequest(ctx, RequestOptionsParameters{
+		RequestURL: client.GetBaseURL() + "/status",
+		Method:     http.MethodGet,
+	})
+	require.NoError(t, err)
+
+	resp, err := client.ExecuteRequest(ctx, req, "/status")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, `{"status":"ok"}`, string(resp.Content))
+	assert.True(t, traced.Load())
+}
+
+func TestWithBaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		opts     []APIClientOption
+		expected string
+	}{
+		{
+			name:     "overrides the constructor argument",
+			baseURL:  "https://api.example.com",
+			opts:     []APIClientOption{WithBaseURL("https://staging.example.com/")},
+			expected: "https://staging.example.com",
+		},
+		{
+			name:     "the last one wins",
+			baseURL:  "https://api.example.com",
+			opts:     []APIClientOption{WithBaseURL("https://staging.example.com"), WithBaseURL("https://dev.example.com")},
+			expected: "https://dev.example.com",
+		},
+		{
+			name:     "sets the base URL when the constructor argument is empty",
+			opts:     []APIClientOption{WithBaseURL("https://api.example.com")},
+			expected: "https://api.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewAPIClient(tt.baseURL, tt.opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, client.GetBaseURL())
 		})
 	}
 }
@@ -424,6 +522,48 @@ func TestWithHTTPClient(t *testing.T) {
 	err := WithHTTPClient(mockDoer)(client)
 	assert.NoError(t, err)
 	assert.Equal(t, mockDoer, client.httpClient)
+}
+
+func TestWithStdHTTPClient(t *testing.T) {
+	custom := &http.Client{}
+	plain := &MockPlainHTTPClient{}
+
+	tests := []struct {
+		name           string
+		client         HTTPClient
+		expectedClient HTTPClient
+	}{
+		{
+			name:           "sends requests with the given *http.Client",
+			client:         custom,
+			expectedClient: custom,
+		},
+		{
+			name:           "sends requests with a plain Do-only client",
+			client:         plain,
+			expectedClient: plain,
+		},
+		{
+			name:           "falls back to the default client when given a nil interface",
+			expectedClient: http.DefaultClient,
+		},
+		{
+			name:           "falls back to the default client when given a nil *http.Client",
+			client:         (*http.Client)(nil),
+			expectedClient: http.DefaultClient,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewAPIClient("https://api.example.com", WithStdHTTPClient(tt.client))
+			require.NoError(t, err)
+
+			doer, ok := client.httpClient.(httpClientDoer)
+			require.True(t, ok)
+			assert.Same(t, tt.expectedClient, doer.client)
+		})
+	}
 }
 
 func TestWithRequestEditorFn(t *testing.T) {

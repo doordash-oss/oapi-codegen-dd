@@ -1,0 +1,67 @@
+openapi: 3.0.0
+info:
+  title: API
+  description: Form-encoded bodies decoded into generated types
+  version: 1.0.0
+
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Order'
+      responses:
+        '204':
+          description: Created
+
+components:
+  schemas:
+    Order:
+      type: object
+      properties:
+        reference:
+          type: string
+        quantity:
+          type: integer
+        address:
+          anyOf:
+            - $ref: '#/components/schemas/Address'
+            - type: string
+        contact:
+          oneOf:
+            - $ref: '#/components/schemas/Email'
+            - $ref: '#/components/schemas/Phone'
+            - type: string
+        labels:
+          type: object
+          properties:
+            kind:
+              type: string
+          additionalProperties:
+            type: string
+
+    Address:
+      type: object
+      properties:
+        city:
+          type: string
+        postal_code:
+          type: string
+
+    Email:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+
+    Phone:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string

@@ -12,6 +12,18 @@ type UploadDocumentErrorResponse = ValidationError
 
 type UploadDocumentErrorResponseText string
 
+type GetDocumentResponse = DocumentStored
+
+type GetDocumentErrorResponse = NotFoundError
+
+type GetDocumentErrorResponseJSON = ServiceError
+
+type GetDocumentErrorResponseJSON4XX = ValidationError
+
+type DeleteDocumentErrorResponse = ServiceError
+
+type GetHealthResponse = Health
+
 type UploadDocumentResp201Headers struct {
 	Location   string `header:"Location"`
 	XRequestID string `header:"X-Request-Id"`
@@ -32,4 +44,35 @@ type UploadDocumentResp struct {
 	Headers202   *UploadDocumentResp202Headers
 	JSON422      *UploadDocumentErrorResponse
 	Text503      *UploadDocumentErrorResponseText
+}
+
+type GetDocumentResp5XXHeaders struct {
+	RetryAfter string `header:"Retry-After"`
+}
+
+type GetDocumentResp struct {
+	HTTPResponse *http.Response
+	Body         []byte
+	StatusCode   int
+	JSON200      *GetDocumentResponse
+	JSON404      *GetDocumentErrorResponse
+	JSON4XX      *GetDocumentErrorResponseJSON4XX
+	// Deprecated: Use JSON4XX, which this always equals.
+	JSON400    *GetDocumentErrorResponseJSON4XX
+	JSON5XX    *GetDocumentErrorResponseJSON
+	Headers5XX *GetDocumentResp5XXHeaders
+}
+
+type DeleteDocumentResp struct {
+	HTTPResponse *http.Response
+	Body         []byte
+	StatusCode   int
+	JSONDefault  *DeleteDocumentErrorResponse
+}
+
+type GetHealthResp struct {
+	HTTPResponse *http.Response
+	Body         []byte
+	StatusCode   int
+	JSONDefault  *GetHealthResponse
 }

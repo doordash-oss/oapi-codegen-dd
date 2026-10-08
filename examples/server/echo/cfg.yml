@@ -3,8 +3,6 @@ package: api
 output:
   directory: api
   use-single-file: true
-error-mapping:
-  CreateOrderErrorResponse: message
 generate:
   handler:
     kind: echo

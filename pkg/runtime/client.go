@@ -51,6 +51,21 @@ type HttpRequestDoer interface {
 	Do(context context.Context, req *http.Request) (*http.Response, error)
 }
 
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// httpClientDoer adapts an HTTPClient to HttpRequestDoer.
+type httpClientDoer struct {
+	client HTTPClient
+}
+
+// Do sends req under its own context, which CreateRequest derives from ctx.
+// Swapping ctx back in would drop whatever request editors attached to it.
+func (d httpClientDoer) Do(_ context.Context, req *http.Request) (*http.Response, error) {
+	return d.client.Do(req)
+}
+
 type Response struct {
 	Content    []byte
 	StatusCode int
@@ -172,16 +187,42 @@ func NewAPIClient(baseURL string, opts ...APIClientOption) (*Client, error) {
 		}
 	}
 
+	if res.httpClient == nil {
+		res.httpClient = httpClientDoer{client: http.DefaultClient}
+	}
+
 	return res, nil
 }
 
-// WithHTTPClient allows overriding the default Doer, which is
-// automatically created using http.Client.
+// WithBaseURL overrides the baseURL passed to NewAPIClient. Options apply in
+// order, so the last WithBaseURL wins.
+func WithBaseURL(baseURL string) APIClientOption {
+	return func(c *Client) error {
+		c.baseURL = strings.TrimSuffix(baseURL, "/")
+		return nil
+	}
+}
+
+// WithHTTPClient allows overriding the default Doer, which sends requests
+// with http.DefaultClient. A nil doer falls back to the default. For a plain
+// *http.Client, use WithStdHTTPClient.
 func WithHTTPClient(doer HttpRequestDoer) APIClientOption {
 	return func(c *Client) error {
 		c.httpClient = doer
 		return nil
 	}
+}
+
+// WithStdHTTPClient sends requests with client. A nil client falls back to the default.
+func WithStdHTTPClient(client HTTPClient) APIClientOption {
+	// A nil *http.Client boxed into HTTPClient isn't itself a nil interface.
+	if client == nil {
+		return WithHTTPClient(nil)
+	}
+	if c, ok := client.(*http.Client); ok && c == nil {
+		return WithHTTPClient(nil)
+	}
+	return WithHTTPClient(httpClientDoer{client: client})
 }
 
 // WithRequestEditorFn allows setting up a callback function, which will be

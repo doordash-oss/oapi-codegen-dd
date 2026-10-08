@@ -75,6 +75,11 @@ type ParseOptions struct {
 	// is bit-for-bit what it was before streaming support existed.
 	ClientStreaming bool
 
+	// ClientWithResponse resolves the `default` response next to explicit
+	// error codes, which only the envelope client consumes. Off means no type
+	// generated for it there, so output is unchanged without the envelope.
+	ClientWithResponse bool
+
 	// ErrorMapping maps response type names to the field that should be used
 	// for the Error() method. When a response type has error mapping configured,
 	// it cannot be an alias (aliases don't support methods).
@@ -139,11 +144,15 @@ type TplOperationsContext struct {
 	WithHeader    bool
 	ServerOptions *ServerOptions
 	PackageName   string
+
+	// ErrorConstructors holds the error types that have a generated New<Type>(message string) constructor.
+	ErrorConstructors map[string]bool
 }
 
 // NewParser creates a new Parser with the provided ParseConfig and ParseContext.
 func NewParser(cfg Configuration, ctx *ParseContext) (*Parser, error) {
 	cfg = cfg.WithDefaults()
+	cfg.ErrorMapping = applicableErrorMapping(cfg.ErrorMapping, ctx)
 
 	tpl, err := loadTemplates(cfg)
 	if err != nil {
@@ -180,6 +189,17 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 
 	useSingleFile := p.cfg.Output != nil && p.cfg.Output.UseSingleFile
 	withHeader := !useSingleFile
+	typeSchemaMap := buildTypeSchemaMap(p.ctx)
+
+	// Bind the real models-package qualifier now that typeSchemaMap - the
+	// set of type names the models run would emit for this spec - is known.
+	// A nil/empty alias keeps modelType/modelsPrefix as no-ops, so output is
+	// unchanged when models-package isn't configured.
+	var modelsPackageAlias string
+	if p.cfg.Generate.Handler != nil && p.cfg.Generate.Handler.ModelsPackage != nil {
+		modelsPackageAlias = p.cfg.Generate.Handler.ModelsPackage.Alias
+	}
+	p.tpl.Funcs(newModelsQualifier(modelsPackageAlias, typeSchemaMap).funcMap())
 
 	// Only generate models if Models is not explicitly false
 	shouldGenerateModels := p.cfg.Generate == nil || p.cfg.Generate.Models == nil || *p.cfg.Generate.Models
@@ -267,10 +287,11 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 		ops := filterRouteConflicts(p.ctx.Operations, handlerKind)
 
 		opsCtx := &TplOperationsContext{
-			Operations: ops,
-			Imports:    p.ctx.Imports,
-			Config:     p.cfg,
-			WithHeader: withHeader,
+			Operations:        ops,
+			Imports:           p.ctx.Imports,
+			Config:            p.cfg,
+			WithHeader:        withHeader,
+			ErrorConstructors: errorConstructors(p.cfg.ErrorMapping, typeSchemaMap),
 		}
 		templatePrefix := "handler/" + string(handlerKind) + "/"
 		sharedPrefix := "handler/"
@@ -483,17 +504,6 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 	responseErrs := make(map[string]bool)
 	for _, respErr := range p.ctx.ResponseErrors {
 		responseErrs[respErr] = true
-	}
-
-	// Build a map of type names to schemas for cross-referencing
-	typeSchemaMap := make(map[string]GoSchema)
-	for _, tds := range p.ctx.TypeDefinitions {
-		for _, td := range tds {
-			typeSchemaMap[td.Name] = td.Schema
-		}
-	}
-	for _, td := range p.ctx.UnionTypes {
-		typeSchemaMap[td.Name] = td.Schema
 	}
 
 	// Only generate model types if Models is not explicitly false
@@ -768,6 +778,20 @@ func getSpecLocationOutName(specLocation SpecLocation) string {
 	default:
 		return string(specLocation)
 	}
+}
+
+// buildTypeSchemaMap maps type names to schemas for cross-referencing.
+func buildTypeSchemaMap(ctx *ParseContext) map[string]GoSchema {
+	res := make(map[string]GoSchema)
+	for _, tds := range ctx.TypeDefinitions {
+		for _, td := range tds {
+			res[td.Name] = td.Schema
+		}
+	}
+	for _, td := range ctx.UnionTypes {
+		res[td.Name] = td.Schema
+	}
+	return res
 }
 
 // getUserTemplateText attempts to retrieve the template text from a passed string or file..

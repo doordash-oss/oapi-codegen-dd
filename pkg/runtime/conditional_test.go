@@ -11,6 +11,7 @@
 package runtime
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -236,6 +237,16 @@ func TestConditional_Validate(t *testing.T) {
 		assert.NoError(t, c.Validate())
 	})
 
+	t.Run("fails validation for invalid Else variant", func(t *testing.T) {
+		c := NewConditionalFromElse[string, StrictConfig](StrictConfig{})
+		assert.Error(t, c.Validate())
+	})
+
+	t.Run("passes Then variant that is not a Validator", func(t *testing.T) {
+		c := NewConditionalFromThen[string, StrictConfig]("fallback")
+		assert.NoError(t, c.Validate())
+	})
+
 	t.Run("returns nil when neither is active", func(t *testing.T) {
 		var c Conditional[StrictConfig, string]
 		assert.NoError(t, c.Validate())
@@ -265,6 +276,15 @@ func TestConditional_UnmarshalJSON_Disambiguation(t *testing.T) {
 		assert.Equal(t, "fast", c.Then.Mode)
 		assert.Equal(t, 30, c.Then.Timeout)
 	})
+
+	t.Run("prefers Then when only Then validates", func(t *testing.T) {
+		data := []byte(`{"mode":"","timeout":0}`)
+		var c Conditional[LaxConfig, StrictConfig]
+
+		err := c.UnmarshalJSON(data)
+		assert.NoError(t, err)
+		assert.True(t, c.IsThen(), "should choose Then (LaxConfig) because it validates")
+	})
 }
 
 func TestConditional_UnmarshalJSON_FailsBoth(t *testing.T) {
@@ -274,4 +294,8 @@ func TestConditional_UnmarshalJSON_FailsBoth(t *testing.T) {
 
 	err := c.UnmarshalJSON(data)
 	assert.Error(t, err)
+}
+
+func TestConditional_FormMembers(t *testing.T) {
+	assert.Equal(t, []reflect.Type{reflect.TypeFor[bool](), reflect.TypeFor[string]()}, new(Conditional[bool, string]).formMembers())
 }

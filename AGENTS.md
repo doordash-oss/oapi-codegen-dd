@@ -28,7 +28,8 @@
 ### Handler/Server generation config
 - `generate.handler.kind` - Router framework: `chi`, `echo`, `fiber`, `gin`, `std-http` (required)
 - `generate.handler.name` - Service interface name (default: "Service")
-- `generate.handler.models-package-alias` - Prefix for model types when models are in separate package
+- `generate.handler.models-package` - `{path, alias}` of the models package when `generate.models: false` and models live in a different package from the handler; qualifies model type references in the handler and adds the import automatically
+- `generate.handler.handler-package-alias` - Alias used by the service scaffold (`service.go`) to reference the generated handler, when the scaffold is in its own package. Replaces the misleadingly named `models-package-alias` (still works as a deprecated fallback) - neither of these affects model type references, use `models-package` for that
 - `generate.handler.validation.request/response` - Enable request/response validation in handlers
 - `generate.handler.output.directory/package` - Output for scaffold files (service.go, middleware.go)
 - `generate.handler.middleware: {}` - Enable middleware.go generation
@@ -154,6 +155,16 @@ Central registry for managing type names and references:
 - Sibling methods live in `templates/client-stream.tmpl`. Names are precomputed by `assignStreamMethodNames` through the TypeTracker: `<ID>Stream` collides readily (lichess ships both `StreamGame` and `BoardGameStream`)
 - `warnUnconsumableStreams` logs affected operations when the flag is off, so the flag is discoverable. It scans media type names only, independent of the detection pass, because the warning has to work precisely when detection is switched off
 - The client marks the request via `RequestOptionsParameters.Stream`, and `runtime.Client.ExecuteRequest` skips buffering only for a marked request whose 2xx response has a sequential Content-Type
+
+### Status ranges and `default` (envelope client)
+- `All` / `Success` / `Error` put a range or `default` at a stand-in `StatusCode` (`2XX` 200, `4XX` and `5XX` both 400, `default` 200 or 500). Handler generation depends on those codes, so they stay as they are. The envelope client never matches on them
+- The envelope reads `Successes` / `Errors` (exact codes only), `StatusRanges` and `Default`, built by `setEnvelopeResponses` from every documented response. `ResponseContentDefinition.StatusRange` / `IsDefault` say what a response covers, and `StatusName()` gives the `JSON4XX` / `JSONDefault` / `Headers5XX` suffix. Templates get header struct names from `OperationDefinition.HeaderTypeName(rcd)`; `HeaderTypeNames` stays keyed by status code so custom templates indexing it by `StatusCode` keep working
+- Fields earlier versions generated at a stand-in code stay as deprecated aliases that point at the same value: `LegacyBodyField` (e.g. `JSON400` for an inline `4XX`, `JSON200` for `2XX`) and `HasLegacyHeaders` (e.g. `Headers500` plus a `<Op>Resp500Headers` type alias for `default`). Only the response `All` holds at that code gets them, never one referencing a component response (it had no field), and an exact code documented there owns the name instead. `decodeBody` sets the alias through its optional `alias` input
+- A type name that needs a status suffix to stay unique takes the range (`...JSON4XX`), so `...JSON400` always means an explicit 400
+- Exact codes stay `case N:` values, so operations without ranges or `default` generate byte-identical code. Ranges (`resp.StatusCode/100 == N`) and then `default` are matched inside the `default:` branch, giving OpenAPI precedence
+- A documented error without a body only joins the envelope when a range or `default` would otherwise claim its status, so it keeps precedence without changing other operations' output
+- `default` next to explicit error codes is only built with `generate.client-with-response` (`ParseOptions.ClientWithResponse`), since it adds a type nothing else uses
+- `client-stream.tmpl`'s `<Op>StreamWithResponse` matches only error responses past the streaming status, so it skips success ranges and a `default` standing in for the success
 
 ### Union types (oneOf/anyOf)
 - Union types are generated as structs with pointer fields for each variant

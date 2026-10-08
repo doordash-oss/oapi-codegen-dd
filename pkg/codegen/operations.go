@@ -60,8 +60,23 @@ type OperationDefinition struct {
 	// HeaderTypeNames maps each documented status code to the name of the
 	// per-status typed header struct emitted alongside the envelope (e.g.
 	// 201 -> "UploadDocumentResp201Headers"). Only populated for statuses
-	// that declare at least one header in the spec.
+	// that declare at least one header in the spec. A range or `default` the
+	// envelope used to expose at its stand-in code keeps its old name here,
+	// as a deprecated alias; HeaderTypeName returns any response's current name.
 	HeaderTypeNames map[int]string
+
+	// statusHeaderTypeNames maps a range or `default` response, by its
+	// StatusName, to the name of its typed header struct.
+	statusHeaderTypeNames map[string]string
+}
+
+// HeaderTypeName returns the name of the typed header struct the envelope
+// declares for rcd, a response of this operation that documents headers.
+func (o OperationDefinition) HeaderTypeName(rcd *ResponseContentDefinition) string {
+	if rcd.isExactStatus() {
+		return o.HeaderTypeNames[rcd.StatusCode]
+	}
+	return o.statusHeaderTypeNames[rcd.StatusName()]
 }
 
 // RequiresParamObject indicates If we have parameters other than path parameters, they're bundled into an

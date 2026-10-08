@@ -39,6 +39,11 @@ type Constraints struct {
 	MinProperties  *int64
 	MaxProperties  *int64
 	ValidationTags []string
+
+	// RequiredKey is set for an object property listed in required: its key is written even when
+	// nil, as null. Required only drives the validator tag, which some types drop. readOnly and
+	// writeOnly properties don't count, as each is left out of one direction.
+	RequiredKey bool
 }
 
 func (c Constraints) IsEqual(other Constraints) bool {
@@ -55,7 +60,8 @@ func (c Constraints) IsEqual(other Constraints) bool {
 		ptrEqual(c.MaxItems, other.MaxItems) &&
 		ptrEqual(c.MinProperties, other.MinProperties) &&
 		ptrEqual(c.MaxProperties, other.MaxProperties) &&
-		slices.Equal(c.ValidationTags, other.ValidationTags)
+		slices.Equal(c.ValidationTags, other.ValidationTags) &&
+		c.RequiredKey == other.RequiredKey
 }
 
 // Count returns the number of validation constraints.

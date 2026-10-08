@@ -482,3 +482,51 @@ func TestDeduplicateUnionElements_StricterWins(t *testing.T) {
 		assert.Equal(t, "string", result[2].TypeName)
 	})
 }
+
+func TestIsNullableUnion(t *testing.T) {
+	typed := func(types ...string) *base.SchemaProxy {
+		return base.CreateSchemaProxy(&base.Schema{Type: types})
+	}
+
+	tests := []struct {
+		name   string
+		schema *base.Schema
+		want   bool
+	}{
+		{
+			name:   "anyOf of a type and null",
+			schema: &base.Schema{AnyOf: []*base.SchemaProxy{typed("string"), typed("null")}},
+			want:   true,
+		},
+		{
+			name:   "oneOf listing null first",
+			schema: &base.Schema{OneOf: []*base.SchemaProxy{typed("null"), typed("object")}},
+			want:   true,
+		},
+		{
+			name:   "two types besides null make a union",
+			schema: &base.Schema{AnyOf: []*base.SchemaProxy{typed("string"), typed("integer"), typed("null")}},
+		},
+		{
+			name:   "no null option",
+			schema: &base.Schema{AnyOf: []*base.SchemaProxy{typed("string"), typed("integer")}},
+		},
+		{
+			name:   "only null",
+			schema: &base.Schema{AnyOf: []*base.SchemaProxy{typed("null")}},
+		},
+		{
+			name:   "a type of its own excludes null",
+			schema: &base.Schema{Type: []string{"string"}, AnyOf: []*base.SchemaProxy{typed("string"), typed("null")}},
+		},
+		{
+			name: "no schema",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isNullableUnion(tt.schema))
+		})
+	}
+}

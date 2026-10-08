@@ -101,6 +101,24 @@ func TestEncodeFormFields(t *testing.T) {
 		expected := "v1=1&v2=1.2&v3=true&v4=test&v5=123456789&v6=123.456789&v7=12345678901234"
 		assert.Equal(t, expected, resDecoded)
 	})
+
+	t.Run("form style without explode", func(t *testing.T) {
+		explode := false
+		data := map[string]any{"filter": map[string]any{"b": 2, "a": "x"}}
+		res, err := EncodeFormFields(data, map[string]FieldEncoding{"filter": {Style: "form", Explode: &explode}})
+
+		resDecoded, _ := url.QueryUnescape(res)
+		require.NoError(t, err)
+		assert.Equal(t, "filter=a,x,b,2", resDecoded)
+	})
+
+	t.Run("data that is not a JSON object", func(t *testing.T) {
+		_, err := EncodeFormFields(map[string]any{"c": make(chan int)}, nil)
+		assert.Error(t, err)
+
+		_, err = EncodeFormFields([]int{1}, nil)
+		assert.Error(t, err)
+	})
 }
 
 func TestConvertFormFields(t *testing.T) {
@@ -304,6 +322,38 @@ func TestConvertFormFields(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, data)
 	})
+}
+
+func TestDecodeFormData(t *testing.T) {
+	tests := []struct {
+		name     string
+		form     string
+		expected map[string]any
+	}{
+		{"simple", "a=1", map[string]any{"a": "1"}},
+		{"repeated", "a=1&a=2", map[string]any{"a": []any{"1", "2"}}},
+		{"nested", "o[k]=1", map[string]any{"o": map[string]any{"k": "1"}}},
+		{"repeated nested", "o[k]=1&o[k]=2", map[string]any{"o": map[string]any{"k": []any{"1", "2"}}}},
+		{"array", "a[1]=1", map[string]any{"a": []any{nil, "1"}}},
+		{"nested array", "o[a][1]=1", map[string]any{"o": map[string]any{"a": []any{nil, "1"}}}},
+		{"array of objects", "o[a][0][k]=1", map[string]any{"o": map[string]any{"a": []any{map[string]any{"k": "1"}}}}},
+		{"key with no name", "[]=1", map[string]any{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			values, err := url.ParseQuery(tt.form)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, decodeFormData(values, keepFormString))
+		})
+	}
+}
+
+func TestSetNestedValue(t *testing.T) {
+	// A scalar at the index gives way to the object the key descends into.
+	result := map[string]any{"o": map[string]any{"a": []any{"x"}}}
+	setNestedValue(result, "o[a][0][k]", []string{"1"}, keepFormString)
+	assert.Equal(t, map[string]any{"o": map[string]any{"a": []any{map[string]any{"k": "1"}}}}, result)
 }
 
 func TestParseDeepObjectKey(t *testing.T) {

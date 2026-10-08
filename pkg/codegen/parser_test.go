@@ -253,6 +253,25 @@ type AddressOneOf struct {
 	})
 }
 
+func TestBuildTypeSchemaMap(t *testing.T) {
+	ctx := &ParseContext{
+		TypeDefinitions: map[SpecLocation][]TypeDefinition{
+			SpecLocationSchema:   {{Name: "PlainError", Schema: GoSchema{GoType: "struct{}"}}},
+			SpecLocationResponse: {{Name: "GetErrorResponse", Schema: GoSchema{RefType: "PlainError"}}},
+		},
+		UnionTypes: []TypeDefinition{
+			{Name: "Error_OneOf", Schema: GoSchema{UnionElements: []UnionElement{{TypeName: "A"}, {TypeName: "B"}}}},
+		},
+	}
+
+	res := buildTypeSchemaMap(ctx)
+
+	assert.Len(t, res, 3)
+	assert.Equal(t, "struct{}", res["PlainError"].GoType)
+	assert.Equal(t, "PlainError", res["GetErrorResponse"].RefType)
+	assert.Len(t, res["Error_OneOf"].UnionElements, 2)
+}
+
 func TestFilterAmbiguousRoutes(t *testing.T) {
 	tests := []struct {
 		name     string

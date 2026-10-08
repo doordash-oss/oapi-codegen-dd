@@ -14,19 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// httpClientAdapter adapts http.Client to runtime.HttpRequestDoer.
-type httpClientAdapter struct {
-	client *http.Client
-}
-
-func (a *httpClientAdapter) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return a.client.Do(req)
-}
-
 // newClient points a generated client at srv.
 func newClient(t *testing.T, srv *httptest.Server) *Client {
 	t.Helper()
-	client, err := NewDefaultClient(srv.URL, runtime.WithHTTPClient(&httpClientAdapter{client: srv.Client()}))
+	client, err := NewDefaultClient(srv.URL, runtime.WithStdHTTPClient(srv.Client()))
 	require.NoError(t, err)
 	return client
 }
@@ -302,6 +293,47 @@ func TestStreamLogs_DecodesLineDelimitedJSON(t *testing.T) {
 
 	assert.Equal(t, []string{"first", "second"}, messages)
 	assert.Equal(t, []StreamLogsResponseLevel{Info, Warn}, levels)
+}
+
+// A status range and `default` reach the streaming envelope too, matched after
+// the exact codes like in the buffered method.
+func TestStreamLogsStreamWithResponse_DecodesRangeAndDefault(t *testing.T) {
+	errorServer := func(t *testing.T, status int) *httptest.Server {
+		t.Helper()
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			_, _ = fmt.Fprintf(w, `{"message":"status %d"}`, status)
+		}))
+	}
+
+	t.Run("4XX", func(t *testing.T) {
+		srv := errorServer(t, http.StatusTooManyRequests)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).StreamLogsStreamWithResponse(context.Background())
+		var apiErr *runtime.ClientAPIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusTooManyRequests, apiErr.StatusCode())
+		require.NotNil(t, resp.JSON4XX)
+		assert.Equal(t, "status 429", resp.JSON4XX.Message)
+		assert.Same(t, resp.JSON4XX, resp.JSON400, "the deprecated name earlier versions used")
+		assert.Nil(t, resp.JSONDefault)
+		assert.Nil(t, resp.Stream200)
+	})
+
+	t.Run("default", func(t *testing.T) {
+		srv := errorServer(t, http.StatusServiceUnavailable)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).StreamLogsStreamWithResponse(context.Background())
+		var apiErr *runtime.ClientAPIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusServiceUnavailable, apiErr.StatusCode())
+		require.NotNil(t, resp.JSONDefault)
+		assert.Equal(t, "status 503", resp.JSONDefault.Message)
+		assert.Nil(t, resp.JSON4XX)
+	})
 }
 
 func TestGetEventsWithResponse_ExposesStreamOnEnvelope(t *testing.T) {

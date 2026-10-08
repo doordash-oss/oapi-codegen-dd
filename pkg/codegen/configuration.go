@@ -12,6 +12,7 @@ package codegen
 
 import (
 	"fmt"
+	"path"
 	"strings"
 	"time"
 )
@@ -104,6 +105,29 @@ func (o Configuration) WithDefaults() Configuration {
 			}
 			if o.Generate.Handler.MultipartMaxMemory == 0 {
 				o.Generate.Handler.MultipartMaxMemory = 32
+			}
+
+			// HandlerPackageAlias replaces the misleadingly named
+			// ModelsPackageAlias. Fall back to it when unset so existing
+			// configs keep working.
+			if o.Generate.Handler.HandlerPackageAlias == "" {
+				o.Generate.Handler.HandlerPackageAlias = o.Generate.Handler.ModelsPackageAlias
+			}
+
+			if mp := o.Generate.Handler.ModelsPackage; mp != nil {
+				naturalAlias := path.Base(mp.Path)
+				if mp.Alias == "" {
+					mp.Alias = naturalAlias
+				}
+				imp := AdditionalImport{Package: mp.Path}
+
+				// Only emit an explicit import alias when it differs from
+				// the one Go would infer on its own - matches how these
+				// imports look when written by hand.
+				if mp.Alias != naturalAlias {
+					imp.Alias = mp.Alias
+				}
+				o.AdditionalImports = appendImportIfMissing(o.AdditionalImports, imp)
 			}
 		}
 	}
@@ -265,6 +289,17 @@ type AdditionalImport struct {
 	Package string `yaml:"package"`
 }
 
+// appendImportIfMissing appends imp to imports unless an entry with the same
+// Package is already present.
+func appendImportIfMissing(imports []AdditionalImport, imp AdditionalImport) []AdditionalImport {
+	for _, existing := range imports {
+		if existing.Package == imp.Package {
+			return imports
+		}
+	}
+	return append(imports, imp)
+}
+
 // FilterConfig is the configuration for filtering the paths and operations to be parsed.
 type FilterConfig struct {
 	Include FilterParamsConfig `yaml:"include"`
@@ -378,6 +413,14 @@ func (o GenerateOptions) Validate() error {
 			return fmt.Errorf("%w: %q", ErrInvalidAdditionalTag, tag)
 		}
 	}
+
+	if o.Handler != nil && o.Handler.ModelsPackage != nil {
+		modelsDisabled := o.Models != nil && !*o.Models
+		if !modelsDisabled {
+			return ErrModelsPackageRequiresModelsFalse
+		}
+	}
+
 	return nil
 }
 
@@ -456,9 +499,33 @@ type HandlerOptions struct {
 	// Validation specifies options for request/response validation in handlers.
 	Validation HandlerValidation `yaml:"validation"`
 
-	// ModelsPackageAlias is the package alias to prefix model types with.
-	// Used when models are generated separately (generate.models: false).
-	// Example: "types" will generate "types.User" instead of "User".
+	// ModelsPackage specifies the package that model types live in, when they
+	// are generated separately from the handler (generate.models: false) and
+	// into a different package. Model type references in the generated
+	// handler (request/response types, path/query/header/body params) are
+	// qualified with its alias, and its import is added automatically.
+	//
+	// Requires generate.models: false, and both generation runs must be
+	// given the same spec, filters, and error-mapping.
+	ModelsPackage *ModelsPackage `yaml:"models-package"`
+
+	// HandlerPackageAlias is the package alias used to reference the
+	// generated handler code from the service scaffold (service.go), when
+	// the scaffold is generated into its own package via
+	// generate.handler.output. Example: "server" produces
+	// "server.ServiceInterface" in service.go.
+	//
+	// This does not affect model type references - use ModelsPackage for
+	// that. It replaces the misleadingly named ModelsPackageAlias.
+	HandlerPackageAlias string `yaml:"handler-package-alias"`
+
+	// ModelsPackageAlias is the package alias used to reference the
+	// generated handler code from the service scaffold.
+	//
+	// Deprecated: use HandlerPackageAlias. Despite the name, this was never
+	// the package models live in - it's the package the generated handler
+	// itself is in, as seen from service.go. Kept only as a fallback: if
+	// HandlerPackageAlias is unset, its value is used.
 	ModelsPackageAlias string `yaml:"models-package-alias"`
 
 	// MultipartMaxMemory is the maximum memory in MB for multipart form parsing.
@@ -521,7 +588,27 @@ func (o HandlerOptions) Validate() error {
 	if o.Server != nil && o.Service == nil {
 		return ErrServerRequiresService
 	}
+
+	if o.ModelsPackage != nil && o.ModelsPackage.Path == "" {
+		return ErrModelsPackagePathRequired
+	}
+
+	if o.HandlerPackageAlias != "" && o.ModelsPackageAlias != "" && o.HandlerPackageAlias != o.ModelsPackageAlias {
+		return ErrConflictingPackageAlias
+	}
+
 	return nil
+}
+
+// ModelsPackage specifies the package that model types are generated into,
+// for handler code that is generated separately and needs to reference them.
+type ModelsPackage struct {
+	// Path is the Go import path of the models package. Required.
+	Path string `yaml:"path"`
+
+	// Alias is the identifier used to qualify model type references in the
+	// generated handler. Defaults to the last path segment of Path.
+	Alias string `yaml:"alias,omitempty"`
 }
 
 // HandlerValidation specifies validation options for handlers.

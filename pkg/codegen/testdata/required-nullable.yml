@@ -1,0 +1,74 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Required nullable properties
+paths:
+  /items:
+    get:
+      operationId: getItem
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+components:
+  schemas:
+    Owner:
+      type: object
+      properties:
+        name:
+          type: string
+    Cat:
+      type: object
+      properties:
+        meow:
+          type: string
+    Dog:
+      type: object
+      properties:
+        bark:
+          type: string
+    Item:
+      type: object
+      required:
+        - updated_at
+        - owner
+        - nickname
+        - tags
+        - id
+        - pet
+      properties:
+        # anyOf with null becomes a pointer that writes nil as null
+        updated_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        owner:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/Owner"
+        nickname:
+          type: [string, "null"]
+        tags:
+          type: [array, "null"]
+          items:
+            type: string
+        # readOnly properties count as optional, so they keep omitempty
+        id:
+          anyOf:
+            - type: string
+            - type: "null"
+          readOnly: true
+        # A union of two types already decodes null itself
+        pet:
+          anyOf:
+            - $ref: "#/components/schemas/Cat"
+            - $ref: "#/components/schemas/Dog"
+            - type: "null"
+        note:
+          anyOf:
+            - type: string
+            - type: "null"

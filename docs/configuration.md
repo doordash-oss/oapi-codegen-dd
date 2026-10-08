@@ -158,6 +158,8 @@ Generate `<Op>WithResponse` sibling functions that return a typed envelope: one 
 
 Use this when an operation has multiple 2xx statuses with different bodies (e.g. 201 sync + 202 queued), or when callers need typed access to response headers like `Location` or `Retry-After`.
 
+Status ranges and `default` get fields of their own: `JSON4XX` for `4XX`, `JSONDefault` for `default`. Responses are matched as OpenAPI specifies, so an exact status wins over the range covering it, and both win over `default`: with `404`, `4XX` and `default` documented, a 404 fills `JSON404`, a 409 `JSON4XX` and a 503 `JSONDefault`. The returned error is nil only for a documented success. When `default` is the only success documented, it counts as one for 2xx statuses only. Earlier versions exposed a range under a single stand-in code, such as `JSON400` for `4XX` or `JSON200` for `2XX`; those fields remain as deprecated aliases of the new ones, unless an explicit code now owns the name.
+
 Additive to [`generate.client`](#generateclient). When both flags are true, the generated `ClientInterface` lists every classic method alongside its `WithResponse` sibling so a single mock or test double covers both shapes.
 
 ```yaml
@@ -338,20 +340,56 @@ generate:
     name: "APIService"
 ```
 
-#### `generate.handler.models-package-alias`
-**Type:** `string` | **Default:** `""`
+#### `generate.handler.models-package`
+**Type:** `object` (`path`, `alias`) | **Default:** none
 
-Package alias to prefix model types with. Used when models are generated in a separate package (`generate.models: false`).
+Package that model types live in, when they're generated separately
+(`generate.models: false`) into a different package from the handler.
+`path` is the Go import path (required); `alias` is the identifier used to
+qualify model type references and defaults to the last segment of `path`.
+Every model type reference in the generated handler is qualified, and the
+import is added automatically.
 
 ```yaml
 generate:
   models: false
   handler:
     kind: chi
-    models-package-alias: types
+    models-package:
+      path: example.com/myapp/models
+      alias: models  # optional
 ```
 
-This generates `types.User` instead of `User` in the handler code.
+This generates `models.User` instead of `User` in the handler code. Both the
+models run and the handler run must use the same spec, `filter`, and
+`error-mapping`. See [Server Generation](server-generation.md#generatehandlermodels-package)
+for the full two-step setup.
+
+#### `generate.handler.handler-package-alias`
+**Type:** `string` | **Default:** `""`
+
+Package alias used to reference the generated handler code from the service
+scaffold (`service.go`), when the scaffold is generated into its own
+package. Unrelated to `models-package` above - this qualifies handler-owned
+symbols (`ServiceInterface`, `<Op>ServiceRequestOptions`), not model types.
+
+```yaml
+generate:
+  handler:
+    kind: chi
+    handler-package-alias: server
+```
+
+This generates `server.ServiceInterface` instead of `ServiceInterface` in
+`service.go`.
+
+#### `generate.handler.models-package-alias`
+**Type:** `string` | **Default:** `""`
+
+**Deprecated:** use `handler-package-alias`. Despite the name, this was
+never the package models live in - it's the package the generated handler
+itself is in, as seen from `service.go`. Kept as a fallback: if
+`handler-package-alias` is unset, this value is used.
 
 #### `generate.handler.multipart-max-memory`
 **Type:** `integer` | **Default:** `32`
@@ -597,10 +635,17 @@ error-mapping:
   UpdateClientErrorResponseJSON: arrayField[].code
 ```
 
+Each key names an error response type: the component name when the response references a component, or `<OperationId>ErrorResponse` when the error schema is defined inline in the operation.
+
 When configured, the response type will have:
 
 1. **`Error() string` method** - Returns the value from the specified field path
 2. **Constructor function** - `NewTypeName(message string)` for easy error creation
+
+An entry that cannot be applied is skipped with a warning at generation time. This happens when:
+
+- The key does not name an error response type. If the response references a component that is only an alias (`AliasedError: {$ref: BaseError}`), map the target type (`BaseError`) instead.
+- The path does not resolve against the type's properties, or against the variants of a union (see [Union Error Types](#union-error-types)). The type keeps the default `Error()`, which returns `"unmapped client error"`.
 
 ### Generated Code Example
 
@@ -643,6 +688,39 @@ func (s *Service) CreateUser(ctx context.Context, opts *CreateUserOpts) (*Create
 ```
 
 See [examples/client/example1/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/client/example1/cfg.yaml){:target="_blank"} for a complete example.
+
+### Union Error Types
+
+When the error type is a `oneOf`/`anyOf` union, or the path passes through one, the rest of the path is looked up in each variant. `Error()` returns the field of whichever variant was decoded, and `"unknown error"` for a variant that doesn't have it.
+
+Given `WidgetError` defined as `anyOf: [NotFound, string]` and this configuration:
+
+```yaml
+error-mapping:
+  WidgetError: message
+```
+
+The generator produces:
+
+```go
+func (s WidgetError) Error() string {
+    res0 := s.WidgetError_AnyOf
+    if res0 == nil {
+        return "unknown error"
+    }
+    res1 := *res0
+    switch res2 := res1.Value().(type) {
+    case NotFound:
+        res3 := res2.Message
+        return res3
+    }
+    return "unknown error"
+}
+```
+
+A union that doesn't have exactly two variants needs a `discriminator` so the decoded variant is known; without one, the entry is skipped with a warning. On an `anyOf`, the discriminator is only used when every variant is a `$ref` or declares its own discriminator value. No constructor is generated for union error types, because a message alone doesn't say which variant to build, so generated server handlers use the generic error response for them.
+
+See [examples/responses/error-mapping/union](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/error-mapping/union){:target="_blank"} for a complete example.
 
 ## User Templates
 

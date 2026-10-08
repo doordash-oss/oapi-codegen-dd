@@ -131,13 +131,17 @@ func createObjectSchema(schema *base.Schema, options ParseOptions) (GoSchema, er
 
 				hasNilTyp := false
 				if p.Schema() != nil {
-					hasNilTyp = slices.Contains(p.Schema().Type, "null")
+					// generateUnion drops the null option of `anyOf: [T, {type: "null"}]`, so pSchema is plain T.
+					hasNilTyp = slices.Contains(p.Schema().Type, "null") || isNullableUnion(p.Schema())
 				}
+				isRequired := slices.Contains(required, pName)
 				constraints := newConstraints(p.Schema(), ConstraintsContext{
 					hasNilType:   hasNilTyp,
-					required:     slices.Contains(required, pName),
+					required:     isRequired,
 					specLocation: options.specLocation,
 				})
+				// readOnly and writeOnly count as optional, as they do in newConstraints.
+				constraints.RequiredKey = isRequired && !deref(constraints.ReadOnly) && !deref(constraints.WriteOnly)
 				pSchema.Constraints = constraints
 
 				if (pSchema.HasAdditionalProperties || len(pSchema.UnionElements) != 0) && pSchema.RefType == "" {

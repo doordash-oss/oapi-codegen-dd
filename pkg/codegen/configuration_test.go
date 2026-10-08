@@ -384,4 +384,194 @@ func TestGenerateOptions_Validate(t *testing.T) {
 		o := GenerateOptions{}
 		assert.NoError(t, o.Validate())
 	})
+
+	t.Run("models-package requires models: false", func(t *testing.T) {
+		o := GenerateOptions{
+			Handler: &HandlerOptions{
+				Kind:          HandlerKindChi,
+				ModelsPackage: &ModelsPackage{Path: "example.com/app/models"},
+			},
+		}
+		assert.ErrorIs(t, o.Validate(), ErrModelsPackageRequiresModelsFalse)
+	})
+
+	t.Run("models-package with models: false is valid", func(t *testing.T) {
+		o := GenerateOptions{
+			Models: ptr(false),
+			Handler: &HandlerOptions{
+				Kind:          HandlerKindChi,
+				ModelsPackage: &ModelsPackage{Path: "example.com/app/models"},
+			},
+		}
+		assert.NoError(t, o.Validate())
+	})
+
+	t.Run("no models-package does not require models: false", func(t *testing.T) {
+		o := GenerateOptions{
+			Handler: &HandlerOptions{Kind: HandlerKindChi},
+		}
+		assert.NoError(t, o.Validate())
+	})
+}
+
+func TestHandlerOptions_Validate(t *testing.T) {
+	t.Run("models-package without a path is invalid", func(t *testing.T) {
+		o := HandlerOptions{
+			Kind:          HandlerKindChi,
+			ModelsPackage: &ModelsPackage{},
+		}
+		assert.ErrorIs(t, o.Validate(), ErrModelsPackagePathRequired)
+	})
+
+	t.Run("models-package with a path is valid", func(t *testing.T) {
+		o := HandlerOptions{
+			Kind:          HandlerKindChi,
+			ModelsPackage: &ModelsPackage{Path: "example.com/app/models"},
+		}
+		assert.NoError(t, o.Validate())
+	})
+
+	t.Run("conflicting handler-package-alias and models-package-alias", func(t *testing.T) {
+		o := HandlerOptions{
+			Kind:                HandlerKindChi,
+			HandlerPackageAlias: "server",
+			ModelsPackageAlias:  "handler",
+		}
+		assert.ErrorIs(t, o.Validate(), ErrConflictingPackageAlias)
+	})
+
+	t.Run("same value in both alias fields is not a conflict", func(t *testing.T) {
+		o := HandlerOptions{
+			Kind:                HandlerKindChi,
+			HandlerPackageAlias: "server",
+			ModelsPackageAlias:  "server",
+		}
+		assert.NoError(t, o.Validate())
+	})
+
+	t.Run("only the deprecated alias set is not a conflict", func(t *testing.T) {
+		o := HandlerOptions{
+			Kind:               HandlerKindChi,
+			ModelsPackageAlias: "server",
+		}
+		assert.NoError(t, o.Validate())
+	})
+}
+
+func TestConfiguration_WithDefaults_ModelsPackage(t *testing.T) {
+	t.Run("deprecated models-package-alias falls back to handler-package-alias", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:               HandlerKindChi,
+					ModelsPackageAlias: "server",
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		assert.Equal(t, "server", result.Generate.Handler.HandlerPackageAlias)
+		assert.Equal(t, "server", result.Generate.Handler.ModelsPackageAlias)
+	})
+
+	t.Run("handler-package-alias set explicitly is not overwritten", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:                HandlerKindChi,
+					HandlerPackageAlias: "server",
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		assert.Equal(t, "server", result.Generate.Handler.HandlerPackageAlias)
+	})
+
+	t.Run("models-package alias defaults to the last path segment", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:          HandlerKindChi,
+					ModelsPackage: &ModelsPackage{Path: "example.com/app/models"},
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		assert.Equal(t, "models", result.Generate.Handler.ModelsPackage.Alias)
+	})
+
+	t.Run("models-package alias set explicitly is not overwritten", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:          HandlerKindChi,
+					ModelsPackage: &ModelsPackage{Path: "example.com/app/models", Alias: "custom"},
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		assert.Equal(t, "custom", result.Generate.Handler.ModelsPackage.Alias)
+	})
+
+	t.Run("models-package adds an additional-imports entry without a redundant alias", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:          HandlerKindChi,
+					ModelsPackage: &ModelsPackage{Path: "example.com/app/models"},
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		require.Len(t, result.AdditionalImports, 1)
+		assert.Equal(t, AdditionalImport{Package: "example.com/app/models"}, result.AdditionalImports[0])
+	})
+
+	t.Run("models-package with a custom alias keeps an explicit import alias", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:          HandlerKindChi,
+					ModelsPackage: &ModelsPackage{Path: "example.com/app/models", Alias: "mdl"},
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		require.Len(t, result.AdditionalImports, 1)
+		assert.Equal(t, AdditionalImport{Alias: "mdl", Package: "example.com/app/models"}, result.AdditionalImports[0])
+	})
+
+	t.Run("models-package does not duplicate an existing additional-imports entry", func(t *testing.T) {
+		cfg := Configuration{
+			AdditionalImports: []AdditionalImport{
+				{Alias: "m", Package: "example.com/app/models"},
+			},
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{
+					Kind:          HandlerKindChi,
+					ModelsPackage: &ModelsPackage{Path: "example.com/app/models"},
+				},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		require.Len(t, result.AdditionalImports, 1)
+		assert.Equal(t, "m", result.AdditionalImports[0].Alias)
+	})
+
+	t.Run("no models-package leaves additional-imports untouched", func(t *testing.T) {
+		cfg := Configuration{
+			Generate: &GenerateOptions{
+				Handler: &HandlerOptions{Kind: HandlerKindChi},
+			},
+		}
+
+		result := cfg.WithDefaults()
+		assert.Empty(t, result.AdditionalImports)
+	})
 }

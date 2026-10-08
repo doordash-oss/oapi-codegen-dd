@@ -99,8 +99,13 @@ func createFromCombinator(schema *base.Schema, options ParseOptions) (GoSchema, 
 
 	if hasAnyOf {
 		anyOfPath := append(path, "anyOf")
+		// The discriminator goes to anyOf only when there is no oneOf to take it.
+		var anyOfDiscriminator *base.Discriminator
+		if !hasOneOf {
+			anyOfDiscriminator = usableDiscriminator(schema.AnyOf, schema.Discriminator)
+		}
 		var err error
-		anyOfSchema, err = generateUnion(schema.AnyOf, nil, options.WithPath(anyOfPath))
+		anyOfSchema, err = generateUnion(schema.AnyOf, anyOfDiscriminator, options.WithPath(anyOfPath))
 		if err != nil {
 			return GoSchema{}, fmt.Errorf("error resolving anyOf: %w", err)
 		}
