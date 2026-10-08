@@ -210,18 +210,19 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                 queryParams.{{ .GoName }} = {{ $paramVar }}
             {{- end }}
             }
-        {{- else if .Schema.ArrayType }}
+        {{- else if .ArraySchema }}
+            {{- $array := .ArraySchema }}
             {{/* Array query params: use query["key"] to get all values */}}
             if values, ok := query["{{ escapeGoString .ParamName }}"]; ok {
-                {{- if hasPrefix .Schema.GoType "[]*" }}
+                {{- if hasPrefix $array.GoType "[]*" }}
                     {{/* Nullable array - parse and convert each element to pointer */}}
-                    {{- if eq .Schema.ArrayType.TypeDecl "string" }}
+                    {{- if eq $array.ArrayType.TypeDecl "string" }}
                     result := make([]*string, len(values))
                     for i := range values {
                         result[i] = &values[i]
                     }
                     {{- else }}
-                    parsed, err := runtime.ParseStringSlice[{{ modelType .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
+                    parsed, err := runtime.ParseStringSlice[{{ modelType $array.ArrayType.TypeDecl }}](values{{- if $array.ArrayType.Format }}, "{{ escapeGoString $array.ArrayType.Format }}"{{- end }})
                     if err != nil {
                         {{- if $hasTypedError }}
                         a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))
@@ -237,23 +238,23 @@ func (a *HTTPAdapter) {{ $op.ID | ucFirst }}(w http.ResponseWriter, r *http.Requ
                         {{- end }}
                         return
                     }
-                    result := make({{ modelType .Schema.GoType }}, len(parsed))
+                    result := make({{ modelType $array.GoType }}, len(parsed))
                     for i := range parsed {
                         result[i] = &parsed[i]
                     }
                     {{- end }}
                     queryParams.{{ .GoName }} = result
-                {{- else if eq .Schema.ArrayType.TypeDecl "string" }}
+                {{- else if eq $array.ArrayType.TypeDecl "string" }}
                     queryParams.{{ .GoName }} = values
-                {{- else if and (eq .Schema.ArrayType.GoType "string") (ne .Schema.ArrayType.TypeDecl "string") }}
+                {{- else if and (eq $array.ArrayType.GoType "string") (ne $array.ArrayType.TypeDecl "string") }}
                     {{/* String-based enum array - convert each element */}}
-                    result := make([]{{ modelType .Schema.ArrayType.TypeDecl }}, len(values))
+                    result := make([]{{ modelType $array.ArrayType.TypeDecl }}, len(values))
                     for i, v := range values {
-                        result[i] = {{ modelType .Schema.ArrayType.TypeDecl }}(v)
+                        result[i] = {{ modelType $array.ArrayType.TypeDecl }}(v)
                     }
                     queryParams.{{ .GoName }} = result
                 {{- else }}
-                    parsed, err := runtime.ParseStringSlice[{{ modelType .Schema.ArrayType.TypeDecl }}](values{{- if .Schema.ArrayType.Format }}, "{{ escapeGoString .Schema.ArrayType.Format }}"{{- end }})
+                    parsed, err := runtime.ParseStringSlice[{{ modelType $array.ArrayType.TypeDecl }}](values{{- if $array.ArrayType.Format }}, "{{ escapeGoString $array.ArrayType.Format }}"{{- end }})
                     if err != nil {
                         {{- if $hasTypedError }}
                         a.errHandler.HandleError(w, r, {{ $op.Response.Error.StatusCode }}, {{ modelsPrefix }}New{{ $errorTypeName }}(err.Error()))

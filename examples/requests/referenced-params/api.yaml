@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: API
+  description: Array query parameters declared once and referenced
+  version: 1.0.0
+
+paths:
+  /search:
+    get:
+      operationId: search
+      parameters:
+        - $ref: '#/components/parameters/Terms'
+        - $ref: '#/components/parameters/Tags'
+        - name: id
+          in: query
+          schema:
+            $ref: '#/components/schemas/IDList'
+      responses:
+        '204':
+          description: OK
+
+components:
+  parameters:
+    Terms:
+      name: term
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          maxLength: 3
+    Tags:
+      name: tag
+      in: query
+      schema:
+        $ref: '#/components/schemas/TagList'
+
+  schemas:
+    TagList:
+      type: array
+      maxItems: 2
+      items:
+        type: string
+    IDList:
+      type: array
+      items:
+        type: integer

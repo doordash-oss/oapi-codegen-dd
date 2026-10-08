@@ -1069,3 +1069,39 @@ func TestOptionalRequestBodyToleratesAnEmptyBody(t *testing.T) {
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err, "Generated code should compile without syntax errors")
 }
+
+// A query array declared with a named type, a referenced component parameter or schema,
+// reads every value and parses it by the items, as an inline array does.
+func TestReferencedArrayQueryParams(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output:      &Output{UseSingleFile: true},
+		Generate: &GenerateOptions{
+			Handler: &HandlerOptions{Kind: "chi"},
+		},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "referenced-array-query-params.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	for _, name := range []string{"term", "score", "tag", "id", "inline"} {
+		assert.Contains(t, code, `if values, ok := query["`+name+`"]; ok {`)
+	}
+	assert.NotContains(t, code, "runtime.ParseString[", "no array is parsed as a single value")
+
+	assert.Contains(t, code, "queryParams.Term = values", "a component parameter")
+	assert.Contains(t, code, "result := make([]*int, len(parsed))", "nullable items behind an alias")
+	assert.Contains(t, code, "queryParams.Tag = values", "a component parameter referencing a schema")
+	assert.Contains(t, code, "parsed, err := runtime.ParseStringSlice[int64](values", "a schema referenced inline")
+
+	// An alias has no Validate() of its own, so the parameters struct checks its items.
+	assert.Contains(t, code, "for i, item := range s.Term {")
+	assert.Contains(t, code, "for i, item := range s.Score {")
+	// A defined type keeps validating itself, maxItems included.
+	assert.Contains(t, code, "if v, ok := any(s.Tag).(runtime.Validator); ok && v != nil {")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
+}

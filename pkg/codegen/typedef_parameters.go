@@ -49,7 +49,8 @@ type ParameterDefinition struct {
 	Required       bool
 	Spec           *v3high.Parameter
 	Schema         GoSchema
-	resolvedGoName string // The actual Go field name after conflict resolution (set by generateParamsTypes)
+	resolvedGoName string    // The actual Go field name after conflict resolution (set by generateParamsTypes)
+	arraySchema    *GoSchema // The slice schema behind a named type the parameter is declared with (set by describeOperationParameters)
 }
 
 // TypeDef is here as an adapter after a large refactoring so that I don't
@@ -189,6 +190,18 @@ func (pd ParameterDefinition) IsPointerType() bool {
 	return !pd.Required
 }
 
+// ArraySchema returns the schema of the slice type the parameter is declared with, or nil if it isn't one.
+// For a named type, such as a referenced component parameter or schema, it is that type's schema.
+func (pd ParameterDefinition) ArraySchema() *GoSchema {
+	if pd.arraySchema != nil {
+		return pd.arraySchema
+	}
+	if pd.Schema.ArrayType != nil {
+		return &pd.Schema
+	}
+	return nil
+}
+
 type ParameterDefinitions []ParameterDefinition
 
 func (p ParameterDefinitions) FindByName(name string) *ParameterDefinition {
@@ -259,6 +272,7 @@ func describeOperationParameters(params []*v3high.Parameter, options ParseOption
 			}
 			pd.Schema.GoType = goType
 		}
+		resolveNamedArray(&pd, options.typeTracker)
 		outParams = append(outParams, pd)
 	}
 	return outParams, nil
@@ -438,4 +452,44 @@ func paramToGoType(param *v3high.Parameter, options ParseOptions) (GoSchema, err
 	mediaRef := mediaType.GoLow().GetReference()
 	// For json, we go through the standard schema mechanism
 	return GenerateGoSchema(mediaType.Schema, options.WithReference(mediaRef))
+}
+
+// resolveNamedArray records the slice schema behind the named type an array parameter is declared with,
+// so the handler can parse each value by the items.
+func resolveNamedArray(pd *ParameterDefinition, tracker *TypeTracker) {
+	// Without an array schema the struct field may be a pointer, which the handler can't assign a slice to.
+	schema := pd.Schema.OpenAPISchema
+	if pd.Schema.ArrayType != nil || schema == nil || !slices.Contains(schema.Type, "array") {
+		return
+	}
+	td := sliceTypeDefinition(pd.Schema.TypeDecl(), tracker)
+	if td == nil {
+		return
+	}
+	arraySchema := td.Schema
+	pd.arraySchema = &arraySchema
+	// An alias like `type Terms = []string` has no Validate() of its own, so the
+	// parameters struct checks the items, as it does for an inline array.
+	if td.IsAlias() {
+		pd.Schema.ArrayType = td.Schema.ArrayType
+	}
+}
+
+// sliceTypeDefinition returns the definition of the slice type named name, following aliases, or nil if name isn't one.
+func sliceTypeDefinition(name string, tracker *TypeTracker) *TypeDefinition {
+	seen := map[string]bool{}
+	for !seen[name] {
+		seen[name] = true
+		td, found := tracker.LookupByName(name)
+		switch {
+		case !found:
+			return nil
+		case td.Schema.ArrayType != nil:
+			return td
+		case !td.IsAlias():
+			return nil
+		}
+		name = td.Schema.TypeDecl()
+	}
+	return nil
 }
