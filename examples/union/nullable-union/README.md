@@ -4,7 +4,7 @@ This example demonstrates the optimization for `anyOf` and `oneOf` unions that c
 
 ## Behavior
 
-When a schema uses `anyOf` or `oneOf` with exactly 2 elements and one of them is `type: "null"`, the generator treats it as an optional (nullable) property instead of creating a union type.
+When a schema uses `anyOf` or `oneOf` with exactly 2 elements and one of them is `type: "null"`, the generator treats it as a nullable property (a pointer) instead of creating a union type.
 
 ### Examples
 
@@ -44,12 +44,31 @@ contact:
 ```
 Generates: `Contact *Contact` (not a union)
 
+### Required and nullable
+
+```yaml
+# required, but may be null
+Event:
+  type: object
+  required:
+    - updatedAt
+  properties:
+    updatedAt:
+      anyOf:
+        - type: string
+          format: date-time
+        - type: "null"
+```
+Generates: ``UpdatedAt *time.Time `json:"updatedAt"` ``
+
+Nullable is not optional: the key has to be there, so it gets no `omitempty` and a nil pointer encodes as `null`. An optional property still gets `omitempty` and is left out when nil.
+
 ## Benefits
 
-1. **Simpler types**: No need for union wrapper types when you just want to make a field optional
+1. **Simpler types**: No need for union wrapper types when a field may be null
 2. **Better ergonomics**: Direct access to the value without unwrapping from a union
 3. **Cleaner validation**: Standard nullable field validation instead of union validation
-4. **Consistent with OpenAPI semantics**: `anyOf[T, null]` is semantically equivalent to an optional T
+4. **Consistent with OpenAPI semantics**: `anyOf[T, null]` means a T or null, the same as `type: [T, "null"]`
 
 ## When Union Types Are Still Created
 

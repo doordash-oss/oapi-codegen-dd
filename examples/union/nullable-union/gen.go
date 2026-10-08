@@ -3,6 +3,10 @@
 package gen
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime"
 	"github.com/go-playground/validator/v10"
 )
@@ -52,6 +56,79 @@ type Address struct {
 type Contact struct {
 	Email *string `json:"email,omitempty"`
 	Phone *string `json:"phone,omitempty"`
+}
+
+type Event struct {
+	UpdatedAt *time.Time `json:"updatedAt"`
+	Note      *string    `json:"note"`
+	Location  *string    `json:"location,omitempty"`
+}
+
+type EventWithExtras struct {
+	UpdatedAt            *time.Time     `json:"updatedAt"`
+	AdditionalProperties map[string]any `json:"-"`
+}
+
+// Getter for additional properties for EventWithExtras. Returns the specified
+// element and whether it was found
+func (e EventWithExtras) Get(fieldName string) (value any, found bool) {
+	if e.AdditionalProperties != nil {
+		value, found = e.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for EventWithExtras
+func (e *EventWithExtras) Set(fieldName string, value any) {
+	if e.AdditionalProperties == nil {
+		e.AdditionalProperties = make(map[string]any)
+	}
+	e.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for EventWithExtras to handle AdditionalProperties
+func (e *EventWithExtras) UnmarshalJSON(data []byte) error {
+	object := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(data, &object); err != nil {
+		return err
+	}
+
+	if raw, found := object["updatedAt"]; found {
+		if err := json.Unmarshal(raw, &e.UpdatedAt); err != nil {
+			return fmt.Errorf("error reading 'updatedAt': %w", err)
+		}
+		delete(object, "updatedAt")
+	}
+	if len(object) != 0 {
+		e.AdditionalProperties = make(map[string]any)
+		for fieldName, fieldBuf := range object {
+			var fieldVal any
+			if err := json.Unmarshal(fieldBuf, &fieldVal); err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			e.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for EventWithExtras to handle AdditionalProperties
+func (e EventWithExtras) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["updatedAt"], err = json.Marshal(e.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'updatedAt': %w", err)
+	}
+
+	for fieldName, field := range e.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
 }
 
 var typesValidator *validator.Validate

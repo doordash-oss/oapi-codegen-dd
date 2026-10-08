@@ -106,6 +106,12 @@ func (p Property) IsPointerType() bool {
 	return !p.Schema.SkipOptionalPointer && p.Constraints.Nullable != nil && *p.Constraints.Nullable
 }
 
+// OmitsNil reports whether a nil value leaves the property's key out of the JSON object.
+// A required key is written even then, as null.
+func (p Property) OmitsNil() bool {
+	return p.IsPointerType() && !p.Constraints.RequiredKey
+}
+
 // needsCustomValidation returns true if this property needs custom validation logic
 // (i.e., calling Validate() method) instead of just using validator tags.
 //
@@ -272,7 +278,7 @@ func genFieldsFromProperties(props []Property, options ParseOptions) []string {
 		field += fmt.Sprintf("    %s %s", goFieldName, p.GoTypeDef())
 
 		c := p.Constraints
-		omitEmpty := c.Nullable != nil && *c.Nullable
+		omitEmpty := c.Nullable != nil && *c.Nullable && !c.RequiredKey
 		if p.Schema.SkipOptionalPointer {
 			omitEmpty = false
 		}

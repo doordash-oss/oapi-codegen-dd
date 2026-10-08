@@ -110,12 +110,12 @@ limitations under the License.
 {{- $properties := .properties -}}
 {{- range $properties }}
     {{- if ne .JsonFieldName "" }}
-        {{if .IsPointerType}}if {{$alias}}.{{.GoName}} != nil { {{end}}
+        {{if .OmitsNil}}if {{$alias}}.{{.GoName}} != nil { {{end}}
             object["{{.JsonFieldName}}"], err = json.Marshal({{$alias}}.{{.GoName}})
             if err != nil {
                 return nil, fmt.Errorf("error marshaling '{{.JsonFieldName}}': %w", err)
             }
-            {{if .IsPointerType}} }{{end}}
+            {{if .OmitsNil}} }{{end}}
         {{- end}}
     {{- end}}
 {{- end}}

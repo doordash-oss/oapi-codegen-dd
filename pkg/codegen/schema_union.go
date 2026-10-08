@@ -12,7 +12,6 @@ package codegen
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -92,8 +91,7 @@ func generateUnion(elements []*base.SchemaProxy, discriminator *base.Discriminat
 		if schema == nil {
 			continue
 		}
-		// Check if this element is a null type
-		if len(schema.Type) == 1 && slices.Contains(schema.Type, "null") {
+		if isNullSchema(schema) {
 			hasNull = true
 			continue
 		}
@@ -376,7 +374,7 @@ func usableDiscriminator(elements []*base.SchemaProxy, discriminator *base.Discr
 			continue
 		}
 		schema := element.Schema()
-		if schema == nil || (len(schema.Type) == 1 && slices.Contains(schema.Type, "null")) {
+		if schema == nil || isNullSchema(schema) {
 			continue
 		}
 		if element.GetReference() == "" && extractDiscriminatorValue(element, discriminator.PropertyName) == "" {
@@ -389,6 +387,41 @@ func usableDiscriminator(elements []*base.SchemaProxy, discriminator *base.Discr
 		return nil
 	}
 	return discriminator
+}
+
+// isNullSchema reports whether schema only admits null, as `{type: "null"}` does.
+func isNullSchema(schema *base.Schema) bool {
+	return len(schema.Type) == 1 && schema.Type[0] == "null"
+}
+
+// isNullableUnion reports whether schema is an anyOf or oneOf of one type and `{type: "null"}`.
+// generateUnion collapses it to that type, dropping the null option. With a type of its own, the
+// schema is null only if that type says so.
+func isNullableUnion(schema *base.Schema) bool {
+	if schema == nil || len(schema.Type) > 0 {
+		return false
+	}
+	return hasNullAndOneType(schema.AnyOf) || hasNullAndOneType(schema.OneOf)
+}
+
+// hasNullAndOneType reports whether elements hold `{type: "null"}` and exactly one other schema.
+func hasNullAndOneType(elements []*base.SchemaProxy) bool {
+	hasNull, others := false, 0
+	for _, element := range elements {
+		if element == nil {
+			continue
+		}
+		schema := element.Schema()
+		if schema == nil {
+			continue
+		}
+		if isNullSchema(schema) {
+			hasNull = true
+			continue
+		}
+		others++
+	}
+	return hasNull && others == 1
 }
 
 // generateUnionFromTypes creates a union GoSchema from a list of OpenAPI type strings.

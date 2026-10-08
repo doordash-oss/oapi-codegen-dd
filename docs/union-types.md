@@ -70,10 +70,28 @@ No `Order_Client_AnyOf` wrapper is created—the type bubbles up to `*Identity` 
 **Generated Go Code:**
 
 ```go
---8<-- "union/nullable-union/gen.go:16:22"
+--8<-- "union/nullable-union/gen.go:20:26"
 ```
 
 Nullable unions become simple pointer types—no union wrapper types are created.
+
+### Required and Nullable
+
+A nullable union can also be listed in `required`: the value may be `null`, but the key has to be there. Such a property is a pointer too, but gets no `omitempty`: the key is always written, and a nil pointer encodes as `null`.
+
+**OpenAPI Spec:**
+
+```yaml
+--8<-- "union/nullable-union/api.yaml:84:103"
+```
+
+**Generated Go Code:**
+
+```go
+--8<-- "union/nullable-union/gen.go:61:65"
+```
+
+A type list such as `type: [string, "null"]` works the same way. `readOnly` and `writeOnly` properties count as optional, so they keep `omitempty`.
 
 [View single element example](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/union/anyof-single/){:target="_blank"}
 

@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -105,6 +106,36 @@ func TestExtPropGoTypeSkipOptionalPointer(t *testing.T) {
 
 	// Check that the extension has no effect on required fields
 	assert.Contains(t, code, "RequiredField          string  `json:\"requiredField\" validate:\"required\"`")
+}
+
+func TestRequiredNullableProperties(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output:      &Output{UseSingleFile: true},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "required-nullable.yml")), cfg)
+	require.NoError(t, err)
+
+	code := codes.GetCombined()
+
+	// field matches a struct field whatever its column padding. The tag ends at the name, so no omitempty.
+	field := func(name, goType, jsonTag string) string {
+		return `(?m)^\s*` + name + `\s+` + regexp.QuoteMeta(goType) + `\s+` + regexp.QuoteMeta("`json:\""+jsonTag+`"`)
+	}
+
+	assert.Regexp(t, field("UpdatedAt", "*time.Time", "updated_at"), code,
+		"anyOf with null is a pointer that writes nil as null")
+	assert.Regexp(t, field("Owner", "*Owner", "owner"), code, "so is oneOf listing null first")
+	assert.Regexp(t, field("Nickname", "*string", "nickname"), code, "a type list with null keeps the key too")
+	assert.Regexp(t, field("Tags", "[]string", "tags"), code, "an empty slice keeps the key as well")
+
+	assert.Regexp(t, field("ID", "*string", "id,omitempty"), code, "readOnly counts as optional")
+	assert.Regexp(t, field("Pet", "Item_Pet", "pet"), code, "a union of two types decodes null itself")
+	assert.Regexp(t, field("Note", "*string", "note,omitempty"), code, "an optional property is still left out")
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
 }
 
 func TestNumericSchemaNames(t *testing.T) {
