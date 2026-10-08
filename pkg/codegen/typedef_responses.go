@@ -720,7 +720,10 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		}
 	}
 
-	if ref != "" {
+	// Only a component schema has a type of its own to point at. A JSON pointer
+	// into another operation's response, as bundled specs use, names nothing
+	// generated: GenerateGoSchema already produced the type inline.
+	if ref != "" && isStandardComponentReference(ref) {
 		refType, err = refPathToGoType(ref)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error turning reference (%s) into a Go type: %w", ref, err)

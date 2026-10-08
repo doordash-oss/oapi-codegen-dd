@@ -623,6 +623,82 @@ components:
 	})
 }
 
+// Bundled specs point a response at another operation's inline schema with a
+// JSON pointer. That names no generated type, so default gets its own.
+func TestGetOperationResponsesDefaultPointer(t *testing.T) {
+	const spec = `
+openapi: "3.0.3"
+info:
+  version: 1.0.0
+  title: Test
+paths:
+  /errors:
+    get:
+      responses:
+        '200':
+          description: ok
+        '401':
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id:
+                    type: string
+        default:
+          description: anything else
+          content:
+            application/json:
+              schema:
+                $ref: '#/paths/~1errors/get/responses/401/content/application~1json/schema'
+  /default-only:
+    get:
+      responses:
+        '200':
+          description: ok
+        default:
+          description: any error
+          content:
+            application/json:
+              schema:
+                $ref: '#/paths/~1errors/get/responses/401/content/application~1json/schema'
+`
+
+	requireInline := func(t *testing.T, rcd *ResponseContentDefinition, typeDefs []TypeDefinition) {
+		t.Helper()
+		require.NotNil(t, rcd)
+		assert.Empty(t, rcd.Ref)
+		for _, td := range typeDefs {
+			if td.Name != rcd.ResponseName {
+				continue
+			}
+			assert.Empty(t, td.Schema.RefType, "a JSON pointer must not become a reference to an ungenerated type")
+			require.Len(t, td.Schema.Properties, 1)
+			assert.Equal(t, "id", td.Schema.Properties[0].JsonFieldName)
+			return
+		}
+		t.Fatalf("no type definition for %s", rcd.ResponseName)
+	}
+
+	t.Run("next to explicit errors", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/errors", "get")
+		opts.ClientWithResponse = true
+		def, typeDefs, err := getOperationResponses("GetErrors", op.Responses, opts)
+		require.NoError(t, err)
+		requireInline(t, def.Default, typeDefs)
+	})
+
+	t.Run("as the only error", func(t *testing.T) {
+		op, opts := loadOperation(t, []byte(spec), "/default-only", "get")
+		def, typeDefs, err := getOperationResponses("GetDefaultOnly", op.Responses, opts)
+		require.NoError(t, err)
+		assert.Same(t, def.Error, def.Default)
+		requireInline(t, def.Default, typeDefs)
+	})
+}
+
 func TestStatusRangeOf(t *testing.T) {
 	tests := []struct {
 		key      string
