@@ -328,6 +328,36 @@ func AsMap[V any](v any) (map[string]V, error) {
 		return nil, err
 	}
 
+	// Generated header options use string values on the wire even when
+	// their schemas declare numbers or booleans. Keep JSON numbers exact.
+	if _, stringsOnly := any(*new(V)).(string); stringsOnly {
+		var fields map[string]any
+		decoder := json.NewDecoder(bytes.NewReader(res))
+		decoder.UseNumber()
+		if err := decoder.Decode(&fields); err != nil {
+			return nil, err
+		}
+		if fields == nil {
+			return nil, nil
+		}
+		result := make(map[string]V, len(fields))
+		for key, field := range fields {
+			var value string
+			switch field := field.(type) {
+			case string:
+				value = field
+			case json.Number:
+				value = field.String()
+			case bool:
+				value = strconv.FormatBool(field)
+			case nil:
+			default:
+				return nil, fmt.Errorf("cannot encode %s as a scalar string: %T", key, field)
+			}
+			result[key] = any(value).(V)
+		}
+		return result, nil
+	}
 	var m map[string]V
 	err = json.Unmarshal(res, &m)
 	if err != nil {
