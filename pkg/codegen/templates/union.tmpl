@@ -292,12 +292,12 @@ func ({{$args.alias}} {{$args.name}}) MarshalJSON() ([]byte, error) {
         }
 
         {{range $args.schema.Properties}}
-            {{if .IsPointerType}}if {{$args.alias}}.{{.GoName}} != nil { {{end}}
+            {{if .OmitsNil}}if {{$args.alias}}.{{.GoName}} != nil { {{end}}
                 object["{{.JsonFieldName}}"], err = json.Marshal({{$args.alias}}.{{.GoName}})
                 if err != nil {
                     return nil, fmt.Errorf("error marshaling '{{.JsonFieldName}}': %w", err)
                 }
-                {{if .IsPointerType}} }{{end}}
+                {{if .OmitsNil}} }{{end}}
         {{end -}}
         bts, err = json.Marshal(object)
     {{end -}}

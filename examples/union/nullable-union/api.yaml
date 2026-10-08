@@ -78,3 +78,39 @@ components:
           oneOf:
             - type: string
             - type: "null"
+
+    # Required and nullable: the key must always be there, so a nil pointer encodes as null
+    # instead of being left out.
+    Event:
+      type: object
+      required:
+        - updatedAt
+        - note
+      properties:
+        updatedAt:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        note:
+          oneOf:
+            - type: "null"
+            - type: string
+        # Optional, so still left out when nil
+        location:
+          anyOf:
+            - type: string
+            - type: "null"
+
+    # additionalProperties brings a generated MarshalJSON, which writes the required key too
+    EventWithExtras:
+      type: object
+      required:
+        - updatedAt
+      properties:
+        updatedAt:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: "null"
+      additionalProperties: true
