@@ -39,14 +39,19 @@ The following OpenAPI constraints are translated to validation tags:
 | `exclusiveMaximum` | `lt=N` | integers, numbers |
 | `minLength` | `min=N` | strings, arrays |
 | `maxLength` | `max=N` | strings, arrays |
-| `minItems` | `min=N` | arrays |
-| `maxItems` | `max=N` | arrays |
+| `minItems` | `len()` check | arrays |
+| `maxItems` | `len()` check | arrays |
 | `enum` | custom switch | string, integer enums |
 | `pattern` | `runtime.ValidatePattern()` | strings |
 
 `pattern` is a regex, which `validate.Struct()` cannot express, so it is enforced
 wherever per-field/per-item validation is generated (full-mode structs, arrays, maps).
 It is not enforced in `simple` mode (see below).
+
+`minItems` and `maxItems` have no validation tag either. A named array type checks its
+length in its own `Validate()`, and a struct checks the length of each inline array
+property or parameter it holds. An array that wasn't sent is nil and passes `minItems`;
+an empty one that was sent doesn't. Struct fields aren't checked in `simple` mode.
 
 ## Generated Code Examples
 

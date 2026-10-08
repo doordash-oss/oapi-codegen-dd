@@ -1,0 +1,51 @@
+openapi: 3.1.0
+info:
+  title: API
+  description: Inline arrays with minItems and maxItems
+  version: 1.0.0
+
+paths:
+  /search:
+    get:
+      operationId: search
+      parameters:
+        - name: term
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 3
+            items:
+              type: string
+              maxLength: 3
+        - name: id
+          in: query
+          schema:
+            type: array
+            minItems: 2
+            items:
+              type: integer
+      responses:
+        '204':
+          description: OK
+  /tags:
+    put:
+      operationId: setTags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tags]
+              properties:
+                tags:
+                  type: array
+                  minItems: 1
+                  maxItems: 2
+                  items:
+                    type: string
+      responses:
+        '204':
+          description: OK
