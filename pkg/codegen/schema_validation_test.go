@@ -1424,6 +1424,137 @@ func TestGoSchema_ValidateDecl_StructWithMultipleArraysOfCustomTypes(t *testing.
 	assertCodeEqual(t, expected, result)
 }
 
+// An inline array has no Validate() of its own, so the struct checks its item count.
+func TestGoSchema_ValidateDecl_StructWithArrayItemCount(t *testing.T) {
+	schema := GoSchema{
+		GoType: "struct { Tags []string }",
+		Properties: []Property{
+			{
+				GoName:      "Tags",
+				Schema:      GoSchema{GoType: "[]string", ArrayType: &GoSchema{GoType: "string"}},
+				Constraints: Constraints{MinItems: ptr(int64(2)), MaxItems: ptr(int64(4))},
+			},
+		},
+	}
+
+	if !schema.NeedsValidation() {
+		t.Error("Expected NeedsValidation() to return true for struct with an array item count")
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		if s.Tags != nil && len(s.Tags) < 2 {
+			errors = errors.Add("Tags", fmt.Sprintf("must have at least 2 items, got %d", len(s.Tags)))
+		}
+		if len(s.Tags) > 4 {
+			errors = errors.Add("Tags", fmt.Sprintf("must have at most 4 items, got %d", len(s.Tags)))
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_StructWithArrayItemCountAndValidatedItems(t *testing.T) {
+	schema := GoSchema{
+		GoType: "struct { Term []string }",
+		Properties: []Property{
+			{
+				GoName: "Term",
+				Schema: GoSchema{
+					GoType: "[]string",
+					ArrayType: &GoSchema{
+						GoType:      "string",
+						Constraints: Constraints{ValidationTags: []string{"omitempty", "max=3"}},
+					},
+				},
+				Constraints: Constraints{MaxItems: ptr(int64(10))},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		if len(s.Term) > 10 {
+			errors = errors.Add("Term", fmt.Sprintf("must have at most 10 items, got %d", len(s.Term)))
+		}
+		for i, item := range s.Term {
+			if err := typesValidator.Var(item, "omitempty,max=3"); err != nil {
+				errors = errors.Append(fmt.Sprintf("Term[%d]", i), err)
+			}
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_StructWithRequiredArrayItemCount(t *testing.T) {
+	schema := GoSchema{
+		GoType: "struct { Names []string }",
+		Properties: []Property{
+			{
+				GoName: "Names",
+				Schema: GoSchema{GoType: "[]string", ArrayType: &GoSchema{GoType: "string"}},
+				Constraints: Constraints{
+					Required:       ptr(true),
+					MinItems:       ptr(int64(1)),
+					ValidationTags: []string{"required"},
+				},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		if err := typesValidator.Var(s.Names, "required"); err != nil {
+			errors = errors.Append("Names", err)
+		}
+		if s.Names != nil && len(s.Names) < 1 {
+			errors = errors.Add("Names", fmt.Sprintf("must have at least 1 items, got %d", len(s.Names)))
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+// An alias such as a component parameter's `type Terms = []string` has no Validate() to delegate to.
+func TestGoSchema_ValidateDecl_StructWithAliasedArrayItemCount(t *testing.T) {
+	schema := GoSchema{
+		GoType: "struct { Term Terms }",
+		Properties: []Property{
+			{
+				GoName:      "Term",
+				Schema:      GoSchema{GoType: "Terms", ArrayType: &GoSchema{GoType: "string"}},
+				Constraints: Constraints{MaxItems: ptr(int64(2))},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		if len(s.Term) > 2 {
+			errors = errors.Add("Term", fmt.Sprintf("must have at most 2 items, got %d", len(s.Term)))
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
 // TestGoSchema_ValidateDecl_StructWithMapOfCustomTypes tests validation
 // for a struct with map properties whose value types need validation.
 func TestGoSchema_ValidateDecl_StructWithMapOfCustomTypes(t *testing.T) {

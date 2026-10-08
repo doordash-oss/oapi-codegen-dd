@@ -346,8 +346,8 @@ func generateCustomPropertyValidation(s GoSchema, alias, validatorVar string) st
 	lines = append(lines, declareErrorsVar())
 	for _, prop := range s.Properties {
 		if prop.needsCustomValidation() {
-			// Check if this is an array property with items that need validation
-			if prop.Schema.ArrayType != nil && prop.Schema.ArrayType.NeedsValidation() {
+			// Check if this is an array property whose item count or items need validation
+			if prop.Schema.ArrayType != nil && (prop.needsItemCountValidation() || prop.Schema.ArrayType.NeedsValidation()) {
 				lines = append(lines, generateArrayPropertyValidation(alias, prop, validatorVar)...)
 			} else if prop.Schema.AdditionalPropertiesType != nil && prop.Schema.AdditionalPropertiesType.NeedsValidation() {
 				// Check if this is a map property with values that need validation
@@ -393,6 +393,9 @@ func generateCustomPropertyValidation(s GoSchema, alias, validatorVar string) st
 		} else {
 			// Primitive property: may carry validator tags and/or a regex pattern.
 			lines = append(lines, generatePrimitivePropertyValidation(alias, prop, validatorVar)...)
+
+			// A slice of primitives may carry an item count.
+			lines = append(lines, generateItemCountLines(alias, prop)...)
 		}
 	}
 
@@ -451,9 +454,12 @@ func generateElementPatternLines(itemExpr, keyExpr string, elem *GoSchema) []str
 	}
 }
 
-// generateArrayPropertyValidation generates validation code for an array property
+// generateArrayPropertyValidation generates validation code for an array property: its item count, then each item
 func generateArrayPropertyValidation(alias string, prop Property, validatorVar string) []string {
-	var lines []string
+	lines := generateItemCountLines(alias, prop)
+	if !prop.Schema.ArrayType.NeedsValidation() {
+		return lines
+	}
 	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
 
 	// Check for nil before iterating
@@ -485,6 +491,33 @@ func generateArrayPropertyValidation(alias string, prop Property, validatorVar s
 	}
 
 	lines = append(lines, "}")
+	return lines
+}
+
+// generateItemCountLines checks the length of an inline array property against its minItems and maxItems.
+func generateItemCountLines(alias string, prop Property) []string {
+	if !prop.needsItemCountValidation() {
+		return nil
+	}
+
+	var lines []string
+	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
+
+	// An array that wasn't sent is nil, which minItems doesn't reject.
+	if minItems := deref(prop.Constraints.MinItems); minItems > 0 {
+		errMsg := fmt.Sprintf(errMsgArrayMinItems, minItems)
+		lines = append(lines, fmt.Sprintf("if %s != nil && len(%s) < %d {", fieldAccess, fieldAccess, minItems))
+		lines = append(lines, fmt.Sprintf("    errors = errors.Add(\"%s\", fmt.Sprintf(\"%s\", len(%s)))", prop.GoName, errMsg, fieldAccess))
+		lines = append(lines, "}")
+	}
+
+	if maxItems := prop.Constraints.MaxItems; maxItems != nil {
+		errMsg := fmt.Sprintf(errMsgArrayMaxItems, *maxItems)
+		lines = append(lines, fmt.Sprintf("if len(%s) > %d {", fieldAccess, *maxItems))
+		lines = append(lines, fmt.Sprintf("    errors = errors.Add(\"%s\", fmt.Sprintf(\"%s\", len(%s)))", prop.GoName, errMsg, fieldAccess))
+		lines = append(lines, "}")
+	}
+
 	return lines
 }
 
@@ -538,9 +571,9 @@ func canUseSimpleStructValidation(s GoSchema) bool {
 		return false
 	}
 
-	// A property needing custom validation or a regex pattern rules out validator.Struct().
+	// A property needing custom validation, a regex pattern or an item count rules out validator.Struct().
 	for _, prop := range s.Properties {
-		if prop.needsCustomValidation() || prop.needsPatternValidation() {
+		if prop.needsCustomValidation() || prop.needsPatternValidation() || prop.needsItemCountValidation() {
 			return false
 		}
 	}
@@ -572,10 +605,10 @@ func isMapType(s GoSchema) bool {
 	return strings.HasPrefix(typeDecl, "map[")
 }
 
-// hasCustomValidation reports whether any property needs custom validation, including a regex pattern.
+// hasCustomValidation reports whether any property needs custom validation, including a regex pattern or an item count.
 func hasCustomValidation(s GoSchema) bool {
 	for _, prop := range s.Properties {
-		if prop.needsCustomValidation() || prop.needsPatternValidation() {
+		if prop.needsCustomValidation() || prop.needsPatternValidation() || prop.needsItemCountValidation() {
 			return true
 		}
 	}

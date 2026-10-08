@@ -162,10 +162,17 @@ func (s GoSchema) NeedsValidation() bool {
 			if len(prop.Constraints.ValidationTags) > 0 {
 				return true
 			}
+
 			// Property carries a regex pattern
 			if prop.needsPatternValidation() {
 				return true
 			}
+
+			// Property is an inline array with an item count
+			if prop.needsItemCountValidation() {
+				return true
+			}
+
 			// Property needs custom validation (RefType, struct, union, etc.)
 			if prop.needsCustomValidation() {
 				return true

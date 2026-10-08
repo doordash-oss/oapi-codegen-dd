@@ -128,6 +128,51 @@ func TestProperty_OmitsNil(t *testing.T) {
 	}
 }
 
+func TestProperty_needsItemCountValidation(t *testing.T) {
+	inline := GoSchema{GoType: "[]string", ArrayType: &GoSchema{GoType: "string"}}
+
+	tests := []struct {
+		name        string
+		schema      GoSchema
+		constraints Constraints
+		want        bool
+	}{
+		{
+			name:        "minItems",
+			schema:      inline,
+			constraints: Constraints{MinItems: ptr(int64(1))},
+			want:        true,
+		},
+		{
+			name:        "maxItems",
+			schema:      inline,
+			constraints: Constraints{MaxItems: ptr(int64(10))},
+			want:        true,
+		},
+		{
+			name:        "minItems 0 allows any count",
+			schema:      inline,
+			constraints: Constraints{MinItems: ptr(int64(0))},
+		},
+		{
+			name:   "no item count",
+			schema: inline,
+		},
+		{
+			name:        "a named array type checks its own",
+			schema:      GoSchema{GoType: "TagList"},
+			constraints: Constraints{MaxItems: ptr(int64(10))},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := Property{Schema: tt.schema, Constraints: tt.constraints}
+			assert.Equal(t, tt.want, p.needsItemCountValidation())
+		})
+	}
+}
+
 func TestGenFieldsFromProperties_RequiredKey(t *testing.T) {
 	fields := genFieldsFromProperties([]Property{
 		{
