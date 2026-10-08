@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: Referenced array query parameters
+  version: 1.0.0
+paths:
+  /search:
+    get:
+      operationId: search
+      parameters:
+        - $ref: "#/components/parameters/Terms"
+        - $ref: "#/components/parameters/Scores"
+        - $ref: "#/components/parameters/Tags"
+        - name: id
+          in: query
+          schema:
+            $ref: "#/components/schemas/IDList"
+        - name: inline
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              maxLength: 3
+      responses:
+        "204":
+          description: OK
+components:
+  parameters:
+    Terms:
+      name: term
+      in: query
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          maxLength: 3
+    Scores:
+      name: score
+      in: query
+      schema:
+        type: array
+        items:
+          type: [integer, "null"]
+          maximum: 10
+    Tags:
+      name: tag
+      in: query
+      schema:
+        $ref: "#/components/schemas/TagList"
+  schemas:
+    TagList:
+      type: array
+      maxItems: 2
+      items:
+        type: string
+        maxLength: 3
+    IDList:
+      type: array
+      items:
+        type: integer
+        format: int64
