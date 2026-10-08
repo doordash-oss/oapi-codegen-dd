@@ -2,6 +2,7 @@ package gen
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -164,5 +165,139 @@ func TestUploadDocumentWithResponse(t *testing.T) {
 		assert.Nil(t, resp.JSON201)
 		assert.Nil(t, resp.JSON202)
 		assert.Nil(t, resp.JSON422)
+	})
+}
+
+// requireAPIError asserts err is the client's API error for the given status.
+func requireAPIError(t *testing.T, err error, status int) {
+	t.Helper()
+	var apiErr *runtime.ClientAPIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, status, apiErr.StatusCode())
+}
+
+func getDocumentOpts() *GetDocumentRequestOptions {
+	return &GetDocumentRequestOptions{PathParams: &GetDocumentPath{ID: "doc-1"}}
+}
+
+func TestGetDocumentWithResponse(t *testing.T) {
+	t.Run("an exact code takes precedence over the range covering it", func(t *testing.T) {
+		srv := newServer(t, http.StatusNotFound, NotFoundError{ID: "doc-1"}, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetDocumentWithResponse(t.Context(), getDocumentOpts())
+		requireAPIError(t, err, http.StatusNotFound)
+		require.NotNil(t, resp.JSON404)
+		assert.Equal(t, "doc-1", resp.JSON404.ID)
+		assert.Nil(t, resp.JSON4XX)
+	})
+
+	t.Run("an exact code without a body is not decoded as its range", func(t *testing.T) {
+		srv := newServer(t, http.StatusGone, ValidationError{Code: "gone", Message: "deleted"}, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetDocumentWithResponse(t.Context(), getDocumentOpts())
+		requireAPIError(t, err, http.StatusGone)
+		assert.Nil(t, resp.JSON4XX)
+	})
+
+	t.Run("4XX decodes any other client error", func(t *testing.T) {
+		srv := newServer(t, http.StatusConflict, ValidationError{Code: "conflict", Message: "busy"}, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetDocumentWithResponse(t.Context(), getDocumentOpts())
+		requireAPIError(t, err, http.StatusConflict)
+		require.NotNil(t, resp.JSON4XX)
+		assert.Equal(t, "conflict", resp.JSON4XX.Code)
+		assert.Nil(t, resp.JSON404)
+		assert.Nil(t, resp.JSON5XX)
+	})
+
+	// Earlier versions exposed 4XX as JSON400. The field stays, deprecated, so
+	// code written against it keeps compiling and now sees every 4xx.
+	t.Run("the field earlier versions used for 4XX stays as an alias", func(t *testing.T) {
+		for _, status := range []int{http.StatusBadRequest, http.StatusConflict} {
+			srv := newServer(t, status, ValidationError{Code: "invalid", Message: "nope"}, nil)
+
+			resp, err := newClient(t, srv).GetDocumentWithResponse(t.Context(), getDocumentOpts())
+			srv.Close()
+			requireAPIError(t, err, status)
+			require.NotNil(t, resp.JSON4XX)
+			assert.Same(t, resp.JSON4XX, resp.JSON400)
+		}
+	})
+
+	t.Run("5XX decodes into its own type and headers", func(t *testing.T) {
+		srv := newServer(t, http.StatusServiceUnavailable, ServiceError{Message: "overloaded"}, map[string]string{
+			"Retry-After": "30",
+		})
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetDocumentWithResponse(t.Context(), getDocumentOpts())
+		requireAPIError(t, err, http.StatusServiceUnavailable)
+		require.NotNil(t, resp.JSON5XX)
+		assert.Equal(t, "overloaded", resp.JSON5XX.Message)
+		require.NotNil(t, resp.Headers5XX)
+		assert.Equal(t, "30", resp.Headers5XX.RetryAfter)
+		assert.Nil(t, resp.JSON4XX)
+	})
+
+	t.Run("a status no response covers is unexpected", func(t *testing.T) {
+		srv := newServer(t, http.StatusNotModified, nil, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetDocumentWithResponse(t.Context(), getDocumentOpts())
+		requireAPIError(t, err, http.StatusNotModified)
+		assert.Nil(t, resp.JSON200)
+		assert.Nil(t, resp.JSON4XX)
+		assert.Nil(t, resp.JSON5XX)
+	})
+}
+
+func TestDeleteDocumentWithResponse(t *testing.T) {
+	opts := &DeleteDocumentRequestOptions{PathParams: &DeleteDocumentPath{ID: "doc-1"}}
+
+	t.Run("204 is a success", func(t *testing.T) {
+		srv := newServer(t, http.StatusNoContent, nil, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).DeleteDocumentWithResponse(t.Context(), opts)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+		assert.Nil(t, resp.JSONDefault)
+	})
+
+	for _, status := range []int{http.StatusNotFound, http.StatusInternalServerError} {
+		t.Run(fmt.Sprintf("default decodes %d", status), func(t *testing.T) {
+			srv := newServer(t, status, ServiceError{Message: "cannot delete"}, nil)
+			defer srv.Close()
+
+			resp, err := newClient(t, srv).DeleteDocumentWithResponse(t.Context(), opts)
+			requireAPIError(t, err, status)
+			require.NotNil(t, resp.JSONDefault)
+			assert.Equal(t, "cannot delete", resp.JSONDefault.Message)
+		})
+	}
+}
+
+func TestGetHealthWithResponse(t *testing.T) {
+	t.Run("default standing in for the success reports success for a 2xx", func(t *testing.T) {
+		srv := newServer(t, http.StatusOK, Health{Status: "ok"}, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetHealthWithResponse(t.Context())
+		require.NoError(t, err)
+		require.NotNil(t, resp.JSONDefault)
+		assert.Equal(t, "ok", resp.JSONDefault.Status)
+	})
+
+	t.Run("and an error for any other status", func(t *testing.T) {
+		srv := newServer(t, http.StatusServiceUnavailable, Health{Status: "degraded"}, nil)
+		defer srv.Close()
+
+		resp, err := newClient(t, srv).GetHealthWithResponse(t.Context())
+		requireAPIError(t, err, http.StatusServiceUnavailable)
+		require.NotNil(t, resp.JSONDefault)
+		assert.Equal(t, "degraded", resp.JSONDefault.Status)
 	})
 }

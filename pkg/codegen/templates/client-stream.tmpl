@@ -105,7 +105,21 @@ func (c *{{$clientName}}) {{$op.StreamMethodName}}WithResponse(ctx context.Conte
     {{- end }}
     default:
         {{ template "streamReleaseBody" }}
+        {{- /* Like the explicit cases above, only error responses: a success
+               other than the streaming status is not what was asked for. */ -}}
+        {{- range $rcd := $op.Response.StatusRanges }}{{ if not $rcd.IsSuccess }}
+        if resp.StatusCode/100 == {{ $rcd.StatusRange }} {
+            {{- template "decodeBody" (dict "rcd" $rcd "alias" ($op.Response.LegacyBodyField $rcd)) }}
+            return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+        }
+        {{- end }}{{ end }}
+        {{- $default := $op.Response.Default }}
+        {{- if and $default (not $default.IsSuccess) }}
+            {{- template "decodeBody" (dict "rcd" $default) }}
+        return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+        {{- else }}
         return out, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+        {{- end }}
     }
 }
 {{ end }}

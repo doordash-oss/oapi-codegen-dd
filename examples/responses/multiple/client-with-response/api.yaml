@@ -54,6 +54,70 @@ paths:
             text/plain:
               schema:
                 type: string
+  /documents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getDocument
+      summary: Fetch a document
+      responses:
+        '200':
+          description: Document found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStored'
+        '404':
+          description: No document with this ID. Takes precedence over 4XX.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '410':
+          description: Document was deleted. No body, and still not a 4XX.
+        '5XX':
+          description: Any server error
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
+        '4XX':
+          description: Any other client error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+    delete:
+      operationId: deleteDocument
+      summary: Delete a document
+      responses:
+        '204':
+          description: Document deleted
+        default:
+          description: Any status not documented above
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
+  /health:
+    get:
+      operationId: getHealth
+      summary: Report service health, whatever the status
+      responses:
+        default:
+          description: Health report. Only a 2xx means healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
 
 components:
   schemas:
@@ -92,4 +156,22 @@ components:
         code:
           type: string
         message:
+          type: string
+    NotFoundError:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+    ServiceError:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
           type: string

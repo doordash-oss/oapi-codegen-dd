@@ -158,6 +158,8 @@ Generate `<Op>WithResponse` sibling functions that return a typed envelope: one 
 
 Use this when an operation has multiple 2xx statuses with different bodies (e.g. 201 sync + 202 queued), or when callers need typed access to response headers like `Location` or `Retry-After`.
 
+Status ranges and `default` get fields of their own: `JSON4XX` for `4XX`, `JSONDefault` for `default`. Responses are matched as OpenAPI specifies, so an exact status wins over the range covering it, and both win over `default`: with `404`, `4XX` and `default` documented, a 404 fills `JSON404`, a 409 `JSON4XX` and a 503 `JSONDefault`. The returned error is nil only for a documented success. When `default` is the only success documented, it counts as one for 2xx statuses only. Earlier versions exposed a range under a single stand-in code, such as `JSON400` for `4XX` or `JSON200` for `2XX`; those fields remain as deprecated aliases of the new ones, unless an explicit code now owns the name.
+
 Additive to [`generate.client`](#generateclient). When both flags are true, the generated `ClientInterface` lists every classic method alongside its `WithResponse` sibling so a single mock or test double covers both shapes.
 
 ```yaml

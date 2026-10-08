@@ -54,14 +54,14 @@ frames - `Chunk` here, generated from the media type's schema like any other
 response body:
 
 ```go
---8<-- "client/streaming/gen.go:778:782"
+--8<-- "client/streaming/gen.go:884:888"
 ```
 
 With `generate.client-with-response` on, one envelope type carries either shape,
 populated by whichever method was called:
 
 ```go
---8<-- "client/streaming/gen.go:725:731"
+--8<-- "client/streaming/gen.go:827:833"
 ```
 
 ## Consuming a Stream

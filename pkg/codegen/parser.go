@@ -75,6 +75,11 @@ type ParseOptions struct {
 	// is bit-for-bit what it was before streaming support existed.
 	ClientStreaming bool
 
+	// ClientWithResponse resolves the `default` response next to explicit
+	// error codes, which only the envelope client consumes. Off means no type
+	// generated for it there, so output is unchanged without the envelope.
+	ClientWithResponse bool
+
 	// ErrorMapping maps response type names to the field that should be used
 	// for the Error() method. When a response type has error mapping configured,
 	// it cannot be an alias (aliases don't support methods).

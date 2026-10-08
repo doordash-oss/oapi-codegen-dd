@@ -105,6 +105,7 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		AdditionalTags:         cfg.Generate.AdditionalTags,
 		SkipValidation:         cfg.Generate.Validation.Skip,
 		ClientStreaming:        cfg.Generate.ClientStreaming,
+		ClientWithResponse:     cfg.Generate.ClientWithResponse,
 		ErrorMapping:           cfg.ErrorMapping,
 		typeTracker:            newTypeTracker(),
 		visited:                map[string]bool{},
@@ -383,22 +384,29 @@ func assignWithResponseTypeNames(operations []OperationDefinition, tracker *Type
 		op.WithResponseTypeName = tracker.generateUniqueName(baseName)
 		tracker.registerName(op.WithResponseTypeName)
 
-		statusesWithHeaders := func(rcds []*ResponseContentDefinition) {
-			for _, rcd := range rcds {
-				if len(rcd.Headers) == 0 {
-					continue
-				}
-				if op.HeaderTypeNames == nil {
-					op.HeaderTypeNames = make(map[int]string)
-				}
-				header := op.WithResponseTypeName + fmt.Sprintf("%dHeaders", rcd.StatusCode)
-				header = tracker.generateUniqueName(header)
-				tracker.registerName(header)
+		for _, rcd := range op.Response.EnvelopeResponses() {
+			if len(rcd.Headers) == 0 {
+				continue
+			}
+			if op.HeaderTypeNames == nil {
+				op.HeaderTypeNames = make(map[int]string)
+				op.statusHeaderTypeNames = make(map[string]string)
+			}
+			header := tracker.generateUniqueName(op.WithResponseTypeName + rcd.StatusName() + "Headers")
+			tracker.registerName(header)
+			if rcd.isExactStatus() {
 				op.HeaderTypeNames[rcd.StatusCode] = header
+				continue
+			}
+			op.statusHeaderTypeNames[rcd.StatusName()] = header
+
+			// The name it had at its stand-in code, for the deprecated alias.
+			if op.Response.HasLegacyHeaders(rcd) {
+				legacy := tracker.generateUniqueName(fmt.Sprintf("%s%dHeaders", op.WithResponseTypeName, rcd.StatusCode))
+				tracker.registerName(legacy)
+				op.HeaderTypeNames[rcd.StatusCode] = legacy
 			}
 		}
-		statusesWithHeaders(op.Response.Successes)
-		statusesWithHeaders(op.Response.Errors)
 	}
 }
 

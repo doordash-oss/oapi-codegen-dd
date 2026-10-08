@@ -17,12 +17,15 @@ limitations under the License.
 {{- /*
 Defines the "decodeBody" template used by client-with-response.tmpl (and any
 user-provided overrides of it) to populate per-status JSON<status> /
-Text<status> / etc. fields on the envelope. Lives in its own file so that
+Text<status> / etc. fields on the envelope, where <status> is the rcd's
+StatusName: "404", "4XX" or "Default". Lives in its own file so that
 overriding client-with-response.tmpl doesn't shadow this helper - the same
 dispatch logic is reusable from custom client templates that wrap the return
 in futures, channels, or other shapes.
 
-Inputs (from caller's dict): rcd = a *ResponseContentDefinition.
+Inputs (from caller's dict): rcd = a *ResponseContentDefinition, and
+optionally alias = the name of a deprecated field kept pointing at the same
+value (see ResponseDefinition.LegacyBodyField).
 Expected names in the surrounding scope:
   - resp     *runtime.Response  (Content, StatusCode, Headers)
   - out      *<Op>Resp           (the envelope value being populated)
@@ -30,13 +33,20 @@ Expected names in the surrounding scope:
 
 {{- define "decodeBody" -}}
 {{- $rcd := .rcd -}}
-{{- $field := printf "%s%d" $rcd.NameTag $rcd.StatusCode -}}
+{{- $alias := .alias -}}
+{{- $field := printf "%s%s" $rcd.NameTag $rcd.StatusName -}}
 {{- if or (eq $rcd.ResponseName "struct{}") $rcd.IsRaw (eq $rcd.NameTag "") -}}
 {{- else if and (or (eq $rcd.NameTag "Text") (eq $rcd.NameTag "HTML")) (eq $rcd.Schema.GoType "string") }}
         v := {{$rcd.ResponseName}}(resp.Content)
         out.{{$field}} = &v
+        {{- with $alias }}
+        out.{{.}} = out.{{$field}}
+        {{- end }}
 {{- else }}
         out.{{$field}} = new({{$rcd.ResponseName}})
+        {{- with $alias }}
+        out.{{.}} = out.{{$field}}
+        {{- end }}
         bodyBytes := resp.Content
         if len(bodyBytes) > 0 {
             {{- if eq $rcd.NameTag "Formdata" }}
