@@ -423,6 +423,38 @@ func TestAssignWithResponseTypeNames(t *testing.T) {
 		assert.Equal(t, "UploadDocumentResp422Headers", ops[0].HeaderTypeNames[422])
 	})
 
+	t.Run("ranges and default get header type names apart from the code they stand in at", func(t *testing.T) {
+		tracker := newTypeTracker()
+		retryAfter := map[string]GoSchema{"Retry-After": {GoType: "string"}}
+		badRequest := &ResponseContentDefinition{StatusCode: 400, Headers: retryAfter}
+		// 4XX stands in at 400, like the exact code next to it.
+		clientErr := &ResponseContentDefinition{StatusCode: 400, StatusRange: 4, Headers: retryAfter}
+		fallback := &ResponseContentDefinition{StatusCode: 500, IsDefault: true, Headers: retryAfter}
+		ops := []OperationDefinition{{
+			ID: "uploadDocument",
+			Response: ResponseDefinition{
+				All:          map[int]*ResponseContentDefinition{400: clientErr, 500: fallback},
+				Errors:       []*ResponseContentDefinition{badRequest},
+				StatusRanges: []*ResponseContentDefinition{clientErr},
+				Default:      fallback,
+			},
+		}}
+
+		assignWithResponseTypeNames(ops, tracker)
+
+		op := ops[0]
+		assert.Equal(t, "UploadDocumentResp400Headers", op.HeaderTypeName(badRequest))
+		assert.Equal(t, "UploadDocumentResp4XXHeaders", op.HeaderTypeName(clientErr))
+		assert.Equal(t, "UploadDocumentRespDefaultHeaders", op.HeaderTypeName(fallback))
+
+		// The exact 400 keeps its name; default keeps the name it had at 500
+		// for the deprecated alias.
+		assert.Equal(t, map[int]string{
+			400: "UploadDocumentResp400Headers",
+			500: "UploadDocumentResp500Headers",
+		}, op.HeaderTypeNames)
+	})
+
 	t.Run("colliding wrapper name is disambiguated against existing tracker entries", func(t *testing.T) {
 		tracker := newTypeTracker()
 		// Simulate a user-declared schema that collides with the natural wrapper

@@ -164,7 +164,25 @@ func (c *Client) StreamLogs(ctx context.Context, reqEditors ...runtime.RequestEd
 	responseParser := func(ctx context.Context, resp *runtime.Response) (*StreamLogsResponse, error) {
 		bodyBytes := resp.Content
 		if resp.StatusCode != 200 {
-			return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+			target := new(StreamLogsErrorResponse)
+			// Handle empty error response body gracefully - skip unmarshal if no content
+			if len(bodyBytes) > 0 {
+				if err = json.Unmarshal(bodyBytes, target); err != nil {
+					return nil, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "StreamLogsErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
+				}
+			}
+			// Return error with (possibly empty) target
+			if errTarget, ok := any(*target).(error); ok {
+				return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
+			}
+			return nil, runtime.NewClientAPIError(fmt.Errorf("API error (status %d): %v", resp.StatusCode, *target),
 				runtime.WithStatusCode(resp.StatusCode))
 		}
 		result := StreamLogsResponse(bodyBytes)
@@ -456,7 +474,23 @@ func (c *Client) StreamLogsStream(ctx context.Context, reqEditors ...runtime.Req
 		if resp.Raw != nil && resp.Raw.Body != nil {
 			_ = resp.Raw.Body.Close()
 		}
-		return nil, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode),
+		target := new(StreamLogsErrorResponse)
+		if len(resp.Content) > 0 {
+			if err = json.Unmarshal(resp.Content, target); err != nil {
+				return nil, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(resp.Content),
+					TargetType:    "StreamLogsErrorResponse",
+					Body:          resp.Content,
+					Err:           err,
+				}
+			}
+		}
+		if errTarget, ok := any(*target).(error); ok {
+			return nil, runtime.NewClientAPIError(errTarget, runtime.WithStatusCode(resp.StatusCode))
+		}
+		return nil, runtime.NewClientAPIError(fmt.Errorf("API error (status %d): %v", resp.StatusCode, *target),
 			runtime.WithStatusCode(resp.StatusCode))
 	}
 
@@ -511,7 +545,39 @@ func (c *Client) StreamLogsStreamWithResponse(ctx context.Context, reqEditors ..
 		if resp.Raw != nil && resp.Raw.Body != nil {
 			_ = resp.Raw.Body.Close()
 		}
-		return out, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+		if resp.StatusCode/100 == 4 {
+			out.JSON4XX = new(StreamLogsErrorResponse)
+			out.JSON400 = out.JSON4XX
+			bodyBytes := resp.Content
+			if len(bodyBytes) > 0 {
+				if err := json.Unmarshal(bodyBytes, out.JSON4XX); err != nil {
+					return out, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "StreamLogsErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
+				}
+			}
+			return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+		}
+		out.JSONDefault = new(StreamLogsErrorResponseJSON)
+		bodyBytes := resp.Content
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, out.JSONDefault); err != nil {
+				return out, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(bodyBytes),
+					TargetType:    "StreamLogsErrorResponseJSON",
+					Body:          bodyBytes,
+					Err:           err,
+				}
+			}
+		}
+		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
 	}
 }
 
@@ -639,7 +705,39 @@ func (c *Client) StreamLogsWithResponse(ctx context.Context, reqEditors ...runti
 	case 200:
 		return out, nil
 	default:
-		return out, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+		if resp.StatusCode/100 == 4 {
+			out.JSON4XX = new(StreamLogsErrorResponse)
+			out.JSON400 = out.JSON4XX
+			bodyBytes := resp.Content
+			if len(bodyBytes) > 0 {
+				if err := json.Unmarshal(bodyBytes, out.JSON4XX); err != nil {
+					return out, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "StreamLogsErrorResponse",
+						Body:          bodyBytes,
+						Err:           err,
+					}
+				}
+			}
+			return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+		}
+		out.JSONDefault = new(StreamLogsErrorResponseJSON)
+		bodyBytes := resp.Content
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, out.JSONDefault); err != nil {
+				return out, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(bodyBytes),
+					TargetType:    "StreamLogsErrorResponseJSON",
+					Body:          bodyBytes,
+					Err:           err,
+				}
+			}
+		}
+		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
 	}
 }
 
@@ -715,6 +813,10 @@ type GetEventsErrorResponse = ServiceError
 
 type StreamLogsResponse = []byte
 
+type StreamLogsErrorResponse = ServiceError
+
+type StreamLogsErrorResponseJSON = ServiceError
+
 type StreamLogsResponseItem struct {
 	Level   StreamLogsResponseLevel     `json:"level" validate:"required"`
 	Message string                      `json:"message" validate:"required"`
@@ -743,6 +845,10 @@ type StreamLogsResp struct {
 	Body         []byte
 	StatusCode   int
 	Stream200    *runtime.Stream[StreamLogsResponseItem]
+	JSON4XX      *StreamLogsErrorResponse
+	// Deprecated: Use JSON4XX, which this always equals.
+	JSON400     *StreamLogsErrorResponse
+	JSONDefault *StreamLogsErrorResponseJSON
 }
 
 type Completion struct {

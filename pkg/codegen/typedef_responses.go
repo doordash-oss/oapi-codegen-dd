@@ -11,9 +11,10 @@
 package codegen
 
 import (
+	"cmp"
 	"fmt"
 	"iter"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -29,15 +30,26 @@ type ResponseDefinition struct {
 	Error             *ResponseContentDefinition
 	All               map[int]*ResponseContentDefinition
 
-	// Successes lists every 2xx response in ascending status order. Drives
-	// `client-with-response` envelope generation, which needs a deterministic
-	// per-status iteration.
+	// Successes lists every 2xx response documented under an exact status
+	// code, in ascending order. Drives `client-with-response` envelope
+	// generation, which needs a deterministic per-status iteration.
 	Successes []*ResponseContentDefinition
 
-	// Errors lists every non-2xx response in ascending status order. Same
-	// motivation as Successes - the envelope populates `JSON4xx`/`JSON5xx`
-	// fields per documented status.
+	// Errors lists every non-2xx response documented under an exact status
+	// code, in ascending order. Same motivation as Successes - the envelope
+	// populates `JSON404`/`JSON500` fields per documented status.
 	Errors []*ResponseContentDefinition
+
+	// StatusRanges lists the responses documented under a range such as
+	// `4XX`, in ascending order. The envelope client matches them only after
+	// every exact code, so an explicit `404` takes precedence over `4XX`.
+	StatusRanges []*ResponseContentDefinition
+
+	// Default is the `default` response, which the envelope client matches
+	// last: it covers every status nothing more specific documents. Next to
+	// explicit error codes it is only resolved when ParseOptions.ClientWithResponse
+	// is set, because nothing else consumes it there.
+	Default *ResponseContentDefinition
 
 	// Streams lists every sequential media type documented on a success
 	// response, in ascending status order. Populated independently of which
@@ -77,8 +89,21 @@ type ResponseContentDefinition struct {
 	Description  string
 	Ref          string
 	IsSuccess    bool
-	StatusCode   int
-	Headers      map[string]GoSchema
+
+	// StatusCode is the documented status code. For a range or `default` it
+	// is the stand-in code handler generation uses: 200 for `2XX`, 400 for
+	// both `4XX` and `5XX`, 200 or 500 for `default`. The envelope client
+	// matches StatusRange and IsDefault instead.
+	StatusCode int
+
+	// StatusRange is the class digit of a range such as `4XX` (4), or zero
+	// when the response documents an exact status code.
+	StatusRange int
+
+	// IsDefault is true for the `default` response.
+	IsDefault bool
+
+	Headers map[string]GoSchema
 	// IsRaw is true for unsupported content types (XML, form-urlencoded, etc.)
 	// that require the user to handle marshaling manually.
 	IsRaw bool
@@ -88,6 +113,11 @@ type ResponseContentDefinition struct {
 	// callers that cannot stream (the MCP tool template) refuse instead of
 	// blocking forever.
 	IsStream bool
+
+	// componentResponse is true when the response's type comes from a
+	// component response it references, which the envelope gave no typed
+	// field before ranges and `default` got their own.
+	componentResponse bool
 }
 
 // HasStream reports whether streaming siblings can be generated.
@@ -114,6 +144,84 @@ func (r ResponseDefinition) StreamAt(status int) *StreamResponseDefinition {
 	return nil
 }
 
+// StreamFor returns the sequential response streamed in place of rcd's body,
+// or nil. A range sharing its stand-in code with an exact status, such as
+// `2XX` next to `200`, shares the stream too; only the response All holds at
+// that code owns it, so the envelope declares the field once.
+func (r ResponseDefinition) StreamFor(rcd *ResponseContentDefinition) *StreamResponseDefinition {
+	if r.All[rcd.StatusCode] != rcd {
+		return nil
+	}
+	return r.StreamAt(rcd.StatusCode)
+}
+
+// EnvelopeResponses returns every response the envelope client matches, in
+// the order it tries them: exact codes, then ranges, then `default`.
+func (r ResponseDefinition) EnvelopeResponses() []*ResponseContentDefinition {
+	responses := slices.Concat(r.Successes, r.Errors, r.StatusRanges)
+	if r.Default != nil {
+		responses = append(responses, r.Default)
+	}
+	return responses
+}
+
+// LegacyBodyField returns the name the envelope gave a range's body field
+// before ranges were matched by class, such as JSON400 for an inline `4XX`,
+// so it stays as a deprecated alias of the current field. It is "" when there
+// was none - only the range All holds at its stand-in code had one - or when
+// an exact code documented there owns that name now.
+func (r ResponseDefinition) LegacyBodyField(rcd *ResponseContentDefinition) string {
+	// A response referencing a component response had no typed field.
+	if rcd.StatusRange == 0 || rcd.componentResponse || !rcd.hasBodyField() || r.All[rcd.StatusCode] != rcd {
+		return ""
+	}
+	name := rcd.NameTag + strconv.Itoa(rcd.StatusCode)
+	for _, exact := range slices.Concat(r.Successes, r.Errors) {
+		if exact.hasBodyField() && exact.NameTag+strconv.Itoa(exact.StatusCode) == name {
+			return ""
+		}
+	}
+	return name
+}
+
+// HasLegacyHeaders reports whether a range or `default` keeps the headers
+// field and type the envelope declared under its stand-in code, such as
+// Headers500 for `default`, as deprecated aliases. As with LegacyBodyField,
+// only the response All holds at that code had them, and an exact code there
+// documenting headers owns the names now.
+func (r ResponseDefinition) HasLegacyHeaders(rcd *ResponseContentDefinition) bool {
+	if rcd.isExactStatus() || len(rcd.Headers) == 0 || r.All[rcd.StatusCode] != rcd {
+		return false
+	}
+	for _, exact := range slices.Concat(r.Successes, r.Errors) {
+		if exact.StatusCode == rcd.StatusCode && len(exact.Headers) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// StatusName names the response in the envelope client's field and type
+// names: the status code ("404"), the range ("4XX"), or "Default".
+func (r ResponseContentDefinition) StatusName() string {
+	if r.IsDefault {
+		return "Default"
+	}
+	return statusName(r.StatusCode, r.StatusRange)
+}
+
+// isExactStatus reports whether the response documents a single status code
+// rather than a range or `default`.
+func (r ResponseContentDefinition) isExactStatus() bool {
+	return r.StatusRange == 0 && !r.IsDefault
+}
+
+// hasBodyField reports whether the envelope declares a typed body field for
+// the response.
+func (r ResponseContentDefinition) hasBodyField() bool {
+	return r.ResponseName != "struct{}" && !r.IsRaw && r.NameTag != ""
+}
+
 func getOperationResponses(operationID string, responses *v3high.Responses, options ParseOptions) (*ResponseDefinition, []TypeDefinition, error) {
 	var (
 		successCode          int
@@ -125,6 +233,12 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	)
 
 	all := make(map[int]*ResponseContentDefinition)
+
+	// Every response the envelope client can match. Unlike `all`, which puts a
+	// range or `default` at a stand-in code, it keeps each response as
+	// documented, so `4XX` and `5XX` do not overwrite each other and an exact
+	// code can take precedence over the range covering it.
+	var documented []*ResponseContentDefinition
 
 	// Content of every documented success status, plus any schema the primary
 	// pass already generated for a sequential media type. Resolved into
@@ -144,15 +258,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 		all[successCode] = successDefinition
 
-		successes, errs := partitionResponses(all)
-		return &ResponseDefinition{
+		res := &ResponseDefinition{
 			SuccessStatusCode: successCode,
 			Success:           successDefinition,
 			Error:             nil,
 			All:               all,
-			Successes:         successes,
-			Errors:            errs,
-		}, nil, nil
+		}
+		res.setEnvelopeResponses([]*ResponseContentDefinition{successDefinition})
+		return res, nil, nil
 	}
 
 	defaultResponse := responses.Default
@@ -194,6 +307,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 				return nil, nil, fmt.Errorf("error parsing status code %s: %w", statusCode, err)
 			}
 		}
+		statusRange := statusRangeOf(statusCode)
 
 		if status >= 200 && status < 300 {
 			isSuccess = true
@@ -241,20 +355,25 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		bodySchema := responseBodySchema(content, contentType)
 
 		if content == nil || bodySchema == nil {
-			if isSuccess {
-				successDefinition := &ResponseContentDefinition{
-					IsSuccess:    isSuccess,
-					Description:  response.Description,
-					ResponseName: "struct{}",
-					StatusCode:   status,
-					Headers:      headers,
-					// Preserve the declared media type even when the schema
-					// is empty (e.g. `text/html: {}`); strict response
-					// validators rely on it.
-					ContentType: contentType,
-				}
-				all[status] = successDefinition
+			bodyless := &ResponseContentDefinition{
+				IsSuccess:    isSuccess,
+				Description:  response.Description,
+				ResponseName: "struct{}",
+				StatusCode:   status,
+				StatusRange:  statusRange,
+				Headers:      headers,
+				// Preserve the declared media type even when the schema
+				// is empty (e.g. `text/html: {}`); strict response
+				// validators rely on it.
+				ContentType: contentType,
 			}
+			// An error without a body has nothing to decode, so only the
+			// envelope client sees it, to keep its precedence over a range
+			// or `default`.
+			if isSuccess {
+				all[status] = bodyless
+			}
+			documented = append(documented, bodyless)
 			continue
 		}
 
@@ -302,7 +421,7 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 
 		var responseName string
-		tag := ""
+		tag := responseNameTag(contentType)
 
 		// If this is a component reference AND the type exists (was processed by getComponentResponses),
 		// use the component name and don't create a duplicate TypeDefinition.
@@ -405,22 +524,8 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			// rather than duplicates generated with the response path context.
 			contentSchema = componentTd.Schema
 		} else {
-			switch {
-			case contentType == "application/json":
-				tag = "JSON"
-			case isMediaTypeJson(contentType):
-				tag = mediaTypeToCamelCase(contentType)
-			case contentType == "application/x-www-form-urlencoded":
-				tag = "Formdata"
-			case strings.HasPrefix(contentType, "multipart/"):
-				tag = "Multipart"
-			case contentType == "text/plain":
-				tag = "Text"
-			case contentType == "text/html":
-				tag = "HTML"
-			}
-
-			codeName := strconv.Itoa(status)
+			// A range's stand-in code would name a 5XX type after 400.
+			codeName := statusName(status, statusRange)
 			baseName := operationID + typeSuffix
 			nameSuffixes := []string{tag, tag + codeName}
 			responseName = options.typeTracker.generateUniqueNameWithSuffixes(baseName, nameSuffixes)
@@ -486,11 +591,15 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 			ContentType:  contentType,
 			NameTag:      tag,
 			StatusCode:   status,
+			StatusRange:  statusRange,
 			Headers:      headers,
 			IsRaw:        isRaw,
 			IsStream:     isStream,
+
+			componentResponse: componentTypeExists,
 		}
 		all[status] = rcd
+		documented = append(documented, rcd)
 	}
 
 	// When no explicit success is documented but `default` has content, treat
@@ -500,13 +609,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	// would make mocks return content that doesn't satisfy the real schema.
 	defaultAsSuccess := false
 	if successCode == 0 && defaultResponse != nil && defaultResponse.Content != nil && defaultResponse.Content.First() != nil {
-		rcd, tds, err := buildDefaultResponseDefinition(operationID, defaultResponse, 200, true, options)
+		rcd, tds, err := buildDefaultResponseDefinition(operationID, defaultResponse, 200, true, false, options)
 		if err != nil {
 			return nil, nil, err
 		}
 		if rcd != nil {
 			successCode = 200
 			all[200] = rcd
+			documented = append(documented, rcd)
 			typeDefinitions = append(typeDefinitions, tds...)
 			defaultAsSuccess = true
 			// A `default` standing in as the success can be sequential too, so
@@ -525,16 +635,25 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 		}
 
 		all[successCode] = successDefinition
+		documented = append(documented, successDefinition)
 	}
 
-	if errorCode == 0 && defaultResponse != nil && !defaultAsSuccess {
-		rcd, tds, err := buildDefaultResponseDefinition(operationID, defaultResponse, 500, false, options)
+	// Handler generation answers errors with the first explicit error code, so
+	// it only needs `default` when none is documented. The envelope client
+	// matches `default` against every status nothing else documents, so it
+	// needs it next to explicit error codes too.
+	alongsideErrors := errorCode != 0
+	if defaultResponse != nil && !defaultAsSuccess && (!alongsideErrors || options.ClientWithResponse) {
+		rcd, tds, err := buildDefaultResponseDefinition(operationID, defaultResponse, 500, false, alongsideErrors, options)
 		if err != nil {
 			return nil, nil, err
 		}
 		if rcd != nil {
-			fstErrorCode = 500
-			all[500] = rcd
+			if !alongsideErrors {
+				fstErrorCode = 500
+				all[500] = rcd
+			}
+			documented = append(documented, rcd)
 			typeDefinitions = append(typeDefinitions, tds...)
 		}
 	}
@@ -545,16 +664,14 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 	}
 	typeDefinitions = append(typeDefinitions, streamTypes...)
 
-	successes, errs := partitionResponses(all)
 	res := &ResponseDefinition{
 		SuccessStatusCode: successCode,
 		Success:           all[successCode],
 		Error:             all[fstErrorCode],
 		All:               all,
-		Successes:         successes,
-		Errors:            errs,
 		Streams:           streams,
 	}
+	res.setEnvelopeResponses(documented)
 
 	return res, typeDefinitions, nil
 }
@@ -563,10 +680,19 @@ func getOperationResponses(operationID string, responses *v3high.Responses, opti
 // ResponseContentDefinition installed at the given status. Used both when no
 // explicit success is documented (install as 200 success) and when no
 // explicit error is documented (install as 500 error).
-func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.Response, status int, isSuccess bool, options ParseOptions) (*ResponseContentDefinition, []TypeDefinition, error) {
+//
+// With alongsideErrors it is built for the envelope client next to explicit
+// error codes. The first of those already owns the plain type name and schema
+// path, so `default` gets its own to keep nested types apart.
+func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.Response, status int, isSuccess, alongsideErrors bool, options ParseOptions) (*ResponseContentDefinition, []TypeDefinition, error) {
 	typeSuffix := "ErrorResponse"
 	if isSuccess {
 		typeSuffix = "Response"
+	}
+
+	pathParts := []string{operationID, typeSuffix}
+	if alongsideErrors {
+		pathParts = append(pathParts, "default")
 	}
 
 	content := defaultResponse.Content.First()
@@ -586,7 +712,7 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		if bodySchema != nil {
 			ref = bodySchema.GetReference()
 
-			opts := options.WithReference(ref).WithPath([]string{operationID, typeSuffix})
+			opts := options.WithReference(ref).WithPath(pathParts)
 			contentSchema, err = GenerateGoSchema(bodySchema, opts)
 			if err != nil {
 				return nil, nil, fmt.Errorf("error generating request body definition: %w", err)
@@ -625,7 +751,11 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 	if refType != "" {
 		contentSchema.RefType = refType
 	}
+	tag := responseNameTag(contentType)
 	responseName := operationID + typeSuffix
+	if alongsideErrors {
+		responseName = options.typeTracker.generateUniqueNameWithSuffixes(responseName, []string{tag, tag + "Default"})
+	}
 	if contentSchema.ArrayType != nil {
 		contentSchema, _ = replaceInlineTypes(contentSchema, options)
 	}
@@ -667,7 +797,9 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 		Schema:       contentSchema,
 		Ref:          refType,
 		ContentType:  contentType,
+		NameTag:      tag,
 		StatusCode:   status,
+		IsDefault:    true,
 		Headers:      headers,
 		IsRaw:        isRaw,
 		IsStream:     isStream,
@@ -675,27 +807,104 @@ func buildDefaultResponseDefinition(operationID string, defaultResponse *v3high.
 	return rcd, typeDefinitions, nil
 }
 
-// partitionResponses splits an `all` map of every documented response into
-// (successes, errors) slices, each ascending by status code. Used to populate
-// ResponseDefinition.Successes / .Errors so templates can iterate
-// deterministically.
-func partitionResponses(all map[int]*ResponseContentDefinition) (successes, errors []*ResponseContentDefinition) {
-	statuses := make([]int, 0, len(all))
-	for s := range all {
-		statuses = append(statuses, s)
-	}
-
-	sort.Ints(statuses)
-
-	for _, s := range statuses {
-		r := all[s]
-		if r.IsSuccess {
-			successes = append(successes, r)
-		} else {
-			errors = append(errors, r)
+// setEnvelopeResponses sorts every documented response into the lists the
+// envelope client matches, each in ascending order: Successes and Errors for
+// exact codes, then StatusRanges, then Default.
+//
+// An error without a body has nothing to decode, so it is left to the
+// unexpected-status fallback - unless a range or `default` would claim its
+// status instead. Then it keeps an entry of its own, since OpenAPI gives the
+// more specific response precedence.
+func (r *ResponseDefinition) setEnvelopeResponses(documented []*ResponseContentDefinition) {
+	var bodyless []*ResponseContentDefinition
+	for _, rcd := range documented {
+		switch {
+		case rcd.IsDefault:
+			r.Default = rcd
+		case !rcd.IsSuccess && rcd.ResponseName == "struct{}":
+			bodyless = append(bodyless, rcd)
+		case rcd.StatusRange != 0:
+			r.StatusRanges = append(r.StatusRanges, rcd)
+		case rcd.IsSuccess:
+			r.Successes = append(r.Successes, rcd)
+		default:
+			r.Errors = append(r.Errors, rcd)
 		}
 	}
-	return successes, errors
+
+	for _, rcd := range bodyless {
+		if !r.coveredByFallback(rcd) {
+			continue
+		}
+		if rcd.StatusRange != 0 {
+			r.StatusRanges = append(r.StatusRanges, rcd)
+		} else {
+			r.Errors = append(r.Errors, rcd)
+		}
+	}
+
+	byStatus := func(a, b *ResponseContentDefinition) int { return cmp.Compare(a.StatusCode, b.StatusCode) }
+	slices.SortFunc(r.Successes, byStatus)
+	slices.SortFunc(r.Errors, byStatus)
+	slices.SortFunc(r.StatusRanges, func(a, b *ResponseContentDefinition) int {
+		return cmp.Compare(a.StatusRange, b.StatusRange)
+	})
+}
+
+// coveredByFallback reports whether a range or `default` would match the
+// statuses rcd documents, were rcd not matched before them.
+func (r *ResponseDefinition) coveredByFallback(rcd *ResponseContentDefinition) bool {
+	if r.Default != nil {
+		return true
+	}
+	if rcd.StatusRange != 0 {
+		return false
+	}
+	for _, rng := range r.StatusRanges {
+		if rng.StatusRange == rcd.StatusCode/100 {
+			return true
+		}
+	}
+	return false
+}
+
+// statusName names an exact status code ("404"), or the range ("4XX") when
+// statusRange is set - never the range's stand-in code.
+func statusName(code, statusRange int) string {
+	if statusRange != 0 {
+		return strconv.Itoa(statusRange) + "XX"
+	}
+	return strconv.Itoa(code)
+}
+
+// statusRangeOf returns the class digit of a response key documenting a
+// status range, such as 4 for "4XX", or zero for any other key.
+func statusRangeOf(key string) int {
+	if len(key) != 3 || !strings.EqualFold(key[1:], "XX") || key[0] < '1' || key[0] > '5' {
+		return 0
+	}
+	return int(key[0] - '0')
+}
+
+// responseNameTag returns the tag a response's media type contributes to its
+// Go type and envelope field names, such as "JSON" in JSON404, or "" when
+// the media type has none.
+func responseNameTag(contentType string) string {
+	switch {
+	case contentType == "application/json":
+		return "JSON"
+	case isMediaTypeJson(contentType):
+		return mediaTypeToCamelCase(contentType)
+	case contentType == "application/x-www-form-urlencoded":
+		return "Formdata"
+	case strings.HasPrefix(contentType, "multipart/"):
+		return "Multipart"
+	case contentType == "text/plain":
+		return "Text"
+	case contentType == "text/html":
+		return "HTML"
+	}
+	return ""
 }
 
 func generateResponseHeadersSchema(headers iter.Seq2[string, *v3high.Header], operationID string, options ParseOptions) (map[string]GoSchema, error) {

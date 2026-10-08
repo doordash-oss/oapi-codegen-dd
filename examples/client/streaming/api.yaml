@@ -75,6 +75,18 @@ paths:
                         type: string
                       host:
                         type: string
+        '4XX':
+          description: The tail was refused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
+        default:
+          description: Any other failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceError'
 components:
   schemas:
     Completion:

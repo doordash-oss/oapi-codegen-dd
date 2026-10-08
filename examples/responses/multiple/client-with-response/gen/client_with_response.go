@@ -33,6 +33,9 @@ func NewDefaultClient(baseURL string, opts ...runtime.APIClientOption) (*Client,
 // envelope-only generation it lists the WithResponse methods.
 type ClientInterface interface {
 	UploadDocumentWithResponse(ctx context.Context, options *UploadDocumentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*UploadDocumentResp, error)
+	GetDocumentWithResponse(ctx context.Context, options *GetDocumentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetDocumentResp, error)
+	DeleteDocumentWithResponse(ctx context.Context, options *DeleteDocumentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*DeleteDocumentResp, error)
+	GetHealthWithResponse(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetHealthResp, error)
 }
 
 func (c *Client) UploadDocumentWithResponse(ctx context.Context, options *UploadDocumentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*UploadDocumentResp, error) {
@@ -123,6 +126,200 @@ func (c *Client) UploadDocumentWithResponse(ctx context.Context, options *Upload
 		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
 	default:
 		return out, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+	}
+}
+
+func (c *Client) GetDocumentWithResponse(ctx context.Context, options *GetDocumentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*GetDocumentResp, error) {
+	var err error
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL: c.apiClient.GetBaseURL() + "/documents/{id}",
+		Method:     "GET",
+		Options:    options,
+	}
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/documents/{id}")
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+
+	out := &GetDocumentResp{
+		HTTPResponse: resp.Raw,
+		Body:         resp.Content,
+		StatusCode:   resp.StatusCode,
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		out.JSON200 = new(GetDocumentResponse)
+		bodyBytes := resp.Content
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, out.JSON200); err != nil {
+				return out, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(bodyBytes),
+					TargetType:    "GetDocumentResponse",
+					Body:          bodyBytes,
+					Err:           err,
+				}
+			}
+		}
+		return out, nil
+	case 404:
+		out.JSON404 = new(GetDocumentErrorResponse)
+		bodyBytes := resp.Content
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, out.JSON404); err != nil {
+				return out, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(bodyBytes),
+					TargetType:    "GetDocumentErrorResponse",
+					Body:          bodyBytes,
+					Err:           err,
+				}
+			}
+		}
+		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+	case 410:
+		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+	default:
+		if resp.StatusCode/100 == 4 {
+			out.JSON4XX = new(GetDocumentErrorResponseJSON4XX)
+			out.JSON400 = out.JSON4XX
+			bodyBytes := resp.Content
+			if len(bodyBytes) > 0 {
+				if err := json.Unmarshal(bodyBytes, out.JSON4XX); err != nil {
+					return out, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "GetDocumentErrorResponseJSON4XX",
+						Body:          bodyBytes,
+						Err:           err,
+					}
+				}
+			}
+			return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+		}
+		if resp.StatusCode/100 == 5 {
+			out.JSON5XX = new(GetDocumentErrorResponseJSON)
+			bodyBytes := resp.Content
+			if len(bodyBytes) > 0 {
+				if err := json.Unmarshal(bodyBytes, out.JSON5XX); err != nil {
+					return out, &runtime.ResponseDecodeError{
+						StatusCode:    resp.StatusCode,
+						ContentType:   resp.Headers.Get("Content-Type"),
+						ContentLength: len(bodyBytes),
+						TargetType:    "GetDocumentErrorResponseJSON",
+						Body:          bodyBytes,
+						Err:           err,
+					}
+				}
+			}
+			out.Headers5XX = &GetDocumentResp5XXHeaders{
+				RetryAfter: resp.Headers.Get("Retry-After"),
+			}
+			return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+		}
+		return out, runtime.NewClientAPIError(fmt.Errorf("unexpected status code: %d", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+	}
+}
+
+func (c *Client) DeleteDocumentWithResponse(ctx context.Context, options *DeleteDocumentRequestOptions, reqEditors ...runtime.RequestEditorFn) (*DeleteDocumentResp, error) {
+	var err error
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL: c.apiClient.GetBaseURL() + "/documents/{id}",
+		Method:     "DELETE",
+		Options:    options,
+	}
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/documents/{id}")
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+
+	out := &DeleteDocumentResp{
+		HTTPResponse: resp.Raw,
+		Body:         resp.Content,
+		StatusCode:   resp.StatusCode,
+	}
+
+	switch resp.StatusCode {
+	case 204:
+		return out, nil
+	default:
+		out.JSONDefault = new(DeleteDocumentErrorResponse)
+		bodyBytes := resp.Content
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, out.JSONDefault); err != nil {
+				return out, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(bodyBytes),
+					TargetType:    "DeleteDocumentErrorResponse",
+					Body:          bodyBytes,
+					Err:           err,
+				}
+			}
+		}
+		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
+	}
+}
+
+func (c *Client) GetHealthWithResponse(ctx context.Context, reqEditors ...runtime.RequestEditorFn) (*GetHealthResp, error) {
+	var err error
+	reqParams := runtime.RequestOptionsParameters{
+		RequestURL: c.apiClient.GetBaseURL() + "/health",
+		Method:     "GET",
+	}
+
+	req, err := c.apiClient.CreateRequest(ctx, reqParams, reqEditors...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	resp, err := c.apiClient.ExecuteRequest(ctx, req, "/health")
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+
+	out := &GetHealthResp{
+		HTTPResponse: resp.Raw,
+		Body:         resp.Content,
+		StatusCode:   resp.StatusCode,
+	}
+
+	switch resp.StatusCode {
+	default:
+		out.JSONDefault = new(GetHealthResponse)
+		bodyBytes := resp.Content
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, out.JSONDefault); err != nil {
+				return out, &runtime.ResponseDecodeError{
+					StatusCode:    resp.StatusCode,
+					ContentType:   resp.Headers.Get("Content-Type"),
+					ContentLength: len(bodyBytes),
+					TargetType:    "GetHealthResponse",
+					Body:          bodyBytes,
+					Err:           err,
+				}
+			}
+		}
+		if resp.StatusCode/100 == 2 {
+			return out, nil
+		}
+		return out, runtime.NewClientAPIError(fmt.Errorf("API error (status %d)", resp.StatusCode), runtime.WithStatusCode(resp.StatusCode))
 	}
 }
 
