@@ -352,8 +352,7 @@ func createRequest(ctx context.Context, params RequestOptionsParameters) (*http.
 			}
 			bodyBytes = []byte(encodedPayload)
 		default:
-			mediaType, _, _ := strings.Cut(ctLower, ";")
-			mediaType = strings.TrimSpace(mediaType)
+			mediaType := baseMediaType(contentType)
 			if mediaType == "application/json" || strings.HasSuffix(mediaType, "+json") {
 				bodyBytes, err = json.Marshal(payload)
 			} else {

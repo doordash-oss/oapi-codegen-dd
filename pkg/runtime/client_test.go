@@ -647,17 +647,26 @@ func TestClientBinaryUpload(t *testing.T) {
 }
 
 func TestClientJSONFileKeepsJSONEncoding(t *testing.T) {
-	var file File
-	file.InitFromBytes([]byte("abc"), "chunk")
-	client, err := NewAPIClient("http://example.com")
-	require.NoError(t, err)
-	req, err := client.CreateRequest(context.Background(), RequestOptionsParameters{
-		RequestURL: "http://example.com", Method: http.MethodPost, ContentType: "application/json",
-		Options: mockRequestOptions{body: &file},
-	})
-	require.NoError(t, err)
-	body, err := io.ReadAll(req.Body)
-	require.NoError(t, err)
-	require.NoError(t, req.Body.Close())
-	assert.Equal(t, `"YWJj"`, string(body))
+	for _, contentType := range []string{
+		"application/json",
+		"Application/JSON; charset=utf-8",
+		"application/problem+json; charset=utf-8",
+		"application/json; invalid-parameter",
+	} {
+		t.Run(contentType, func(t *testing.T) {
+			var file File
+			file.InitFromBytes([]byte("abc"), "chunk")
+			client, err := NewAPIClient("http://example.com")
+			require.NoError(t, err)
+			req, err := client.CreateRequest(context.Background(), RequestOptionsParameters{
+				RequestURL: "http://example.com", Method: http.MethodPost, ContentType: contentType,
+				Options: mockRequestOptions{body: &file},
+			})
+			require.NoError(t, err)
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			require.NoError(t, req.Body.Close())
+			assert.Equal(t, `"YWJj"`, string(body))
+		})
+	}
 }

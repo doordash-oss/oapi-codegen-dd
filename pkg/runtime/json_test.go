@@ -20,6 +20,12 @@ import (
 )
 
 func TestAsMap(t *testing.T) {
+	t.Run("rejects incompatible value types", func(t *testing.T) {
+		result, err := AsMap[int](map[string]string{"count": "invalid"})
+		require.Error(t, err)
+		assert.Nil(t, result)
+	})
+
 	t.Run("converts struct to map[string]any", func(t *testing.T) {
 		type TestStruct struct {
 			Name  string `json:"name"`
@@ -91,6 +97,57 @@ func TestAsMap(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "NYC", address["city"])
 	})
+}
+
+func TestAsMapStringScalars(t *testing.T) {
+	type Headers struct {
+		Text    string  `json:"text"`
+		Offset  int64   `json:"offset"`
+		Maximum uint64  `json:"maximum"`
+		Ratio   float64 `json:"ratio"`
+		Enabled bool    `json:"enabled"`
+		False   bool    `json:"false"`
+		Null    *string `json:"null"`
+		Omitted *string `json:"omitted,omitempty"`
+	}
+
+	result, err := AsMap[string](Headers{
+		Text: "chunk", Offset: 9007199254740993, Maximum: 18446744073709551615,
+		Ratio: 1.25, Enabled: true,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"text": "chunk", "offset": "9007199254740993", "maximum": "18446744073709551615",
+		"ratio": "1.25", "enabled": "true", "false": "false", "null": "",
+	}, result)
+}
+
+func TestAsMapStringNull(t *testing.T) {
+	for _, input := range []any{nil, (*struct{})(nil), map[string]string(nil)} {
+		result, err := AsMap[string](input)
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	}
+}
+
+func TestAsMapStringErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+	}{
+		{name: "nested object", input: map[string]any{"header": map[string]string{"nested": "value"}}},
+		{name: "nested array", input: map[string]any{"header": []string{"value"}}},
+		{name: "non-object input", input: "value"},
+		{name: "unmarshalable input", input: make(chan int)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := AsMap[string](tt.input)
+			require.Error(t, err)
+			assert.Nil(t, result)
+		})
+	}
 }
 
 var (
