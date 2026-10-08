@@ -1,0 +1,6 @@
+package: gen
+generate:
+  handler:
+    kind: chi
+    validation:
+      request: true

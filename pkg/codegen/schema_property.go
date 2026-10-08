@@ -176,6 +176,13 @@ func (p Property) needsPatternValidation() bool {
 		patternCompiles(*p.Constraints.Pattern)
 }
 
+// needsItemCountValidation reports whether this property is a slice with minItems or maxItems
+// but, unlike a named array type, no Validate() of its own to check them.
+func (p Property) needsItemCountValidation() bool {
+	c := p.Constraints
+	return p.Schema.ArrayType != nil && (deref(c.MinItems) > 0 || c.MaxItems != nil)
+}
+
 func createPropertyGoFieldName(jsonName string, extensions map[string]any) string {
 	goFieldName := jsonName
 	if extension, ok := extensions[extGoName]; ok {
