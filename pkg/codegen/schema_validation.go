@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 )
 
 // This file contains all validation generation logic for GoSchema.
@@ -352,7 +354,7 @@ func generateCustomPropertyValidation(s GoSchema, alias, validatorVar string) st
 			// Check if this is an array property whose item count or items need validation
 			if prop.Schema.ArrayType != nil && (prop.needsItemCountValidation() || prop.Schema.ArrayType.NeedsValidation()) {
 				lines = append(lines, generateArrayPropertyValidation(alias, prop, validatorVar)...)
-			} else if prop.Schema.AdditionalPropertiesType != nil && prop.Schema.AdditionalPropertiesType.NeedsValidation() {
+			} else if prop.Schema.AdditionalPropertiesType != nil && (prop.needsPropertyCountValidation() || prop.Schema.AdditionalPropertiesType.NeedsValidation()) {
 				// Check if this is a map property with values that need validation
 				lines = append(lines, generateMapPropertyValidation(alias, prop, validatorVar)...)
 			} else {
@@ -399,6 +401,9 @@ func generateCustomPropertyValidation(s GoSchema, alias, validatorVar string) st
 
 			// A slice of primitives may carry an item count.
 			lines = append(lines, generateItemCountLines(alias, prop)...)
+
+			// A map of primitives may carry a property count.
+			lines = append(lines, generatePropertyCountLines(alias, prop)...)
 		}
 	}
 
@@ -548,9 +553,49 @@ func generateItemCountLines(alias string, prop Property) []string {
 	return lines
 }
 
+// generatePropertyCountLines checks the size of an inline map property against its minProperties and maxProperties.
+func generatePropertyCountLines(alias string, prop Property) []string {
+	if !prop.needsPropertyCountValidation() {
+		return nil
+	}
+
+	var lines []string
+	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
+
+	// A map that wasn't sent is nil, which only a required one is rejected for, unless it is nullable.
+	if minProps := deref(prop.Constraints.MinProperties); minProps > 0 {
+		errMsg := fmt.Sprintf(errMsgMapMinProps, minProps)
+		cond := fmt.Sprintf("%s != nil && len(%s) < %d", fieldAccess, fieldAccess, minProps)
+		if prop.Constraints.RequiredKey && !isExplicitlyNullable(prop.Schema.OpenAPISchema) {
+			cond = fmt.Sprintf("len(%s) < %d", fieldAccess, minProps)
+		}
+		lines = append(lines, fmt.Sprintf("if %s {", cond))
+		lines = append(lines, fmt.Sprintf("    errors = errors.Add(\"%s\", fmt.Sprintf(\"%s\", len(%s)))", prop.GoName, errMsg, fieldAccess))
+		lines = append(lines, "}")
+	}
+
+	if maxProps := prop.Constraints.MaxProperties; maxProps != nil {
+		errMsg := fmt.Sprintf(errMsgMapMaxProps, *maxProps)
+		lines = append(lines, fmt.Sprintf("if len(%s) > %d {", fieldAccess, *maxProps))
+		lines = append(lines, fmt.Sprintf("    errors = errors.Add(\"%s\", fmt.Sprintf(\"%s\", len(%s)))", prop.GoName, errMsg, fieldAccess))
+		lines = append(lines, "}")
+	}
+
+	return lines
+}
+
+// isExplicitlyNullable reports whether the schema itself says nullable: true, as opposed to the
+// computed constraint, which is also true for an optional property.
+func isExplicitlyNullable(schema *base.Schema) bool {
+	return schema != nil && schema.Nullable != nil && *schema.Nullable
+}
+
 // generateMapPropertyValidation generates validation code for a map property
 func generateMapPropertyValidation(alias string, prop Property, validatorVar string) []string {
-	var lines []string
+	lines := generatePropertyCountLines(alias, prop)
+	if !prop.Schema.AdditionalPropertiesType.NeedsValidation() {
+		return lines
+	}
 	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
 
 	// Iterate over map values
@@ -601,7 +646,7 @@ func canUseSimpleStructValidation(s GoSchema) bool {
 
 	// A property needing custom validation, a regex pattern or an item count rules out validator.Struct().
 	for _, prop := range s.Properties {
-		if prop.needsCustomValidation() || prop.needsPatternValidation() || prop.needsItemCountValidation() {
+		if prop.needsCustomValidation() || prop.needsPatternValidation() || prop.needsCountValidation() {
 			return false
 		}
 	}
@@ -636,7 +681,7 @@ func isMapType(s GoSchema) bool {
 // hasCustomValidation reports whether any property needs custom validation, including a regex pattern or an item count.
 func hasCustomValidation(s GoSchema) bool {
 	for _, prop := range s.Properties {
-		if prop.needsCustomValidation() || prop.needsPatternValidation() || prop.needsItemCountValidation() {
+		if prop.needsCustomValidation() || prop.needsPatternValidation() || prop.needsCountValidation() {
 			return true
 		}
 	}
