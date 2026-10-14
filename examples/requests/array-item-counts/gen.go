@@ -331,7 +331,7 @@ func (s SearchQuery) Validate() error {
 		errors = errors.Add("Term", fmt.Sprintf("must have at most 3 items, got %d", len(s.Term)))
 	}
 	for i, item := range s.Term {
-		if err := typesValidator.Var(item, "omitempty,max=3"); err != nil {
+		if err := typesValidator.Var(item, "max=3"); err != nil {
 			errors = errors.Append(fmt.Sprintf("Term[%d]", i), err)
 		}
 	}

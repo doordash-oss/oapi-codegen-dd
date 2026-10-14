@@ -20,7 +20,7 @@ func (p Payments) Validate() error {
 		errors = errors.Add("Array", fmt.Sprintf("must have at least 1 items, got %d", len(p)))
 	}
 	for i, item := range p {
-		if err := typesValidator.Var(item, "omitempty,min=3"); err != nil {
+		if err := typesValidator.Var(item, "min=3"); err != nil {
 			errors = errors.Append(fmt.Sprintf("[%d]", i), err)
 		}
 	}

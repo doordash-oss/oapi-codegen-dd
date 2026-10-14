@@ -229,12 +229,12 @@ func TestTagsWithLength_Validate(t *testing.T) {
 		assert.Nil(t, obj.Validate())
 	})
 
-	t.Run("valid - empty string with omitempty", func(t *testing.T) {
-		// omitempty in validation tags means empty strings are allowed
+	t.Run("invalid - empty string value (minLength: 1)", func(t *testing.T) {
+		// A map value is always present, so "" is checked against minLength
 		obj := TagsWithLength{
 			"key1": "",
 		}
-		assert.Nil(t, obj.Validate())
+		assert.NotNil(t, obj.Validate())
 	})
 
 	t.Run("invalid - value exceeds maxLength", func(t *testing.T) {
@@ -338,13 +338,11 @@ func TestTagsWithBothConstraints_Validate(t *testing.T) {
 	})
 
 	t.Run("invalid - valid count but empty value (minLength: 1)", func(t *testing.T) {
-		// Note: omitempty allows empty strings, so this should actually pass
 		obj := TagsWithBothConstraints{
 			"key1": "valid",
 			"key2": "",
 		}
 
-		// Empty string is allowed due to omitempty
-		assert.Nil(t, obj.Validate())
+		assert.NotNil(t, obj.Validate())
 	})
 }

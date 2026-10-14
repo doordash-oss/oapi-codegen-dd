@@ -230,6 +230,35 @@ func TestConvertValidatorError(t *testing.T) {
 	})
 }
 
+func TestValidateItemPattern(t *testing.T) {
+	t.Run("matching value passes", func(t *testing.T) {
+		assert.NoError(t, ValidateItemPattern("ABC", `^[A-Z]{3}$`))
+	})
+
+	t.Run("non-matching value fails", func(t *testing.T) {
+		err := ValidateItemPattern("abc", `^[A-Z]{3}$`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must match pattern")
+	})
+
+	t.Run("empty value is checked", func(t *testing.T) {
+		// An element is always present, so "" has to match like any other value.
+		require.Error(t, ValidateItemPattern("", `^[A-Z]{3}$`))
+		assert.NoError(t, ValidateItemPattern("", `^[A-Z]*$`))
+	})
+
+	t.Run("nil pointer and non-string are skipped", func(t *testing.T) {
+		var s *string
+		assert.NoError(t, ValidateItemPattern(s, `^[A-Z]{3}$`))
+		assert.NoError(t, ValidateItemPattern(42, `^[A-Z]{3}$`))
+	})
+
+	t.Run("pointer to empty string is checked", func(t *testing.T) {
+		s := ""
+		require.Error(t, ValidateItemPattern(&s, `^[A-Z]{3}$`))
+	})
+}
+
 func TestValidatePattern(t *testing.T) {
 	t.Run("matching value passes", func(t *testing.T) {
 		assert.NoError(t, ValidatePattern("ABC", `^[A-Z]{3}$`))

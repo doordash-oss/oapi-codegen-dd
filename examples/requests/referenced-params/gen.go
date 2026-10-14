@@ -265,7 +265,7 @@ type SearchQuery struct {
 func (s SearchQuery) Validate() error {
 	var errors runtime.ValidationErrors
 	for i, item := range s.Term {
-		if err := typesValidator.Var(item, "omitempty,max=3"); err != nil {
+		if err := typesValidator.Var(item, "max=3"); err != nil {
 			errors = errors.Append(fmt.Sprintf("Term[%d]", i), err)
 		}
 	}

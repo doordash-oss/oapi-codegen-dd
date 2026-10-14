@@ -315,7 +315,7 @@ func (f FileLink) Validate() error {
 		errors = errors.Append("ID", err)
 	}
 	for k, v := range f.Metadata {
-		if err := typesValidator.Var(v, "omitempty,max=500"); err != nil {
+		if err := typesValidator.Var(v, "max=500"); err != nil {
 			errors = errors.Append(fmt.Sprintf("Metadata[%s]", k), err)
 		}
 	}

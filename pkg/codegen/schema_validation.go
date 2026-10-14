@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -152,13 +153,14 @@ func generateArrayValidation(s GoSchema, alias, validatorVar string) string {
 	}
 	// Validate array items if they need validation
 	if s.ArrayType != nil && s.ArrayType.NeedsValidation() {
-		hasItemTags := len(s.ArrayType.Constraints.ValidationTags) > 0
+		itemTags := elementValidationTags(s.ArrayType)
+		hasItemTags := len(itemTags) > 0
 		hasItemPattern := s.ArrayType.needsPatternValidation()
 		lines = append(lines, "for i, item := range "+alias+" {")
 
 		// If items have validation tags, use validator.Var()
 		if hasItemTags {
-			tags := strings.Join(s.ArrayType.Constraints.ValidationTags, ",")
+			tags := strings.Join(itemTags, ",")
 			lines = append(lines, fmt.Sprintf("    if err := %s.Var(item, \"%s\"); err != nil {", validatorVar, tags))
 			lines = append(lines, "        errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)")
 			lines = append(lines, "    }")
@@ -213,7 +215,7 @@ func generateMapValidation(s GoSchema, alias, validatorVar string) string {
 
 	// Collect all constraint violations
 	needsErrorCollection := (s.Constraints.MinProperties != nil && s.Constraints.MaxProperties != nil) ||
-		(s.AdditionalPropertiesType != nil && (len(s.AdditionalPropertiesType.Constraints.ValidationTags) > 0 || s.AdditionalPropertiesType.NeedsValidation()))
+		(s.AdditionalPropertiesType != nil && (len(elementValidationTags(s.AdditionalPropertiesType)) > 0 || s.AdditionalPropertiesType.NeedsValidation()))
 
 	if needsErrorCollection {
 		lines = append(lines, declareErrorsVar())
@@ -245,13 +247,14 @@ func generateMapValidation(s GoSchema, alias, validatorVar string) string {
 
 	// Validate each value if it needs validation
 	if s.AdditionalPropertiesType != nil {
-		hasValTags := len(s.AdditionalPropertiesType.Constraints.ValidationTags) > 0
+		valTags := elementValidationTags(s.AdditionalPropertiesType)
+		hasValTags := len(valTags) > 0
 		hasValPattern := s.AdditionalPropertiesType.needsPatternValidation()
 		if hasValTags || hasValPattern {
 			// Primitive values: validator tags and/or a regex pattern.
 			lines = append(lines, "for k, v := range "+alias+" {")
 			if hasValTags {
-				tags := strings.Join(s.AdditionalPropertiesType.Constraints.ValidationTags, ",")
+				tags := strings.Join(valTags, ",")
 				lines = append(lines, fmt.Sprintf("    if err := %s.Var(v, \"%s\"); err != nil {", validatorVar, tags))
 				lines = append(lines, "        errors = errors.Append(k, err)")
 				lines = append(lines, "    }")
@@ -443,12 +446,24 @@ func generatePrimitivePropertyValidation(alias string, prop Property, validatorV
 	return lines
 }
 
-// generateElementPatternLines emits a ValidatePattern check for one collection element
-// (array item or map value). The element is passed as-is; runtime.ValidatePattern derefs
-// pointers and skips nil/non-string. keyExpr is the error field-key expression.
+// elementValidationTags returns the validator tags for an array item or map value.
+// Unlike a property, such an element is always present, so omitempty is dropped and a zero
+// value like "" is checked against minLength. A pointer element keeps it, since nil is a null.
+func elementValidationTags(elem *GoSchema) []string {
+	if schemaValueIsPointer(elem) {
+		return elem.Constraints.ValidationTags
+	}
+	return slices.DeleteFunc(slices.Clone(elem.Constraints.ValidationTags), func(tag string) bool {
+		return tag == "omitempty"
+	})
+}
+
+// generateElementPatternLines emits a ValidateItemPattern check for one collection element
+// (array item or map value). The element is passed as-is; runtime.ValidateItemPattern derefs
+// pointers and skips nil/non-string, but checks an empty string. keyExpr is the error field-key expression.
 func generateElementPatternLines(itemExpr, keyExpr string, elem *GoSchema) []string {
 	return []string{
-		fmt.Sprintf("    if err := runtime.ValidatePattern(%s, %s); err != nil {", itemExpr, goStringLiteral(*elem.Constraints.Pattern)),
+		fmt.Sprintf("    if err := runtime.ValidateItemPattern(%s, %s); err != nil {", itemExpr, goStringLiteral(*elem.Constraints.Pattern)),
 		fmt.Sprintf("        errors = errors.Append(%s, err)", keyExpr),
 		"    }",
 	}
@@ -474,13 +489,14 @@ func generateArrayPropertyValidation(alias string, prop Property, validatorVar s
 	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
 
 	// Check for nil before iterating
-	hasItemTags := len(prop.Schema.ArrayType.Constraints.ValidationTags) > 0
+	itemTags := elementValidationTags(prop.Schema.ArrayType)
+	hasItemTags := len(itemTags) > 0
 	hasItemPattern := prop.Schema.ArrayType.needsPatternValidation()
 	lines = append(lines, fmt.Sprintf("for i, item := range %s {", fieldAccess))
 
 	// If items have validation tags, use validator.Var()
 	if hasItemTags {
-		tags := strings.Join(prop.Schema.ArrayType.Constraints.ValidationTags, ",")
+		tags := strings.Join(itemTags, ",")
 		lines = append(lines, fmt.Sprintf("    if err := %s.Var(item, \"%s\"); err != nil {", validatorVar, tags))
 		lines = append(lines, fmt.Sprintf("        errors = errors.Append(fmt.Sprintf(\"%s[%%d]\", i), err)", prop.GoName))
 		lines = append(lines, "    }")
@@ -538,13 +554,14 @@ func generateMapPropertyValidation(alias string, prop Property, validatorVar str
 	fieldAccess := fmt.Sprintf("%s.%s", alias, prop.GoName)
 
 	// Iterate over map values
-	hasValTags := len(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags) > 0
+	valTags := elementValidationTags(prop.Schema.AdditionalPropertiesType)
+	hasValTags := len(valTags) > 0
 	hasValPattern := prop.Schema.AdditionalPropertiesType.needsPatternValidation()
 	lines = append(lines, fmt.Sprintf("for k, v := range %s {", fieldAccess))
 
 	// If values have validation tags, use validator.Var()
 	if hasValTags {
-		tags := strings.Join(prop.Schema.AdditionalPropertiesType.Constraints.ValidationTags, ",")
+		tags := strings.Join(valTags, ",")
 		lines = append(lines, fmt.Sprintf("    if err := %s.Var(v, \"%s\"); err != nil {", validatorVar, tags))
 		lines = append(lines, fmt.Sprintf("        errors = errors.Append(fmt.Sprintf(\"%s[%%s]\", k), err)", prop.GoName))
 		lines = append(lines, "    }")

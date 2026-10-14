@@ -48,6 +48,10 @@ The following OpenAPI constraints are translated to validation tags:
 wherever per-field/per-item validation is generated (full-mode structs, arrays, maps).
 It is not enforced in `simple` mode (see below).
 
+A property that wasn't sent is skipped, so `pattern` ignores an empty string there. An array
+item or map value is always present, so `""` is checked against its `minLength` and `pattern`
+(`runtime.ValidateItemPattern()`) like any other value.
+
 `minItems` and `maxItems` have no validation tag either. A named array type checks its
 length in its own `Validate()`, and a struct checks the length of each inline array
 property or parameter it holds. An array that wasn't sent is nil and passes `minItems`;
