@@ -267,6 +267,9 @@ type File_Links struct {
 
 func (f File_Links) Validate() error {
 	var errors runtime.ValidationErrors
+	if err := typesValidator.Var(f.Data, "required"); err != nil {
+		errors = errors.Append("Data", err)
+	}
 	for i, item := range f.Data {
 		if v, ok := any(item).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {

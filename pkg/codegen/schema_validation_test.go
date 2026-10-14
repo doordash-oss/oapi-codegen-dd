@@ -1424,6 +1424,65 @@ func TestGoSchema_ValidateDecl_StructWithMultipleArraysOfCustomTypes(t *testing.
 	assertCodeEqual(t, expected, result)
 }
 
+// An array of a $ref to a primitive alias has no Validate() on its items, so the struct enforces their pattern.
+func TestGoSchema_ValidateDecl_StructWithArrayOfPrimitiveAliasPattern(t *testing.T) {
+	item := GoSchema{
+		GoType:           "ItemID",
+		IsPrimitiveAlias: true,
+		DefineViaAlias:   true,
+		Constraints:      Constraints{Pattern: ptr(`^[a-z]+:[0-9]+$`)},
+	}
+	schema := GoSchema{
+		GoType: "struct { Refs []ItemID; Index map[string]ItemID }",
+		Properties: []Property{
+			{
+				GoName:      "Refs",
+				Schema:      GoSchema{GoType: "[]ItemID", ArrayType: &item},
+				Constraints: Constraints{ValidationTags: []string{"required"}},
+			},
+			{
+				GoName: "Index",
+				Schema: GoSchema{GoType: "map[string]ItemID", AdditionalPropertiesType: &item},
+			},
+		},
+	}
+
+	if !schema.NeedsValidation() {
+		t.Error("Expected NeedsValidation() to return true for struct with pattern-bound alias items")
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		if err := typesValidator.Var(s.Refs, "required"); err != nil {
+			errors = errors.Append("Refs", err)
+		}
+		for i, item := range s.Refs {
+			if err := runtime.ValidatePattern(item, ` + "`^[a-z]+:[0-9]+$`" + `); err != nil {
+				errors = errors.Append(fmt.Sprintf("Refs[%d]", i), err)
+			}
+		}
+		for k, v := range s.Index {
+			if err := runtime.ValidatePattern(v, ` + "`^[a-z]+:[0-9]+$`" + `); err != nil {
+				errors = errors.Append(fmt.Sprintf("Index[%s]", k), err)
+			}
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+// A primitive alias without a pattern still needs no validation.
+func TestGoSchema_NeedsValidation_PrimitiveAliasWithoutPattern(t *testing.T) {
+	item := GoSchema{GoType: "ItemID", IsPrimitiveAlias: true, DefineViaAlias: true}
+	if item.NeedsValidation() {
+		t.Error("Expected NeedsValidation() to return false for a primitive alias without a pattern")
+	}
+}
+
 // An inline array has no Validate() of its own, so the struct checks its item count.
 func TestGoSchema_ValidateDecl_StructWithArrayItemCount(t *testing.T) {
 	schema := GoSchema{
