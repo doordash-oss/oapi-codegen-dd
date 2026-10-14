@@ -85,14 +85,19 @@ func TestSetTags_InlineArrayItemCounts(t *testing.T) {
 		return rec.Code, svc.body
 	}
 
-	code, body := setTags(t, `{"tags": ["a", "b"]}`)
+	code, body := setTags(t, `{"tags": ["a", "b"], "codes": ["a:1"]}`)
 	assert.Equal(t, http.StatusNoContent, code)
 	assert.Equal(t, []string{"a", "b"}, body.Tags)
 
 	for name, payload := range map[string]string{
-		"minItems": `{"tags": []}`,
-		"maxItems": `{"tags": ["a", "b", "c"]}`,
-		"required": `{}`,
+		"minItems": `{"tags": [], "codes": ["a:1"]}`,
+		"maxItems": `{"tags": ["a", "b", "c"], "codes": ["a:1"]}`,
+		"required": `{"codes": ["a:1"]}`,
+		// An array whose items are validated is still required and still has an item count.
+		"required with validated items":     `{"tags": ["a"]}`,
+		"null with validated items":         `{"tags": ["a"], "codes": null}`,
+		"minItems with validated items":     `{"tags": ["a"], "codes": []}`,
+		"item pattern with validated items": `{"tags": ["a"], "codes": ["bad"]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, body := setTags(t, payload)
