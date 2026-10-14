@@ -234,7 +234,7 @@ func TestGoSchema_ValidateDecl_ArrayWithValidationTagsOnItems(t *testing.T) {
 	expected := `
 		var errors runtime.ValidationErrors
 		for i, item := range p {
-			if err := validate.Var(item, "omitempty,min=3"); err != nil {
+			if err := validate.Var(item, "min=3"); err != nil {
 				errors = errors.Append(fmt.Sprintf("[%d]", i), err)
 			}
 		}
@@ -1241,7 +1241,7 @@ func TestGoSchema_ValidateDecl_ArrayWithPatternItems(t *testing.T) {
 	result := schema.ValidateDecl("p", "validate")
 	expected := "var errors runtime.ValidationErrors\n" +
 		"for i, item := range p {\n" +
-		"    if err := runtime.ValidatePattern(item, `^[a-z]+$`); err != nil {\n" +
+		"    if err := runtime.ValidateItemPattern(item, `^[a-z]+$`); err != nil {\n" +
 		"        errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)\n" +
 		"    }\n" +
 		"}\n" +
@@ -1261,7 +1261,7 @@ func TestGoSchema_ValidateDecl_MapWithPatternValues(t *testing.T) {
 	result := schema.ValidateDecl("m", "validate")
 	expected := "var errors runtime.ValidationErrors\n" +
 		"for k, v := range m {\n" +
-		"    if err := runtime.ValidatePattern(v, `^[A-Z]{2}$`); err != nil {\n" +
+		"    if err := runtime.ValidateItemPattern(v, `^[A-Z]{2}$`); err != nil {\n" +
 		"        errors = errors.Append(k, err)\n" +
 		"    }\n" +
 		"}\n" +
@@ -1284,7 +1284,7 @@ func TestGoSchema_ValidateDecl_ArrayWithNullablePatternItems(t *testing.T) {
 	result := schema.ValidateDecl("p", "validate")
 	expected := "var errors runtime.ValidationErrors\n" +
 		"for i, item := range p {\n" +
-		"    if err := runtime.ValidatePattern(item, `^[a-z]+$`); err != nil {\n" +
+		"    if err := runtime.ValidateItemPattern(item, `^[a-z]+$`); err != nil {\n" +
 		"        errors = errors.Append(fmt.Sprintf(\"[%d]\", i), err)\n" +
 		"    }\n" +
 		"}\n" +
@@ -1458,12 +1458,12 @@ func TestGoSchema_ValidateDecl_StructWithArrayOfPrimitiveAliasPattern(t *testing
 			errors = errors.Append("Refs", err)
 		}
 		for i, item := range s.Refs {
-			if err := runtime.ValidatePattern(item, ` + "`^[a-z]+:[0-9]+$`" + `); err != nil {
+			if err := runtime.ValidateItemPattern(item, ` + "`^[a-z]+:[0-9]+$`" + `); err != nil {
 				errors = errors.Append(fmt.Sprintf("Refs[%d]", i), err)
 			}
 		}
 		for k, v := range s.Index {
-			if err := runtime.ValidatePattern(v, ` + "`^[a-z]+:[0-9]+$`" + `); err != nil {
+			if err := runtime.ValidateItemPattern(v, ` + "`^[a-z]+:[0-9]+$`" + `); err != nil {
 				errors = errors.Append(fmt.Sprintf("Index[%s]", k), err)
 			}
 		}
@@ -1542,7 +1542,7 @@ func TestGoSchema_ValidateDecl_StructWithArrayItemCountAndValidatedItems(t *test
 			errors = errors.Add("Term", fmt.Sprintf("must have at most 10 items, got %d", len(s.Term)))
 		}
 		for i, item := range s.Term {
-			if err := typesValidator.Var(item, "omitempty,max=3"); err != nil {
+			if err := typesValidator.Var(item, "max=3"); err != nil {
 				errors = errors.Append(fmt.Sprintf("Term[%d]", i), err)
 			}
 		}

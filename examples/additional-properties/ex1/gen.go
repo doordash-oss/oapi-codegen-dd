@@ -291,7 +291,7 @@ type TagsWithLength map[string]string
 func (t TagsWithLength) Validate() error {
 	var errors runtime.ValidationErrors
 	for k, v := range t {
-		if err := typesValidator.Var(v, "omitempty,max=50,min=1"); err != nil {
+		if err := typesValidator.Var(v, "max=50,min=1"); err != nil {
 			errors = errors.Append(k, err)
 		}
 	}
@@ -315,7 +315,7 @@ func (t TagsWithBothConstraints) Validate() error {
 		errors = errors.Add("Map", fmt.Sprintf("must have at most 5 properties, got %d", len(t)))
 	}
 	for k, v := range t {
-		if err := typesValidator.Var(v, "omitempty,max=50,min=1"); err != nil {
+		if err := typesValidator.Var(v, "max=50,min=1"); err != nil {
 			errors = errors.Append(k, err)
 		}
 	}

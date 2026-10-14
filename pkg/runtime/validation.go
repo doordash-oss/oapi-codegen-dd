@@ -37,8 +37,19 @@ var patternCache sync.Map // map[string]*regexp.Regexp
 // nil, non-string, and empty values are skipped (pair with `required` to reject empties).
 // An uncompilable pattern yields a ValidationError.
 func ValidatePattern(value any, pattern string) error {
+	return validatePattern(value, pattern, true)
+}
+
+// ValidateItemPattern is ValidatePattern for an array item or map value. Such an element is always
+// present, so an empty string is checked against the pattern like any other value.
+// nil and non-string values are still skipped.
+func ValidateItemPattern(value any, pattern string) error {
+	return validatePattern(value, pattern, false)
+}
+
+func validatePattern(value any, pattern string, skipEmpty bool) error {
 	s, ok := patternInput(value)
-	if !ok || s == "" {
+	if !ok || (skipEmpty && s == "") {
 		return nil
 	}
 
