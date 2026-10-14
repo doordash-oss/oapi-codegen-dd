@@ -168,8 +168,8 @@ func (s GoSchema) NeedsValidation() bool {
 				return true
 			}
 
-			// Property is an inline array with an item count
-			if prop.needsItemCountValidation() {
+			// Property is an inline array or map with a size bound
+			if prop.needsCountValidation() {
 				return true
 			}
 

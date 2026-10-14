@@ -85,19 +85,24 @@ func TestSetTags_InlineArrayItemCounts(t *testing.T) {
 		return rec.Code, svc.body
 	}
 
-	code, body := setTags(t, `{"tags": ["a", "b"], "codes": ["a:1"]}`)
+	code, body := setTags(t, `{"tags": ["a", "b"], "codes": ["a:1"], "labels": {"k": "v"}}`)
 	assert.Equal(t, http.StatusNoContent, code)
 	assert.Equal(t, []string{"a", "b"}, body.Tags)
 
 	for name, payload := range map[string]string{
-		"minItems": `{"tags": [], "codes": ["a:1"]}`,
-		"maxItems": `{"tags": ["a", "b", "c"], "codes": ["a:1"]}`,
-		"required": `{"codes": ["a:1"]}`,
+		"minItems": `{"tags": [], "codes": ["a:1"], "labels": {"k": "v"}}`,
+		"maxItems": `{"tags": ["a", "b", "c"], "codes": ["a:1"], "labels": {"k": "v"}}`,
+		"required": `{"codes": ["a:1"], "labels": {"k": "v"}}`,
 		// An array whose items are validated is still required and still has an item count.
-		"required with validated items":     `{"tags": ["a"]}`,
-		"null with validated items":         `{"tags": ["a"], "codes": null}`,
-		"minItems with validated items":     `{"tags": ["a"], "codes": []}`,
-		"item pattern with validated items": `{"tags": ["a"], "codes": ["bad"]}`,
+		"required with validated items":     `{"tags": ["a"], "labels": {"k": "v"}}`,
+		"null with validated items":         `{"tags": ["a"], "codes": null, "labels": {"k": "v"}}`,
+		"minItems with validated items":     `{"tags": ["a"], "codes": [], "labels": {"k": "v"}}`,
+		"required map":                      `{"tags": ["a"], "codes": ["a:1"]}`,
+		"null map":                          `{"tags": ["a"], "codes": ["a:1"], "labels": null}`,
+		"minProperties":                     `{"tags": ["a"], "codes": ["a:1"], "labels": {}}`,
+		"maxProperties":                     `{"tags": ["a"], "codes": ["a:1"], "labels": {"a": "1", "b": "2", "c": "3"}}`,
+		"optional map minProperties":        `{"tags": ["a"], "codes": ["a:1"], "labels": {"k": "v"}, "notes": {}}`,
+		"item pattern with validated items": `{"tags": ["a"], "codes": ["bad"], "labels": {"k": "v"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, body := setTags(t, payload)

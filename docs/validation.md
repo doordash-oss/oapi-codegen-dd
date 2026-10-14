@@ -57,6 +57,10 @@ length in its own `Validate()`, and a struct checks the length of each inline ar
 property or parameter it holds. An array that wasn't sent is nil and passes `minItems`;
 an empty one that was sent doesn't. Struct fields aren't checked in `simple` mode.
 
+`minProperties` and `maxProperties` work the same way for maps: a named map type checks its
+own size, and a struct checks each inline map property it holds. A map that wasn't sent is
+nil; it passes `minProperties` unless it is `required` and not `nullable`.
+
 ## Generated Code Examples
 
 ### Simple Struct Validation

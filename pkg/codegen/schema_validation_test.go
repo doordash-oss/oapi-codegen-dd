@@ -1483,6 +1483,87 @@ func TestGoSchema_NeedsValidation_PrimitiveAliasWithoutPattern(t *testing.T) {
 	}
 }
 
+// An inline map has no Validate() of its own, so the struct checks its property count.
+func TestGoSchema_ValidateDecl_StructWithMapPropertyCount(t *testing.T) {
+	value := GoSchema{GoType: "string"}
+	mapSchema := GoSchema{GoType: "map[string]string", AdditionalPropertiesType: &value}
+	schema := GoSchema{
+		GoType: "struct { Labels map[string]string; Extra map[string]string }",
+		Properties: []Property{
+			{
+				GoName: "Labels",
+				Schema: mapSchema,
+				Constraints: Constraints{
+					RequiredKey:   true,
+					MinProperties: ptr(int64(1)),
+					MaxProperties: ptr(int64(2)),
+				},
+			},
+			{
+				GoName:      "Extra",
+				Schema:      mapSchema,
+				Constraints: Constraints{MinProperties: ptr(int64(1))},
+			},
+		},
+	}
+
+	if !schema.NeedsValidation() {
+		t.Error("Expected NeedsValidation() to return true for struct with a map property count")
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	// A required map that wasn't sent is nil and fails minProperties; an optional one passes.
+	expected := `
+		var errors runtime.ValidationErrors
+		if len(s.Labels) < 1 {
+			errors = errors.Add("Labels", fmt.Sprintf("must have at least 1 properties, got %d", len(s.Labels)))
+		}
+		if len(s.Labels) > 2 {
+			errors = errors.Add("Labels", fmt.Sprintf("must have at most 2 properties, got %d", len(s.Labels)))
+		}
+		if s.Extra != nil && len(s.Extra) < 1 {
+			errors = errors.Add("Extra", fmt.Sprintf("must have at least 1 properties, got %d", len(s.Extra)))
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
+func TestGoSchema_ValidateDecl_StructWithMapPropertyCountAndValidatedValues(t *testing.T) {
+	value := GoSchema{GoType: "string", Constraints: Constraints{Pattern: ptr(`^a$`)}}
+	schema := GoSchema{
+		GoType: "struct { Labels map[string]string }",
+		Properties: []Property{
+			{
+				GoName:      "Labels",
+				Schema:      GoSchema{GoType: "map[string]string", AdditionalPropertiesType: &value},
+				Constraints: Constraints{MaxProperties: ptr(int64(3))},
+			},
+		},
+	}
+
+	result := schema.ValidateDecl("s", "typesValidator")
+	expected := `
+		var errors runtime.ValidationErrors
+		if len(s.Labels) > 3 {
+			errors = errors.Add("Labels", fmt.Sprintf("must have at most 3 properties, got %d", len(s.Labels)))
+		}
+		for k, v := range s.Labels {
+			if err := runtime.ValidateItemPattern(v, ` + "`^a$`" + `); err != nil {
+				errors = errors.Append(fmt.Sprintf("Labels[%s]", k), err)
+			}
+		}
+		if len(errors) == 0 {
+			return nil
+		}
+		return errors
+	`
+	assertCodeEqual(t, expected, result)
+}
+
 // An inline array has no Validate() of its own, so the struct checks its item count.
 func TestGoSchema_ValidateDecl_StructWithArrayItemCount(t *testing.T) {
 	schema := GoSchema{

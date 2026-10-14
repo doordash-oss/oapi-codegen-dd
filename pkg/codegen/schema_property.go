@@ -183,6 +183,20 @@ func (p Property) needsItemCountValidation() bool {
 	return p.Schema.ArrayType != nil && (deref(c.MinItems) > 0 || c.MaxItems != nil)
 }
 
+// needsPropertyCountValidation reports whether this property is a map with minProperties or maxProperties
+// but, unlike a named map type, no Validate() of its own to check them.
+func (p Property) needsPropertyCountValidation() bool {
+	c := p.Constraints
+	return p.Schema.AdditionalPropertiesType != nil &&
+		strings.HasPrefix(p.Schema.TypeDecl(), "map[") &&
+		(deref(c.MinProperties) > 0 || c.MaxProperties != nil)
+}
+
+// needsCountValidation reports whether this property is an inline array or map whose size is bounded.
+func (p Property) needsCountValidation() bool {
+	return p.needsItemCountValidation() || p.needsPropertyCountValidation()
+}
+
 func createPropertyGoFieldName(jsonName string, extensions map[string]any) string {
 	goFieldName := jsonName
 	if extension, ok := extensions[extGoName]; ok {

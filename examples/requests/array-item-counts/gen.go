@@ -300,12 +300,23 @@ func NewRouter(svc ServiceInterface, opts ...RouterOption) chi.Router {
 }
 
 type SetTagsBody struct {
-	Codes []string `json:"codes" validate:"required"`
-	Tags  []string `json:"tags" validate:"required"`
+	Labels map[string]string `json:"labels"`
+	Notes  map[string]string `json:"notes,omitempty"`
+	Codes  []string          `json:"codes" validate:"required"`
+	Tags   []string          `json:"tags" validate:"required"`
 }
 
 func (s SetTagsBody) Validate() error {
 	var errors runtime.ValidationErrors
+	if len(s.Labels) < 1 {
+		errors = errors.Add("Labels", fmt.Sprintf("must have at least 1 properties, got %d", len(s.Labels)))
+	}
+	if len(s.Labels) > 2 {
+		errors = errors.Add("Labels", fmt.Sprintf("must have at most 2 properties, got %d", len(s.Labels)))
+	}
+	if s.Notes != nil && len(s.Notes) < 1 {
+		errors = errors.Add("Notes", fmt.Sprintf("must have at least 1 properties, got %d", len(s.Notes)))
+	}
 	if err := typesValidator.Var(s.Codes, "required"); err != nil {
 		errors = errors.Append("Codes", err)
 	}
