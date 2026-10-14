@@ -456,7 +456,18 @@ func generateElementPatternLines(itemExpr, keyExpr string, elem *GoSchema) []str
 
 // generateArrayPropertyValidation generates validation code for an array property: its item count, then each item
 func generateArrayPropertyValidation(alias string, prop Property, validatorVar string) []string {
-	lines := generateItemCountLines(alias, prop)
+	var lines []string
+
+	// The array's own tags, such as required, run before its items are checked.
+	if len(prop.Constraints.ValidationTags) > 0 {
+		tags := strings.Join(prop.Constraints.ValidationTags, ",")
+		lines = append(lines,
+			fmt.Sprintf("if err := %s.Var(%s.%s, \"%s\"); err != nil {", validatorVar, alias, prop.GoName, tags),
+			fmt.Sprintf("    errors = errors.Append(\"%s\", err)", prop.GoName),
+			"}")
+	}
+
+	lines = append(lines, generateItemCountLines(alias, prop)...)
 	if !prop.Schema.ArrayType.NeedsValidation() {
 		return lines
 	}

@@ -135,6 +135,11 @@ func (s GoSchema) NeedsValidation() bool {
 		return true
 	}
 
+	// A regex pattern is enforced by the container, since an alias to a primitive has no Validate() to do it.
+	if s.needsPatternValidation() {
+		return true
+	}
+
 	// If it's a primitive alias, it doesn't have Validate()
 	if s.IsPrimitiveAlias {
 		return false
@@ -142,11 +147,6 @@ func (s GoSchema) NeedsValidation() bool {
 
 	// If it has validation tags, it needs validation
 	if len(s.Constraints.ValidationTags) > 0 {
-		return true
-	}
-
-	// If it carries a regex pattern, it needs validation
-	if s.needsPatternValidation() {
 		return true
 	}
 
