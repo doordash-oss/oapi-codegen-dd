@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info: {title: t, version: 0.0.0}
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      parameters:
+        - name: parentID
+          in: query
+          schema:
+            anyOf:
+              - anyOf:
+                  - $ref: '#/components/schemas/WidgetID'
+                  - type: string
+                    enum: ["null"]
+              - type: "null"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {type: array, items: {type: string}}}}}
+  /gadgets:
+    get:
+      operationId: listGadgets
+      parameters:
+        - name: parentID
+          in: query
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/WidgetID'
+              - type: string
+                enum: ["null"]
+              - type: "null"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {type: array, items: {type: string}}}}}
+  /gizmos:
+    get:
+      operationId: listGizmos
+      parameters:
+        - name: order
+          in: query
+          schema:
+            anyOf:
+              - type: string
+                enum: ["asc", "desc"]
+              - type: "null"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {type: array, items: {type: string}}}}}
+components:
+  schemas:
+    WidgetID: {type: string}
