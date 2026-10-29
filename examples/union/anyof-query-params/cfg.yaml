@@ -1,0 +1,5 @@
+package: gen
+generate:
+  client: true
+  handler:
+    kind: std-http

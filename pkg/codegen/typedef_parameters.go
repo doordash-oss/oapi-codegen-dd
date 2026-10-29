@@ -347,6 +347,16 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 			options.typeTracker.register(td, "")
 		}
 
+		// An inline union wrapper holds nameless (json:"-") fields that only a
+		// generated MarshalJSON merges back. An anonymous struct cannot have
+		// one, so the field would marshal to {} and the parameter would be
+		// silently dropped from requests. Give it a named type instead.
+		// A slice is not such a wrapper, it marshals on its own.
+		if pSchema.RefType == "" && !pSchema.HasAdditionalProperties && pSchema.ArrayType == nil && needsMarshaler(pSchema) {
+			pSchema = nameParamSchema(pSchema, strings.Join([]string{typeName, param.GoName()}, "_"), specLocation, options)
+			param.Schema = pSchema
+		}
+
 		typeDefs = append(typeDefs, pSchema.AdditionalTypes...)
 		exts := extractExtensions(param.Spec.Extensions)
 
@@ -412,6 +422,27 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 	}
 
 	return res, append(typeDefs, td), imports
+}
+
+// nameParamSchema registers an inline parameter schema as a named type with a
+// generated marshaler and returns a reference to it.
+func nameParamSchema(src GoSchema, name string, specLocation SpecLocation, options ParseOptions) GoSchema {
+	if options.typeTracker.Exists(name) {
+		name = options.typeTracker.generateUniqueName(name)
+	}
+
+	td := TypeDefinition{
+		Name:           name,
+		Schema:         src,
+		SpecLocation:   specLocation,
+		NeedsMarshaler: true,
+	}
+	options.typeTracker.register(td, "")
+
+	return GoSchema{
+		RefType:         name,
+		AdditionalTypes: append(append([]TypeDefinition{}, src.AdditionalTypes...), td),
+	}
 }
 
 // This constructs a Go type for a parameter, looking at either the schema or
