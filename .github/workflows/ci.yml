@@ -46,7 +46,8 @@ jobs:
           cache: true
 
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+        # v2.30.0 and later require go 1.26
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
 
       - name: Download Go modules
         run: go mod download
