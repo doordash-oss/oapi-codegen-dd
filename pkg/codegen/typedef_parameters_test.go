@@ -85,6 +85,11 @@ func TestUnionParametersAreNamed(t *testing.T) {
 	t.Run("single variant next to null stays a plain pointer", func(t *testing.T) {
 		assert.NotContains(t, code, "ListWidgetsQuery_Order")
 	})
+
+	t.Run("array of unions stays a slice", func(t *testing.T) {
+		assert.Regexp(t, `Statuses\s+\[\]ListGadgets_Query_Statuses_Item `, code)
+		assert.NotContains(t, code, "ListGadgetsQuery_Statuses")
+	})
 }
 
 func TestNameParamSchema(t *testing.T) {

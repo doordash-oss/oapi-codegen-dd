@@ -351,7 +351,8 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 		// generated MarshalJSON merges back. An anonymous struct cannot have
 		// one, so the field would marshal to {} and the parameter would be
 		// silently dropped from requests. Give it a named type instead.
-		if pSchema.RefType == "" && !pSchema.HasAdditionalProperties && needsMarshaler(pSchema) {
+		// A slice is not such a wrapper, it marshals on its own.
+		if pSchema.RefType == "" && !pSchema.HasAdditionalProperties && pSchema.ArrayType == nil && needsMarshaler(pSchema) {
 			pSchema = nameParamSchema(pSchema, strings.Join([]string{typeName, param.GoName()}, "_"), specLocation, options)
 			param.Schema = pSchema
 		}

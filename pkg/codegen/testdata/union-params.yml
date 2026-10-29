@@ -42,6 +42,15 @@ paths:
             anyOf:
               - $ref: '#/components/schemas/WidgetID'
               - type: integer
+        - name: statuses
+          in: query
+          schema:
+            type: array
+            items:
+              oneOf:
+                - $ref: '#/components/schemas/WidgetID'
+                - type: string
+                  enum: [unpublished]
       responses:
         "200":
           description: OK

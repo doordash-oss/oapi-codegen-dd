@@ -569,6 +569,22 @@ func (a *HTTPAdapter) ListGizmos(w http.ResponseWriter, r *http.Request) {
 		queryParamOrder := ListGizmosQueryOrderAnyOf(queryParamOrderStr)
 		queryParams.Order = &queryParamOrder
 	}
+
+	if values, ok := query["statuses"]; ok {
+		parsed, err := runtime.ParseStringSlice[ListGizmos_Query_Statuses_Item](values)
+		if err != nil {
+			a.errHandler.HandleError(w, r, http.StatusBadRequest, OapiHandlerError{
+				Kind:          OapiErrorKindParse,
+				OperationID:   "ListGizmos",
+				Message:       err.Error(),
+				ParamName:     "statuses",
+				ParamLocation: "query",
+				Err:           err,
+			})
+			return
+		}
+		queryParams.Statuses = parsed
+	}
 	opts.Query = queryParams
 
 	// Call business logic
@@ -812,7 +828,8 @@ func (l ListGadgetsQuery) Validate() error {
 }
 
 type ListGizmosQuery struct {
-	Order *ListGizmosQueryOrderAnyOf `json:"order,omitempty"`
+	Order    *ListGizmosQueryOrderAnyOf       `json:"order,omitempty"`
+	Statuses []ListGizmos_Query_Statuses_Item `json:"statuses,omitempty"`
 }
 
 func (l ListGizmosQuery) Validate() error {
@@ -821,6 +838,13 @@ func (l ListGizmosQuery) Validate() error {
 		if v, ok := any(l.Order).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
 				errors = errors.Append("Order", err)
+			}
+		}
+	}
+	for i, item := range l.Statuses {
+		if v, ok := any(item).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append(fmt.Sprintf("Statuses[%d]", i), err)
 			}
 		}
 	}
@@ -1015,6 +1039,59 @@ func (o *ListGizmosServiceRequestOptions) Validate() error {
 
 type WidgetID = string
 
+type ListGizmos_Query_Statuses_Item struct {
+	ListGizmos_Query_Statuses_OneOf *ListGizmos_Query_Statuses_OneOf `json:"-"`
+}
+
+func (l ListGizmos_Query_Statuses_Item) Validate() error {
+	var errors runtime.ValidationErrors
+	if l.ListGizmos_Query_Statuses_OneOf != nil {
+		if v, ok := any(l.ListGizmos_Query_Statuses_OneOf).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append("ListGizmos_Query_Statuses_OneOf", err)
+			}
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+func (l ListGizmos_Query_Statuses_Item) MarshalJSON() ([]byte, error) {
+	var parts []json.RawMessage
+
+	{
+		b, err := runtime.MarshalJSON(l.ListGizmos_Query_Statuses_OneOf)
+		if err != nil {
+			return nil, fmt.Errorf("ListGizmos_Query_Statuses_OneOf marshal: %w", err)
+		}
+		parts = append(parts, b)
+	}
+
+	return runtime.CoalesceOrMerge(parts...)
+}
+
+func (l *ListGizmos_Query_Statuses_Item) UnmarshalJSON(data []byte) error {
+	trim := bytes.TrimSpace(data)
+	if bytes.Equal(trim, []byte("null")) {
+		return nil
+	}
+	if len(trim) == 0 {
+		return fmt.Errorf("empty JSON input")
+	}
+
+	if l.ListGizmos_Query_Statuses_OneOf == nil {
+		l.ListGizmos_Query_Statuses_OneOf = &ListGizmos_Query_Statuses_OneOf{}
+	}
+
+	if err := runtime.UnmarshalJSON(data, l.ListGizmos_Query_Statuses_OneOf); err != nil {
+		return fmt.Errorf("ListGizmos_Query_Statuses_OneOf unmarshal: %w", err)
+	}
+
+	return nil
+}
+
 type ListWidgets_Query_ParentID_AnyOf_AnyOf struct {
 	runtime.Either[WidgetID, string]
 }
@@ -1038,6 +1115,24 @@ type ListGadgets_Query_ParentID_AnyOf struct {
 }
 
 func (l *ListGadgets_Query_ParentID_AnyOf) Validate() error {
+	if l.IsA() {
+		if v, ok := any(l.A).(runtime.Validator); ok {
+			return v.Validate()
+		}
+	}
+	if l.IsB() {
+		if v, ok := any(l.B).(runtime.Validator); ok {
+			return v.Validate()
+		}
+	}
+	return nil
+}
+
+type ListGizmos_Query_Statuses_OneOf struct {
+	runtime.Either[WidgetID, string]
+}
+
+func (l *ListGizmos_Query_Statuses_OneOf) Validate() error {
 	if l.IsA() {
 		if v, ok := any(l.A).(runtime.Validator); ok {
 			return v.Validate()

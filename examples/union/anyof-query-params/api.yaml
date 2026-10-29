@@ -41,6 +41,15 @@ paths:
               - type: string
                 enum: ["asc", "desc"]
               - type: "null"
+        - name: statuses
+          in: query
+          schema:
+            type: array
+            items:
+              oneOf:
+                - $ref: '#/components/schemas/WidgetID'
+                - type: string
+                  enum: ["unpublished"]
       responses:
         "200": {description: OK, content: {application/json: {schema: {type: array, items: {type: string}}}}}
 components:
