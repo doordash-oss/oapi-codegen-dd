@@ -429,3 +429,51 @@ func TestFilterRouteConflicts_DuplicateParamNames(t *testing.T) {
 	}
 	assert.Equal(t, expected, paths)
 }
+
+func TestParseOptions_AddImport(t *testing.T) {
+	t.Run("records the import for every copy of the options", func(t *testing.T) {
+		opts := ParseOptions{imports: importMap{}}
+
+		opts.WithPath([]string{"Pet"}).addImport(goImport{Path: "example.com/pet"})
+		opts.addImport(goImport{Path: "example.com/pet"})
+
+		assert.Equal(t, importMap{`"example.com/pet"`: {Path: "example.com/pet"}}, opts.imports)
+	})
+
+	t.Run("keeps an aliased import apart from the plain one", func(t *testing.T) {
+		opts := ParseOptions{imports: importMap{}}
+
+		opts.addImport(goImport{Path: "example.com/pet"})
+		opts.addImport(goImport{Name: "pets", Path: "example.com/pet"})
+
+		assert.Len(t, opts.imports, 2)
+	})
+
+	t.Run("does nothing without a registry", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			ParseOptions{}.addImport(goImport{Path: "example.com/pet"})
+		})
+	})
+}
+
+func TestParseOptions_AddUnimported(t *testing.T) {
+	t.Run("records the schema under every package the type names", func(t *testing.T) {
+		opts := ParseOptions{unimported: map[string][]string{}}
+
+		opts.WithPath([]string{"Pet", "id"}).addUnimported("map[string]uuid.UUID")
+		opts.WithPath([]string{"Pet", "tags"}).addUnimported("[]uuid.UUID")
+		opts.WithPath([]string{"Pet", "owner"}).addUnimported("people.Person")
+		opts.addUnimported("Pet")
+
+		assert.Equal(t, map[string][]string{
+			"uuid":   {"Pet.id", "Pet.tags"},
+			"people": {"Pet.owner"},
+		}, opts.unimported)
+	})
+
+	t.Run("does nothing without a registry", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			ParseOptions{}.addUnimported("uuid.UUID")
+		})
+	})
+}

@@ -1,0 +1,32 @@
+openapi: 3.1.0
+info:
+  title: x-go-type-import under additionalProperties
+  version: "1"
+paths:
+  /things:
+    get:
+      operationId: getThings
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  byName:
+                    type: object
+                    additionalProperties:
+                      type: string
+                      x-go-type: values.Value
+                      x-go-type-import:
+                        path: example.com/values
+                  byTag:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: string
+                        x-go-type: tags.Tag
+                        x-go-type-import:
+                          path: example.com/tags

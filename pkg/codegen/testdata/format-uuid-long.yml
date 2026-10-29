@@ -1,0 +1,21 @@
+openapi: 3.1.0
+info:
+  title: format uuid with a non-standard length
+  version: "1"
+paths:
+  /things:
+    get:
+      operationId: getThings
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    maxLength: 64

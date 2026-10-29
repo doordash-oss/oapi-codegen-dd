@@ -245,6 +245,135 @@ func TestGoTypeImport(t *testing.T) {
 	}
 }
 
+func TestTypeImports(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    string
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "format uuid imports github.com/google/uuid",
+			spec: "format-uuid.yml",
+			want: []string{`"github.com/google/uuid"`},
+		},
+		{
+			name:    "format uuid with a non-standard length is a string and imports nothing",
+			spec:    "format-uuid-long.yml",
+			notWant: []string{`"github.com/google/uuid"`},
+		},
+		{
+			name:    "x-go-type-import replaces the import of the type it overrides",
+			spec:    "x-go-type-stdlib-uuid.yml",
+			want:    []string{`"uuid"`},
+			notWant: []string{`"github.com/google/uuid"`},
+		},
+		{
+			name: "x-go-type-import under additionalProperties",
+			spec: "x-go-type-import-additional-properties.yml",
+			want: []string{`"example.com/values"`, `"example.com/tags"`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parseCtx, errs := CreateParseContext([]byte(readTestdata(t, tt.spec)), Configuration{PackageName: "api"})
+			require.Empty(t, errs)
+			require.NotNil(t, parseCtx)
+
+			for _, imp := range tt.want {
+				assert.Contains(t, parseCtx.Imports, imp)
+			}
+			for _, imp := range tt.notWant {
+				assert.NotContains(t, parseCtx.Imports, imp)
+			}
+		})
+	}
+}
+
+func TestTypeImports_StdlibUUID(t *testing.T) {
+	cfg := Configuration{
+		PackageName: "api",
+		Output:      &Output{UseSingleFile: true},
+	}
+
+	codes, err := Generate([]byte(readTestdata(t, "x-go-type-stdlib-uuid.yml")), cfg)
+	require.NoError(t, err)
+	code := codes.GetCombined()
+
+	_, err = format.Source([]byte(code))
+	require.NoError(t, err)
+
+	// both packages are named uuid, so importing the default one next to the override does not build
+	assert.Contains(t, code, `"uuid"`)
+	assert.NotContains(t, code, "github.com/google/uuid")
+}
+
+func TestTypeImports_InvalidGoTypeImport(t *testing.T) {
+	_, errs := CreateParseContext([]byte(readTestdata(t, "x-go-type-import-invalid.yml")), Configuration{PackageName: "api"})
+
+	require.NotEmpty(t, errs)
+	assert.ErrorContains(t, errs[0], `invalid value for "x-go-type-import"`)
+}
+
+func TestUnimportedGoTypeWarning(t *testing.T) {
+	tests := []struct {
+		name       string
+		spec       string
+		additional []AdditionalImport
+		wantWarn   bool
+	}{
+		{
+			name:     "x-go-type names a package nothing imports",
+			spec:     "x-go-type-uuid-no-import.yml",
+			wantWarn: true,
+		},
+		{
+			name: "a plain format uuid in the spec imports the package",
+			spec: "x-go-type-uuid-no-import-with-format.yml",
+		},
+		{
+			name: "x-go-type-import is given",
+			spec: "x-go-type-stdlib-uuid.yml",
+		},
+		{
+			name:       "additional-imports provides the package",
+			spec:       "x-go-type-uuid-no-import.yml",
+			additional: []AdditionalImport{{Package: "github.com/google/uuid"}},
+		},
+		{
+			name:       "additional-imports aliases the package away from its name",
+			spec:       "x-go-type-uuid-no-import.yml",
+			additional: []AdditionalImport{{Alias: "myuuid", Package: "github.com/google/uuid"}},
+			wantWarn:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs := captureLogs(t)
+
+			_, errs := CreateParseContext([]byte(readTestdata(t, tt.spec)), Configuration{
+				PackageName:       "api",
+				AdditionalImports: tt.additional,
+			})
+			require.Empty(t, errs)
+
+			out := logs.String()
+			if !tt.wantWarn {
+				assert.NotContains(t, out, "x-go-type:")
+				return
+			}
+
+			assert.Contains(t, out, "x-go-type: package uuid is only imported when a type uses github.com/google/uuid")
+			assert.Contains(t, out, "schemas=GetThings.Response.id")
+			assert.Contains(t, out, "{path: github.com/google/uuid}")
+			// header.tmpl imports time for every file, so naming it needs no x-go-type-import
+			assert.NotContains(t, out, "package time")
+		})
+	}
+}
+
 func TestBackslashEscaping(t *testing.T) {
 	// Generate code
 	cfg := Configuration{
@@ -982,10 +1111,9 @@ func TestCollectWebhookDefinitions(t *testing.T) {
 		require.NoError(t, err)
 
 		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
-		typeDefs, schemas, err := collectWebhookDefinitions(&model.Model, opts)
+		typeDefs, err := collectWebhookDefinitions(&model.Model, opts)
 		require.NoError(t, err)
 		assert.Empty(t, typeDefs)
-		assert.Empty(t, schemas)
 	})
 
 	t.Run("ref webhooks produce alias types", func(t *testing.T) {
@@ -999,11 +1127,10 @@ func TestCollectWebhookDefinitions(t *testing.T) {
 		require.NoError(t, err)
 
 		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
-		typeDefs, schemas, err := collectWebhookDefinitions(&model.Model, opts)
+		typeDefs, err := collectWebhookDefinitions(&model.Model, opts)
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, typeDefs)
-		assert.NotEmpty(t, schemas)
 
 		// All types should be tagged as webhook
 		for _, td := range typeDefs {
@@ -1030,7 +1157,7 @@ func TestCollectWebhookDefinitions(t *testing.T) {
 		require.NoError(t, err)
 
 		opts := ParseOptions{typeTracker: newTypeTracker(), visited: map[string]bool{}, model: &model.Model}
-		typeDefs, _, err := collectWebhookDefinitions(&model.Model, opts)
+		typeDefs, err := collectWebhookDefinitions(&model.Model, opts)
 		require.NoError(t, err)
 
 		// All types should be tagged as webhook

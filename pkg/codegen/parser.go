@@ -94,6 +94,14 @@ type ParseOptions struct {
 	// Track visited schema paths to prevent infinite recursion
 	visited map[string]bool
 
+	// imports collects the packages the generated Go types refer to, so only
+	// the ones in use are imported. Like visited, every copy of the options shares it.
+	imports importMap
+
+	// unimported collects, by package name, the schemas whose x-go-type names a package
+	// without giving an x-go-type-import. Every copy of the options shares it too.
+	unimported map[string][]string
+
 	// model is the high-level OpenAPI model, used to resolve $ref to mutated schemas
 	// instead of following stale low-level references
 	model *v3high.Document
@@ -112,6 +120,26 @@ func (o ParseOptions) WithPath(path []string) ParseOptions {
 func (o ParseOptions) WithSpecLocation(specLocation SpecLocation) ParseOptions {
 	o.specLocation = specLocation
 	return o
+}
+
+// addImport records a package that a generated Go type refers to.
+// Options built without a registry, as the unit tests do, record nothing.
+func (o ParseOptions) addImport(gi goImport) {
+	if o.imports != nil {
+		o.imports[gi.String()] = gi
+	}
+}
+
+// addUnimported records the packages an x-go-type value names, for a schema that gives no x-go-type-import.
+// Options built without a registry record nothing.
+func (o ParseOptions) addUnimported(goType string) {
+	if o.unimported == nil {
+		return
+	}
+
+	for _, name := range goTypePackages(goType) {
+		o.unimported[name] = append(o.unimported[name], strings.Join(o.path, "."))
+	}
 }
 
 type EnumContext struct {

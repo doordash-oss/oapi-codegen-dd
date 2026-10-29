@@ -1,0 +1,23 @@
+openapi: 3.1.0
+info:
+  title: x-go-type uuid without x-go-type-import
+  version: "1"
+paths:
+  /things:
+    get:
+      operationId: getThings
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, timeout]
+                properties:
+                  id:
+                    type: string
+                    x-go-type: uuid.UUID
+                  timeout:
+                    type: string
+                    x-go-type: time.Duration
