@@ -32,3 +32,5 @@ Generates: `ParentID *ListGadgetsQuery_ParentID`, which wraps the `anyOf` and en
 Generates: `Order *ListGizmosQueryOrderAnyOf` (no wrapper).
 
 The same applies to path and header parameters.
+
+The config also generates a `std-http` handler, so the request adapter has to parse into the same named type; the example would not compile otherwise.

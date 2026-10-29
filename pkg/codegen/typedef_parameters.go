@@ -353,6 +353,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 		// silently dropped from requests. Give it a named type instead.
 		if pSchema.RefType == "" && !pSchema.HasAdditionalProperties && needsMarshaler(pSchema) {
 			pSchema = nameParamSchema(pSchema, strings.Join([]string{typeName, param.GoName()}, "_"), specLocation, options)
+			param.Schema = pSchema
 		}
 
 		typeDefs = append(typeDefs, pSchema.AdditionalTypes...)
