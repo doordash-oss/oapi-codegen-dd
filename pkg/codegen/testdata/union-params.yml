@@ -1,0 +1,61 @@
+openapi: 3.1.0
+info:
+  title: Union Parameters Test
+  version: 1.0.0
+
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      parameters:
+        - name: parentID
+          in: query
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/WidgetID'
+              - type: string
+                enum: ["null"]
+              - type: "null"
+        - name: X-Owner
+          in: header
+          schema:
+            anyOf:
+              - type: integer
+              - type: string
+        - name: order
+          in: query
+          schema:
+            anyOf:
+              - type: string
+                enum: [asc, desc]
+              - type: "null"
+      responses:
+        "200":
+          description: OK
+  /gadgets:
+    get:
+      operationId: listGadgets
+      parameters:
+        - name: parentID
+          in: query
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/WidgetID'
+              - type: integer
+        - name: statuses
+          in: query
+          schema:
+            type: array
+            items:
+              oneOf:
+                - $ref: '#/components/schemas/WidgetID'
+                - type: string
+                  enum: [unpublished]
+      responses:
+        "200":
+          description: OK
+
+components:
+  schemas:
+    WidgetID:
+      type: string
