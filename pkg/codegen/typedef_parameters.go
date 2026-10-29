@@ -309,9 +309,9 @@ func combineOperationParameters(globalParams []ParameterDefinition, localParams 
 }
 
 // generateParamsTypes defines the schema for a parameters definition object.
-func generateParamsTypes(objectParams []ParameterDefinition, typeName string, options ParseOptions) (*RequestParametersDefinition, []TypeDefinition, []GoSchema) {
+func generateParamsTypes(objectParams []ParameterDefinition, typeName string, options ParseOptions) (*RequestParametersDefinition, []TypeDefinition) {
 	if len(objectParams) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	specLocation := SpecLocation(strings.ToLower(objectParams[0].In))
 
@@ -324,7 +324,6 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 	var (
 		typeDefs   []TypeDefinition
 		properties []Property
-		imports    []GoSchema
 	)
 
 	encodings := map[string]ParameterEncoding{}
@@ -392,7 +391,6 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 				specLocation: specLocation,
 			}),
 		})
-		imports = append(imports, pSchema)
 		encodings[param.ParamName] = ParameterEncoding{
 			Style:         param.Spec.Style,
 			Explode:       param.Spec.Explode,
@@ -421,7 +419,7 @@ func generateParamsTypes(objectParams []ParameterDefinition, typeName string, op
 		TypeDef:  td,
 	}
 
-	return res, append(typeDefs, td), imports
+	return res, append(typeDefs, td)
 }
 
 // nameParamSchema registers an inline parameter schema as a named type with a

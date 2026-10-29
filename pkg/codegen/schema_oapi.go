@@ -304,6 +304,7 @@ func oapiSchemaToGoType(schema *base.Schema, options ParseOptions) (GoSchema, er
 			// Non-standard lengths should use string to avoid unmarshal errors
 			if isStandardUUIDLength(schema) {
 				goType = "uuid.UUID"
+				options.addImport(builtinTypeImports["uuid"])
 			}
 		}
 

@@ -12,6 +12,10 @@ package codegen
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 
@@ -63,9 +67,17 @@ var templateHardcodedImports = map[string]bool{
 	"log/slog":        true,
 	"github.com/doordash-oss/oapi-codegen-dd/v3/pkg/runtime": true,
 	"github.com/google/go-querystring/query":                 true,
-	"github.com/google/uuid":                                 true,
 	"github.com/go-playground/validator/v10":                 true,
 }
+
+// builtinTypeImports lists the packages behind the Go types generated for built-in formats, by the name
+// the generated code uses for them. header.tmpl leaves them out, a type that uses one adds its import.
+var builtinTypeImports = map[string]goImport{
+	"uuid": {Path: "github.com/google/uuid"},
+}
+
+// maxListedSchemas caps how many schemas a warning lists, an overlay can match hundreds.
+const maxListedSchemas = 5
 
 // GoImports returns a slice of go import statements
 func (im importMap) GoImports() []string {
@@ -80,65 +92,6 @@ func (im importMap) GoImports() []string {
 		goImports = append(goImports, v.String())
 	}
 	return goImports
-}
-
-func collectSchemaImports(s GoSchema) (map[string]goImport, error) {
-	res := map[string]goImport{}
-
-	for _, p := range s.Properties {
-		imprts, err := getOpenAPISchemaImports(p.Schema.OpenAPISchema)
-		if err != nil {
-			return nil, err
-		}
-		mergeImports(res, imprts)
-	}
-
-	imprts, err := getOpenAPISchemaImports(s.OpenAPISchema)
-	if err != nil {
-		return nil, err
-	}
-	mergeImports(res, imprts)
-	return res, nil
-}
-
-func getOpenAPISchemaImports(schema *base.Schema) (map[string]goImport, error) {
-	res := map[string]goImport{}
-
-	if schema == nil || (schema.ParentProxy != nil && schema.ParentProxy.IsReference()) {
-		return nil, nil
-	}
-
-	if gi, err := parseGoImportExtension(schema); err != nil {
-		return nil, err
-	} else {
-		if gi != nil {
-			res[gi.String()] = *gi
-		}
-	}
-
-	t := schema.Type
-	if slices.Contains(t, "object") {
-		for _, v := range schema.Properties.FromOldest() {
-			imprts, err := getOpenAPISchemaImports(v.Schema())
-			if err != nil {
-				return nil, err
-			}
-			mergeImports(res, imprts)
-		}
-	} else if slices.Contains(t, "array") {
-		if schema.Items == nil {
-			return nil, nil
-		}
-		if schema.Items.IsA() && schema.Items.A != nil {
-			imprts, err := getOpenAPISchemaImports(schema.Items.A.Schema())
-			if err != nil {
-				return nil, err
-			}
-			mergeImports(res, imprts)
-		}
-	}
-
-	return res, nil
 }
 
 func parseGoImportExtension(v *base.Schema) (*goImport, error) {
@@ -178,8 +131,64 @@ func parseGoImportExtension(v *base.Schema) (*goImport, error) {
 	return &gi, nil
 }
 
-func mergeImports(dst, src map[string]goImport) {
-	for k, v := range src {
-		dst[k] = v
+// goTypePackages returns the names of the packages a Go type expression refers to, e.g. uuid for []uuid.UUID.
+// An expression that does not parse refers to none.
+func goTypePackages(goType string) []string {
+	expr, err := parser.ParseExpr(goType)
+	if err != nil {
+		return nil
 	}
+
+	var res []string
+	ast.Inspect(expr, func(n ast.Node) bool {
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		if pkg, ok := sel.X.(*ast.Ident); ok && !slices.Contains(res, pkg.Name) {
+			res = append(res, pkg.Name)
+		}
+		return true
+	})
+	return res
+}
+
+// isImported reports whether an import, or an additional-imports entry, binds the package gi to name.
+func isImported(imports importMap, additional []AdditionalImport, name string, gi goImport) bool {
+	for _, v := range imports {
+		if v.Path == gi.Path && (v.Name == "" || v.Name == name) {
+			return true
+		}
+	}
+
+	for _, a := range additional {
+		if a.Package == gi.Path && (a.Alias == "" || a.Alias == name) {
+			return true
+		}
+	}
+	return false
+}
+
+// warnUnimportedGoTypes reports the x-go-type values that name a built-in package without an x-go-type-import
+// while nothing else imports it. header.tmpl no longer imports these packages for every file, so such a
+// schema builds only if goimports happens to find a package of that name.
+func warnUnimportedGoTypes(imports importMap, additional []AdditionalImport, unimported map[string][]string) {
+	for _, name := range slices.Sorted(maps.Keys(unimported)) {
+		builtin, ok := builtinTypeImports[name]
+		if !ok || isImported(imports, additional, name, builtin) {
+			continue
+		}
+
+		schemas := slices.Compact(slices.Sorted(slices.Values(unimported[name])))
+		slog.Warn(fmt.Sprintf("x-go-type: package %s is only imported when a type uses %s, so a schema that names it without an x-go-type-import may not build", name, builtin.Path),
+			"schemas", listSchemas(schemas),
+			"hint", fmt.Sprintf("set x-go-type-import to the package you want, e.g. {path: %s}", builtin.Path))
+	}
+}
+
+func listSchemas(schemas []string) string {
+	if len(schemas) <= maxListedSchemas {
+		return strings.Join(schemas, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(schemas[:maxListedSchemas], ", "), len(schemas)-maxListedSchemas)
 }

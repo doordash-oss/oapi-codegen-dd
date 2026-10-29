@@ -31,7 +31,6 @@ type ParseContext struct {
 
 type operationsCollection struct {
 	operations     []OperationDefinition
-	importSchemas  []GoSchema
 	typeDefs       []TypeDefinition
 	responseErrors []string
 }
@@ -109,12 +108,13 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		ErrorMapping:           cfg.ErrorMapping,
 		typeTracker:            newTypeTracker(),
 		visited:                map[string]bool{},
+		imports:                importMap{},
+		unimported:             map[string][]string{},
 		model:                  model,
 	}
 
 	var (
 		operations     []OperationDefinition
-		importSchemas  []GoSchema
 		responseErrors []string
 	)
 
@@ -134,33 +134,16 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 
 	if opColl != nil {
 		operations = opColl.operations
-		importSchemas = opColl.importSchemas
 		typeDefs = append(typeDefs, opColl.typeDefs...)
 		responseErrors = opColl.responseErrors
 	}
 
 	// Collect webhook type definitions (request body and response types)
-	webhookTypeDefs, webhookSchemas, err := collectWebhookDefinitions(model, parseOptions)
+	webhookTypeDefs, err := collectWebhookDefinitions(model, parseOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting webhook definitions: %w", err)
 	}
 	typeDefs = append(typeDefs, webhookTypeDefs...)
-	importSchemas = append(importSchemas, webhookSchemas...)
-
-	// Collect Schemas from components
-	for _, componentDef := range typeDefs {
-		importSchemas = append(importSchemas, componentDef.Schema)
-	}
-
-	// Collect Imports
-	imprts := map[string]goImport{}
-	for _, schema := range importSchemas {
-		importRes, err := collectSchemaImports(schema)
-		if err != nil {
-			return nil, fmt.Errorf("error getting schema imports: %w", err)
-		}
-		mergeImports(imprts, importRes)
-	}
 
 	enums, typeDefs := filterOutEnums(typeDefs, parseOptions)
 
@@ -196,12 +179,14 @@ func CreateParseContextFromModel(model *v3high.Document, cfg Configuration) (*Pa
 		return nil, fmt.Errorf("error collecting response errors: %w", err)
 	}
 
+	warnUnimportedGoTypes(parseOptions.imports, cfg.AdditionalImports, parseOptions.unimported)
+
 	return &ParseContext{
 		Operations:      operations,
 		TypeDefinitions: groupedTypeDefs,
 		Enums:           enums,
 		UnionTypes:      unionTypes,
-		Imports:         importMap(imprts).GoImports(),
+		Imports:         parseOptions.imports.GoImports(),
 		ResponseErrors:  respErrs,
 		TypeTracker:     parseOptions.typeTracker,
 	}, nil
@@ -214,7 +199,6 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 	var (
 		operations     []OperationDefinition
-		importSchemas  []GoSchema
 		typeDefs       []TypeDefinition
 		responseErrors []string
 	)
@@ -263,40 +247,28 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 			if err != nil {
 				return nil, err
 			}
-			for _, param := range allParams {
-				importSchemas = append(importSchemas, param.Schema)
-			}
 
 			// Order the path parameters to match the order as specified in
 			// the path, not in the openapi spec, and validate that the parameter
 			// names match, as downstream code depends on that.
 			pathParameters := filterParameterDefinitionByType(allParams, "path")
-			reqParamsDef, pathDefs, pathSchemas := generateParamsTypes(pathParameters, operationID+"Path", options)
+			reqParamsDef, pathDefs := generateParamsTypes(pathParameters, operationID+"Path", options)
 			if reqParamsDef != nil {
 				pathParamsDef = &reqParamsDef.TypeDef
 				typeDefs = append(typeDefs, pathDefs...)
-				if len(pathSchemas) > 0 {
-					importSchemas = append(importSchemas, pathSchemas...)
-				}
 			}
 
 			queryParams := filterParameterDefinitionByType(allParams, "query")
-			queryParamsDef, queryDefs, querySchemas := generateParamsTypes(queryParams, operationID+"Query", options)
+			queryParamsDef, queryDefs := generateParamsTypes(queryParams, operationID+"Query", options)
 			if queryParamsDef != nil {
 				typeDefs = append(typeDefs, queryDefs...)
-				if len(querySchemas) > 0 {
-					importSchemas = append(importSchemas, querySchemas...)
-				}
 			}
 
 			headerParams := filterParameterDefinitionByType(allParams, "header")
-			headerParamsDef, headerDefs, headerSchemas := generateParamsTypes(headerParams, operationID+"Headers", options)
+			headerParamsDef, headerDefs := generateParamsTypes(headerParams, operationID+"Headers", options)
 			if headerParamsDef != nil {
 				headerDef = headerParamsDef
 				typeDefs = append(typeDefs, headerDefs...)
-				if len(headerSchemas) > 0 {
-					importSchemas = append(importSchemas, headerSchemas...)
-				}
 			}
 
 			// Process Request Body
@@ -306,7 +278,6 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 			}
 			if bodyTypeDef != nil {
 				typeDefs = append(typeDefs, *bodyTypeDef)
-				importSchemas = append(importSchemas, bodyTypeDef.Schema)
 			}
 			if bodyDefinition != nil {
 				typeDefs = append(typeDefs, bodyDefinition.Schema.AdditionalTypes...)
@@ -320,9 +291,6 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 			}
 			if responseTypes != nil {
 				typeDefs = append(typeDefs, responseTypes...)
-				for _, responseType := range responseTypes {
-					importSchemas = append(importSchemas, responseType.Schema)
-				}
 			}
 			if responseDef != nil {
 				response = *responseDef
@@ -367,7 +335,6 @@ func collectOperationDefinitions(model *v3high.Document, options ParseOptions) (
 
 	return &operationsCollection{
 		operations:     operations,
-		importSchemas:  importSchemas,
 		typeDefs:       allTypeDefs,
 		responseErrors: responseErrors,
 	}, nil
@@ -600,47 +567,41 @@ func collectResponseErrors(errNames []string, tracker *TypeTracker) ([]string, e
 // collectWebhookDefinitions walks webhook operations and collects type definitions
 // for request bodies and responses. Types are tagged with SpecLocationWebhook
 // so they appear in a separate "webhooks" output file in multi-file mode.
-func collectWebhookDefinitions(model *v3high.Document, options ParseOptions) ([]TypeDefinition, []GoSchema, error) {
+func collectWebhookDefinitions(model *v3high.Document, options ParseOptions) ([]TypeDefinition, error) {
 	if model.Webhooks == nil {
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	var (
-		typeDefs      []TypeDefinition
-		importSchemas []GoSchema
-	)
+	var typeDefs []TypeDefinition
 
 	for webhookName, pathItem := range model.Webhooks.FromOldest() {
 		for method, operation := range pathItem.GetOperations().FromOldest() {
 			operationID, err := CreateOperationID(method, "/webhooks/"+webhookName, operation.OperationId)
 			if err != nil {
-				return nil, nil, fmt.Errorf("error creating webhook operation ID: %w", err)
+				return nil, fmt.Errorf("error creating webhook operation ID: %w", err)
 			}
 
 			// Process Request Body
 			_, bodyTypeDef, err := createBodyDefinition(operationID, operation.RequestBody, options)
 			if err != nil {
-				return nil, nil, fmt.Errorf("error generating webhook body definitions for %s: %w", webhookName, err)
+				return nil, fmt.Errorf("error generating webhook body definitions for %s: %w", webhookName, err)
 			}
 			if bodyTypeDef != nil {
 				bodyTypeDef.SpecLocation = SpecLocationWebhook
 				typeDefs = append(typeDefs, *bodyTypeDef)
-				importSchemas = append(importSchemas, bodyTypeDef.Schema)
 			}
 
 			// Process Responses
 			_, responseTypes, err := getOperationResponses(operationID, operation.Responses, options)
 			if err != nil {
-				return nil, nil, fmt.Errorf("error getting webhook response types for %s: %w", webhookName, err)
+				return nil, fmt.Errorf("error getting webhook response types for %s: %w", webhookName, err)
 			}
 			for i := range responseTypes {
 				responseTypes[i].SpecLocation = SpecLocationWebhook
-				importSchemas = append(importSchemas, responseTypes[i].Schema)
 			}
 			typeDefs = append(typeDefs, responseTypes...)
 		}
 	}
 
-	allTypeDefs := extractAllTypeDefinitions(typeDefs)
-	return allTypeDefs, importSchemas, nil
+	return extractAllTypeDefinitions(typeDefs), nil
 }

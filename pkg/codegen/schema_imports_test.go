@@ -11,6 +11,7 @@
 package codegen
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,4 +57,75 @@ func TestGoImports_EmptyMap(t *testing.T) {
 	im := importMap{}
 	result := im.GoImports()
 	assert.Empty(t, result)
+}
+
+func TestGoTypePackages(t *testing.T) {
+	tests := []struct {
+		goType string
+		want   []string
+	}{
+		{"uuid.UUID", []string{"uuid"}},
+		{"*uuid.UUID", []string{"uuid"}},
+		{"[]uuid.UUID", []string{"uuid"}},
+		{"map[string]uuid.UUID", []string{"uuid"}},
+		{"map[uuid.UUID]uuid.UUID", []string{"uuid"}},
+		{"map[a.Key]b.Value", []string{"a", "b"}},
+		{"struct{ID uuid.UUID}", []string{"uuid"}},
+		{"Pet", nil},
+		{"[]string", nil},
+		{"uuid.", nil},
+		{"", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.goType, func(t *testing.T) {
+			assert.Equal(t, tt.want, goTypePackages(tt.goType))
+		})
+	}
+}
+
+func TestWarnUnimportedGoTypes(t *testing.T) {
+	uuidImport := goImport{Path: "github.com/google/uuid"}
+
+	t.Run("lists a few schemas once each and counts the rest", func(t *testing.T) {
+		logs := captureLogs(t)
+
+		warnUnimportedGoTypes(importMap{}, nil, map[string][]string{
+			"uuid": {"G", "F", "E", "D", "C", "B", "A", "A", "H"},
+		})
+
+		out := logs.String()
+		assert.Equal(t, 1, strings.Count(out, "WARN"))
+		assert.Contains(t, out, `schemas="A, B, C, D, E and 3 more"`)
+	})
+
+	t.Run("ignores packages the generator does not import for its own types", func(t *testing.T) {
+		logs := captureLogs(t)
+
+		warnUnimportedGoTypes(importMap{}, nil, map[string][]string{"decimal": {"A"}, "time": {"B"}})
+
+		assert.Empty(t, logs.String())
+	})
+
+	t.Run("is silent once an import binds the package", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			imports    importMap
+			additional []AdditionalImport
+		}{
+			{"import", importMap{uuidImport.String(): uuidImport}, nil},
+			{"additional import", importMap{}, []AdditionalImport{{Package: uuidImport.Path}}},
+			{"additional import aliased as the package", importMap{}, []AdditionalImport{{Alias: "uuid", Package: uuidImport.Path}}},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				logs := captureLogs(t)
+
+				warnUnimportedGoTypes(tt.imports, tt.additional, map[string][]string{"uuid": {"A"}})
+
+				assert.Empty(t, logs.String())
+			})
+		}
+	})
 }

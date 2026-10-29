@@ -615,6 +615,16 @@ func GenerateGoSchema(schemaProxy *base.SchemaProxy, options ParseOptions) (GoSc
 		outSchema.GoType = typeName
 		outSchema.DefineViaAlias = true
 
+		gi, err := parseGoImportExtension(schema)
+		if err != nil {
+			return outSchema, fmt.Errorf("invalid value for %q: %w", extPropGoImport, err)
+		}
+		if gi != nil {
+			options.addImport(*gi)
+		} else {
+			options.addUnimported(typeName)
+		}
+
 		enhanced := enhanceSchema(outSchema, merged, options)
 		return enhanced, nil
 	}
