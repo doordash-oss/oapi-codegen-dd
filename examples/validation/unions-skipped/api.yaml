@@ -1,0 +1,55 @@
+openapi: 3.1.0
+info:
+  title: Unions with constraints, validation skipped
+  description: Union variants that carry constraints, in a package generated without validation
+  version: 1.0.0
+
+paths:
+
+components:
+  schemas:
+    Percent:
+      type: object
+      properties:
+        kind:
+          type: string
+
+    # An object next to a constrained scalar, each checked in place by Validate()
+    Box:
+      type: object
+      properties:
+        buffer:
+          anyOf:
+            - $ref: '#/components/schemas/Percent'
+            - type: integer
+              minimum: 0
+              maximum: 9007199254740991
+
+    # More than two variants: the As*/From* helpers do the checking
+    Crate:
+      type: object
+      properties:
+        size:
+          oneOf:
+            - $ref: '#/components/schemas/Percent'
+            - type: integer
+              minimum: 1
+            - type: string
+              minLength: 3
+
+    # if/then/else: both branches are checked in place by Validate()
+    Parcel:
+      type: object
+      properties:
+        kind:
+          type: string
+      if:
+        properties:
+          kind:
+            const: letter
+      then:
+        type: string
+        minLength: 3
+      else:
+        type: integer
+        minimum: 1

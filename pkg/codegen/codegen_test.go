@@ -1232,3 +1232,65 @@ func TestReferencedArrayQueryParams(t *testing.T) {
 	_, err = format.Source([]byte(code))
 	require.NoError(t, err)
 }
+
+// A union variant that is a plain value with constraints is checked by the validator library, which
+// is only declared when validation is not skipped. A skipped run must not call it, or the package
+// no longer compiles, and a run that validates must keep calling it from every site that does.
+func TestUnionConstrainedMembersFollowSkipValidation(t *testing.T) {
+	// One tag per template site that validates a variant, see testdata/union-constrained-members.yml.
+	tags := map[string]string{
+		"an object next to a scalar": "gte=0,lte=9007199254740991",
+		"the first of two":           "max=43",
+		"the second of two":          "gte=44",
+		"a scalar among three":       "gte=45",
+		"a string among three":       "min=46",
+		"the then branch":            "min=41",
+		"the else branch":            "gte=42",
+	}
+
+	tests := []struct {
+		name       string
+		validation ValidationOptions
+		singleFile bool
+		validates  bool
+	}{
+		{name: "skipped in a single file", validation: ValidationOptions{Skip: true}, singleFile: true},
+		{name: "skipped in several files", validation: ValidationOptions{Skip: true}},
+		{name: "validated in a single file", singleFile: true, validates: true},
+		{name: "validated in several files", validates: true},
+		{name: "simple validation", validation: ValidationOptions{Simple: true}, validates: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Configuration{
+				PackageName: "api",
+				Output:      &Output{UseSingleFile: tt.singleFile},
+				Generate:    &GenerateOptions{Validation: tt.validation},
+			}
+
+			codes, err := Generate([]byte(readTestdata(t, "union-constrained-members.yml")), cfg)
+			require.NoError(t, err)
+
+			var code strings.Builder
+			for _, file := range codes {
+				code.WriteString(file)
+				code.WriteString("\n")
+			}
+			all := code.String()
+
+			if !tt.validates {
+				assert.NotContains(t, all, "typesValidator", "nothing declares it")
+				for site, tag := range tags {
+					assert.NotContains(t, all, `"`+tag+`"`, site)
+				}
+				return
+			}
+
+			assert.Contains(t, all, "var typesValidator *validator.Validate", "every call needs it declared")
+			for site, tag := range tags {
+				assert.Regexp(t, `typesValidator\.Var\([^,]+, "`+regexp.QuoteMeta(tag)+`"\)`, all, site)
+			}
+		})
+	}
+}
