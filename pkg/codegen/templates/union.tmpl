@@ -15,6 +15,11 @@ limitations under the License.
 */}}
 {{ $config := .Config }}
 {{ $typeSchemaMap := .TypeSchemaMap }}
+{{/*
+    With validation skipped, common.tmpl is not rendered, so there is no typesValidator to call.
+    A variant with constraints is then handled like one without: it only defers to its own Validate().
+*/}}
+{{ $skipValidation := $config.Generate.Validation.Skip }}
 
 {{range .Types}}
 {{$typeName := .Name -}}
@@ -38,7 +43,7 @@ limitations under the License.
         {{- $tagsThen := filterOmitEmpty $elementThen.Schema.Constraints.ValidationTags }}
         {{- $tagsElse := filterOmitEmpty $elementElse.Schema.Constraints.ValidationTags }}
         if {{$alias}}.IsThen() {
-            {{- if gt (len $tagsThen) 0 }}
+            {{- if and (not $skipValidation) (gt (len $tagsThen) 0) }}
             if err := typesValidator.Var({{$alias}}.Then, "{{join "," $tagsThen}}"); err != nil {
                 return err
             }
@@ -49,7 +54,7 @@ limitations under the License.
             {{- end }}
         }
         if {{$alias}}.IsElse() {
-            {{- if gt (len $tagsElse) 0 }}
+            {{- if and (not $skipValidation) (gt (len $tagsElse) 0) }}
             if err := typesValidator.Var({{$alias}}.Else, "{{join "," $tagsElse}}"); err != nil {
                 return err
             }
@@ -66,7 +71,7 @@ limitations under the License.
         {{- $tagsA := filterOmitEmpty $elementA.Schema.Constraints.ValidationTags }}
         {{- $tagsB := filterOmitEmpty $elementB.Schema.Constraints.ValidationTags }}
         if {{$alias}}.IsA() {
-            {{- if gt (len $tagsA) 0 }}
+            {{- if and (not $skipValidation) (gt (len $tagsA) 0) }}
             if err := typesValidator.Var({{$alias}}.A, "{{join "," $tagsA}}"); err != nil {
                 return err
             }
@@ -77,7 +82,7 @@ limitations under the License.
             {{- end }}
         }
         if {{$alias}}.IsB() {
-            {{- if gt (len $tagsB) 0 }}
+            {{- if and (not $skipValidation) (gt (len $tagsB) 0) }}
             if err := typesValidator.Var({{$alias}}.B, "{{join "," $tagsB}}"); err != nil {
                 return err
             }
@@ -156,7 +161,7 @@ limitations under the License.
     {{range .Schema.UnionElements}}
         {{$element := . -}}
         {{- $tags := filterOmitEmpty .Schema.Constraints.ValidationTags }}
-        {{- if gt (len $tags) 0 }}
+        {{- if and (not $skipValidation) (gt (len $tags) 0) }}
         // validate{{.Method}} validates a {{.TypeName}} value
         func ({{$alias}} *{{$typeName}}) validate{{.Method}}(val {{.TypeName}}) error {
             return typesValidator.Var(val, "{{join "," $tags}}")

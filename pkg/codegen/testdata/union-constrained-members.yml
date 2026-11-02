@@ -1,0 +1,85 @@
+openapi: "3.1.0"
+info:
+  version: 1.0.0
+  title: Union members with validation constraints
+  description: >
+    Union variants that are plain values carrying constraints. Each one has its own
+    constraint value, so a generated validation tag points at the template site that wrote it.
+paths:
+  /boxes:
+    get:
+      operationId: getBoxes
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reported:
+                    $ref: '#/components/schemas/Reported'
+                  either:
+                    $ref: '#/components/schemas/Either'
+                  many:
+                    $ref: '#/components/schemas/Many'
+                  conditional:
+                    $ref: '#/components/schemas/Conditional'
+components:
+  schemas:
+    Percent:
+      type: object
+      properties:
+        kind:
+          type: string
+
+    # An object variant next to a constrained scalar, the shape reported in issue 188.
+    Reported:
+      type: object
+      properties:
+        buffer:
+          anyOf:
+            - $ref: '#/components/schemas/Percent'
+            - type: integer
+              minimum: 0
+              maximum: 9007199254740991
+
+    # Two variants, each checked in place by Validate().
+    Either:
+      type: object
+      properties:
+        value:
+          anyOf:
+            - type: string
+              maxLength: 43
+            - type: integer
+              minimum: 44
+
+    # More than two variants: Validate() is a no-op and the As*/From* helpers do the checking.
+    Many:
+      type: object
+      properties:
+        value:
+          oneOf:
+            - $ref: '#/components/schemas/Percent'
+            - type: integer
+              minimum: 45
+            - type: string
+              minLength: 46
+
+    # if/then/else: both branches are checked in place by Validate().
+    Conditional:
+      type: object
+      properties:
+        kind:
+          type: string
+      if:
+        properties:
+          kind:
+            const: typeA
+      then:
+        type: string
+        minLength: 41
+      else:
+        type: integer
+        minimum: 42
