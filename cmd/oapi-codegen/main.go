@@ -140,8 +140,8 @@ func main() {
 			continue
 		}
 
-		// In single-file mode, only write scaffold files
-		if destFile != "" && !isScaffold {
+		// In single-file mode, only write scaffold and test files
+		if destFile != "" && !isScaffold && !codegen.IsTestFile(name) {
 			continue
 		}
 

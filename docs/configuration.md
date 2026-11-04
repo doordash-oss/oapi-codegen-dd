@@ -179,6 +179,43 @@ The four valid combinations:
 
 See [examples/responses/multiple/client-with-response/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-with-response/cfg.yaml){:target="_blank"} for envelope-only and [examples/responses/multiple/client-combined/cfg.yaml](https://github.com/doordash-oss/oapi-codegen-dd/blob/main/examples/responses/multiple/client-combined/cfg.yaml){:target="_blank"} for the combined case.
 
+#### `generate.client-tests`
+**Type:** `boolean` | **Default:** `false`
+
+Generate `client_test.go` next to the classic client: one `httptest`-based
+contract test per operation, so `go test ./...` checks the generated client
+against the spec it came from after every regeneration.
+
+```yaml
+generate:
+  client: true
+  client-tests: true
+```
+
+Each test builds request fixtures from the spec at generation time (`example`,
+`enum` and `const` values first, then type and format, honoring bounds such as
+`minimum` and `minLength`), sends them through the real client to a test
+server, and checks:
+
+- the method and the resolved path,
+- query parameters (exact values for primitive `form` parameters, presence
+  for arrays, `deepObject` and other styles) and header parameters,
+- the request `Content-Type`, and for JSON bodies that the body the server
+  received decodes to the value that was sent,
+- that the documented success response decodes into the generated response
+  type, and, when the operation documents an error response, that its status
+  surfaces as a `*runtime.ClientAPIError` with that code.
+
+A fixture that does not decode into its generated type fails the test, which
+points at a type that cannot hold a value its own schema allows.
+
+The tests are contract smoke tests: they cover the wire format, not business
+logic. Streaming siblings, `WithResponse` envelopes, and the bodies of
+non-JSON requests are not covered yet. Requires [`generate.client`](#generateclient).
+In single-file mode `client_test.go` is written next to the output file.
+
+See [examples/client/contract-tests](https://github.com/doordash-oss/oapi-codegen-dd/tree/main/examples/client/contract-tests){:target="_blank"} for a complete example.
+
 #### `generate.client-streaming`
 **Type:** `boolean` | **Default:** `false`
 

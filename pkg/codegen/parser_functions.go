@@ -27,6 +27,7 @@ var TemplateFunctions = template.FuncMap{
 	"genTypeName":    nameNormalizer,
 	"lcFirst":        lowercaseFirstCharacter,
 	"ucFirst":        uppercaseFirstCharacter,
+	"fixtureLiteral": fixtureLiteral,
 	"caps":           strings.ToUpper,
 	"lower":          strings.ToLower,
 	"snake":          strcase.ToSnake,

@@ -37,6 +37,7 @@ var (
 	ErrServerRequiresService                     = errors.New("server generation requires service generation: add 'service: {}' to handler config")
 	ErrInvalidAdditionalTag                      = errors.New("invalid additional tag name: must not be empty or contain spaces, quotes, or colons")
 	ErrModelsPackageRequiresModelsFalse          = errors.New("generate.handler.models-package requires generate.models: false")
+	ErrClientTestsRequireClient                  = errors.New("generate.client-tests requires generate.client: true")
 	ErrModelsPackagePathRequired                 = errors.New("generate.handler.models-package.path is required")
 	ErrConflictingPackageAlias                   = errors.New("generate.handler.handler-package-alias and the deprecated models-package-alias are both set to different values")
 
