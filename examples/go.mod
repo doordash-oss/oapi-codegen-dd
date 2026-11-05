@@ -10,7 +10,7 @@ require (
 	github.com/doordash-oss/oapi-codegen-dd/v3 v3.63.4
 	github.com/fasthttp/router v1.5.4
 	github.com/gin-gonic/gin v1.11.0
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/go-playground/validator/v10 v10.30.4
 	github.com/gofiber/fiber/v3 v3.3.0
