@@ -192,6 +192,9 @@ func (o Configuration) OverwriteWith(other Configuration) Configuration {
 			if other.Generate.ClientStreaming {
 				o.Generate.ClientStreaming = other.Generate.ClientStreaming
 			}
+			if other.Generate.ClientTests {
+				o.Generate.ClientTests = other.Generate.ClientTests
+			}
 			if other.Generate.OmitDescription {
 				o.Generate.OmitDescription = other.Generate.OmitDescription
 			}
@@ -375,6 +378,13 @@ type GenerateOptions struct {
 	// interface, which would break hand-written mocks on upgrade.
 	ClientStreaming bool `yaml:"client-streaming"`
 
+	// ClientTests emits client_test.go next to the classic client: one
+	// httptest-based contract test per operation, built from spec-derived
+	// fixtures. Each test checks the request the client sends (method, path,
+	// query, headers, body) and that the documented success and error
+	// responses decode. Requires Client.
+	ClientTests bool `yaml:"client-tests"`
+
 	// Models specifies whether to generate model types. Defaults to true.
 	// Set to false when models are generated in a separate package.
 	Models *bool `yaml:"models,omitempty"`
@@ -412,6 +422,10 @@ func (o GenerateOptions) Validate() error {
 		if tag == "" || strings.ContainsAny(tag, " \t\"'`:") {
 			return fmt.Errorf("%w: %q", ErrInvalidAdditionalTag, tag)
 		}
+	}
+
+	if o.ClientTests && !o.Client {
+		return ErrClientTestsRequireClient
 	}
 
 	if o.Handler != nil && o.Handler.ModelsPackage != nil {

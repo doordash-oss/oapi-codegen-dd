@@ -1,0 +1,45 @@
+openapi: "3.0.0"
+info: {title: t, version: "1"}
+paths:
+  /pets/{petId}/:
+    put:
+      operationId: updatePet
+      parameters:
+        - {name: petId, in: path, required: true, schema: {type: integer, minimum: 10}}
+        - {name: dryRun, in: query, required: false, schema: {type: boolean}}
+        - {name: fields, in: query, required: false, schema: {type: array, items: {type: string}}, style: form, explode: false}
+        - {name: filter, in: query, required: true, style: deepObject, schema: {type: object, properties: {kind: {type: string}}}}
+        - {name: X-Trace, in: header, required: true, schema: {type: string, minLength: 12}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Pet'}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Pet'}
+        "422":
+          description: invalid
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Problem'}
+  /ping:
+    get:
+      operationId: ping
+      responses:
+        "204": {description: pong}
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, example: Rex}
+        kind: {type: string, enum: [dog, cat]}
+    Problem:
+      type: object
+      properties:
+        detail: {type: string}
