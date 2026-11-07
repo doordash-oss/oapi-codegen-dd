@@ -13,6 +13,7 @@ package codegen
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"mime"
 	"net/http"
 	"strconv"
@@ -27,17 +28,19 @@ import (
 // Its "_test" suffix makes the CLI write it as client_test.go.
 const clientTestsFileName = "client_test"
 
-// IsTestFile reports whether a GeneratedCode entry is a Go test file. Test
-// files are never part of the combined single-file output; the CLI writes
-// them next to it instead.
-func IsTestFile(name string) bool {
-	return strings.HasSuffix(name, "_test")
-}
-
 // maxFixtureDepth bounds how deep fixtures recurse into nested schemas. It
 // keeps circular schemas finite: past it, only required properties are kept,
 // and a schema nested deeper than twice the limit is dropped.
 const maxFixtureDepth = 4
+
+// goTypeFixtureFormats maps x-go-type suffixes to the string format whose
+// fixture they decode, for schemas that have no example.
+var goTypeFixtureFormats = []struct{ goType, format string }{
+	{"uuid.UUID", "uuid"},
+	{"time.Time", "date-time"},
+	{"netip.Addr", "ipv4"},
+	{"net.IP", "ipv4"},
+}
 
 // ClientTestCase is everything client-tests.tmpl needs for one operation: the
 // request fixtures to send and the wire format the server should observe.
@@ -84,6 +87,41 @@ type ClientTestCase struct {
 type ClientTestKeyValue struct {
 	Key   string
 	Value string
+}
+
+type fixtureBuilder struct {
+	// active tracks the schemas and references on the current path, to stop
+	// at cycles. A proxy resolves to a fresh *base.Schema on every call, so a
+	// recursive reference is only recognizable by its reference string.
+	active    map[*base.Schema]bool
+	activeRef map[string]bool
+}
+
+// IsTestFile reports whether a GeneratedCode entry is a Go test file. Test
+// files are never part of the combined single-file output; the CLI writes
+// them next to it instead.
+func IsTestFile(name string) bool {
+	return strings.HasSuffix(name, "_test")
+}
+
+// IsGeneratedTestFile reports whether an existing client_test.go was written
+// by the generator, so regenerating may replace it: it carries the standard
+// "Code generated ... DO NOT EDIT." line, or (with a custom copyright-header)
+// defines the generated contract-test helpers.
+func IsGeneratedTestFile(existing string) bool {
+	if strings.Contains(existing, "func decodeClientContractFixture(") {
+		return true
+	}
+	for _, line := range strings.Split(existing, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "package ") {
+			break
+		}
+		if strings.HasPrefix(line, "// Code generated ") && strings.HasSuffix(line, " DO NOT EDIT.") {
+			return true
+		}
+	}
+	return false
 }
 
 // buildClientTestCases derives one ClientTestCase per operation. Fixture
@@ -397,14 +435,6 @@ func schemaType(s *base.Schema) string {
 	return ""
 }
 
-type fixtureBuilder struct {
-	// active tracks the schemas and references on the current path, to stop
-	// at cycles. A proxy resolves to a fresh *base.Schema on every call, so a
-	// recursive reference is only recognizable by its reference string.
-	active    map[*base.Schema]bool
-	activeRef map[string]bool
-}
-
 func newFixtureBuilder() *fixtureBuilder {
 	return &fixtureBuilder{active: map[*base.Schema]bool{}, activeRef: map[string]bool{}}
 }
@@ -697,11 +727,13 @@ func proxySchema(proxy *base.SchemaProxy) *base.Schema {
 func stringFixture(s *base.Schema) string {
 	format := s.Format
 	// A Go type override decides what decodes, whatever the format says.
-	switch goType := goTypeOverride(s); {
-	case strings.HasSuffix(goType, "uuid.UUID"):
-		format = "uuid"
-	case goType == "time.Time":
-		format = "date-time"
+	if goType := goTypeOverride(s); goType != "" {
+		for _, f := range goTypeFixtureFormats {
+			if strings.HasSuffix(goType, f.goType) {
+				format = f.format
+				break
+			}
+		}
 	}
 	var v string
 	switch format {
@@ -801,7 +833,9 @@ func exampleOf(s *base.Schema, typ string) (any, bool) {
 		}
 		switch v := v.(type) {
 		case string:
-			if typ == "string" && s.Format == "" && goTypeOverride(s) == "" {
+			// With an x-go-type the example was written for that type, so it
+			// is the best value there is.
+			if typ == "string" && (s.Format == "" || goTypeOverride(s) != "") {
 				return v, true
 			}
 		case int64:
@@ -831,6 +865,11 @@ func nodeValue(n *yaml.Node) (any, bool) {
 	case int:
 		return int64(v), true
 	case uint64:
+		// Only values above math.MaxInt64 decode as uint64. Converting them
+		// would wrap around to a negative number, so they are skipped.
+		if v > math.MaxInt64 {
+			return nil, false
+		}
 		return int64(v), true
 	case string, bool, int64, float64, nil:
 		return v, true

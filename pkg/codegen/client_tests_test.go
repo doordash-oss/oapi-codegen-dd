@@ -20,54 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const clientTestsSpec = `
-openapi: "3.0.0"
-info: {title: t, version: "1"}
-paths:
-  /pets/{petId}/:
-    put:
-      operationId: updatePet
-      parameters:
-        - {name: petId, in: path, required: true, schema: {type: integer, minimum: 10}}
-        - {name: dryRun, in: query, required: false, schema: {type: boolean}}
-        - {name: fields, in: query, required: false, schema: {type: array, items: {type: string}}, style: form, explode: false}
-        - {name: filter, in: query, required: true, style: deepObject, schema: {type: object, properties: {kind: {type: string}}}}
-        - {name: X-Trace, in: header, required: true, schema: {type: string, minLength: 12}}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/Pet'}
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Pet'}
-        "422":
-          description: invalid
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Problem'}
-  /ping:
-    get:
-      operationId: ping
-      responses:
-        "204": {description: pong}
-components:
-  schemas:
-    Pet:
-      type: object
-      required: [name]
-      properties:
-        name: {type: string, example: Rex}
-        kind: {type: string, enum: [dog, cat]}
-    Problem:
-      type: object
-      properties:
-        detail: {type: string}
-`
-
 func generateClientTests(t *testing.T, spec string, cfg Configuration) GeneratedCode {
 	t.Helper()
 	code, err := Generate([]byte(spec), cfg)
@@ -82,7 +34,7 @@ func TestClientTests_Generated(t *testing.T) {
 	cfg.Generate.Client = true
 	cfg.Generate.ClientTests = true
 
-	code := generateClientTests(t, clientTestsSpec, cfg)
+	code := generateClientTests(t, readTestdata(t, "client-tests.yml"), cfg)
 	src, ok := code[clientTestsFileName]
 	require.True(t, ok, "client_test file not generated")
 
@@ -118,7 +70,7 @@ func TestClientTests_SingleFile(t *testing.T) {
 	cfg.Generate.Client = true
 	cfg.Generate.ClientTests = true
 
-	code := generateClientTests(t, clientTestsSpec, cfg)
+	code := generateClientTests(t, readTestdata(t, "client-tests.yml"), cfg)
 	assert.Contains(t, code[clientTestsFileName], "func TestClientContract_UpdatePet")
 	assert.NotContains(t, code.GetCombined(), "httptest", "test code leaked into the combined output")
 	assert.True(t, IsTestFile(clientTestsFileName))
@@ -129,7 +81,7 @@ func TestClientTests_OffByDefault(t *testing.T) {
 	cfg := NewDefaultConfiguration()
 	cfg.Generate.Client = true
 
-	code := generateClientTests(t, clientTestsSpec, cfg)
+	code := generateClientTests(t, readTestdata(t, "client-tests.yml"), cfg)
 	_, ok := code[clientTestsFileName]
 	assert.False(t, ok)
 }
@@ -139,7 +91,7 @@ func TestClientTests_RequireClient(t *testing.T) {
 	cfg.Generate.Client = false
 	cfg.Generate.ClientTests = true
 
-	_, err := Generate([]byte(clientTestsSpec), cfg)
+	_, err := Generate([]byte(readTestdata(t, "client-tests.yml")), cfg)
 	require.ErrorIs(t, err, ErrClientTestsRequireClient)
 }
 
@@ -265,4 +217,59 @@ func TestFixtureLiteral(t *testing.T) {
 	assert.Equal(t, "`{\"a\":1}`", fixtureLiteral(`{"a":1}`))
 	assert.Equal(t, "\"a`b\"", fixtureLiteral("a`b"))
 	assert.Equal(t, `"a\rb"`, fixtureLiteral("a\rb"))
+}
+
+func TestFixture_Uint64AboveMaxInt64(t *testing.T) {
+	spec := `
+openapi: 3.1.0
+info: {title: t, version: "1"}
+components:
+  schemas:
+    S:
+      type: object
+      properties:
+        big: {type: integer, format: uint64, example: 18446744073709551615}
+        fits: {type: integer, format: uint64, example: 9223372036854775807}
+`
+	got := fixtureOf(t, spec, "S")
+	// An example that does not fit in int64 must not wrap to a negative value.
+	assert.Equal(t, float64(1), got["big"])
+	assert.Equal(t, float64(9223372036854775807), got["fits"])
+}
+
+func TestFixture_GoTypeOverrideUsesExample(t *testing.T) {
+	spec := `
+openapi: 3.1.0
+info: {title: t, version: "1"}
+components:
+  schemas:
+    S:
+      type: object
+      properties:
+        addr:
+          type: string
+          example: "192.0.2.10"
+          x-go-type: netip.Addr
+          x-go-type-import: {path: net/netip}
+        stamp:
+          type: string
+          format: date-time
+          example: "2020-05-06T07:08:09Z"
+          x-go-type: time.Time
+        noExample: {type: string, x-go-type: netip.Addr}
+        formatOnly: {type: string, format: date, example: "not a date"}
+`
+	got := fixtureOf(t, spec, "S")
+	assert.Equal(t, "192.0.2.10", got["addr"])
+	assert.Equal(t, "2020-05-06T07:08:09Z", got["stamp"])
+	assert.Equal(t, "192.0.2.1", got["noExample"])
+	// Without x-go-type a formatted string still uses the format's fixture.
+	assert.Equal(t, "2026-01-02", got["formatOnly"])
+}
+
+func TestIsGeneratedTestFile(t *testing.T) {
+	assert.True(t, IsGeneratedTestFile("// Code generated by oapi-codegen. DO NOT EDIT.\n\npackage gen\n"))
+	assert.True(t, IsGeneratedTestFile("// Copyright Acme\n\npackage gen\n\nfunc decodeClientContractFixture(t *testing.T) {}\n"))
+	assert.False(t, IsGeneratedTestFile("package gen\n\nfunc TestMine(t *testing.T) {}\n"))
+	assert.False(t, IsGeneratedTestFile("package gen\n\n// Code generated by oapi-codegen. DO NOT EDIT.\n"))
 }
