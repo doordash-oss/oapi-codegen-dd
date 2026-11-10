@@ -39,6 +39,7 @@ var (
 	ErrModelsPackageRequiresModelsFalse          = errors.New("generate.handler.models-package requires generate.models: false")
 	ErrModelsPackagePathRequired                 = errors.New("generate.handler.models-package.path is required")
 	ErrConflictingPackageAlias                   = errors.New("generate.handler.handler-package-alias and the deprecated models-package-alias are both set to different values")
+	ErrClientTestsRequireClient                  = errors.New("generate.client-tests requires generate.client: true")
 
 	errNoErrorMappingPath    = errors.New("no error-mapping path")
 	errUnionVariantUnknown   = errors.New("its oneOf/anyOf union has neither exactly two variants nor a discriminator that maps them, so the decoded variant is unknown")

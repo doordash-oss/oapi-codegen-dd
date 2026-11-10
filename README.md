@@ -25,6 +25,7 @@ on the real value-add for your organization.
 - **HTTP client generation** - Generate type-safe HTTP clients with customizable timeout and request editors
 - **Envelope `WithResponse` clients** - Opt-in `<Op>WithResponse` siblings that return a typed envelope with per-status bodies, typed headers, and the raw `*http.Response` - useful for operations that legitimately return multiple 2xx statuses or need typed access to response headers
 - **[Streaming responses](https://doordash-oss.github.io/oapi-codegen-dd/streaming/)** - Opt-in `<Op>Stream` siblings for Server-Sent Events and newline-delimited JSON, returning a live `runtime.Stream[T]` over the per-frame type instead of buffering. An operation declaring both `application/json` and `text/event-stream` exposes both shapes
+- **Contract tests** - Opt-in `client_test.go` with one `httptest` contract test per operation, built from the spec, so a regeneration that changes the wire format fails `go test`
 - **Custom client types** - Wrap generated clients with your own types for additional functionality
 - **Error mapping** - Map response types to implement the `error` interface automatically
 

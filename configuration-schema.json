@@ -110,6 +110,10 @@
           "type": "boolean",
           "description": "Generate a <Op>Stream sibling for every operation that documents a sequential success response (text/event-stream, or the ndjson/jsonl family), returning a live runtime.Stream[T] over the per-frame type instead of buffering the body. The per-frame type comes from OpenAPI 3.2 itemSchema when present, else from schema. Non-streaming methods keep their media type and signatures, so an operation offering both application/json and text/event-stream exposes both shapes and no overlay is needed. With client-with-response, a <Op>StreamWithResponse sibling is generated too and the envelope gains Stream<status> next to JSON<status>. Off by default, because the siblings add methods to the generated client interface. Defaults to false."
         },
+        "client-tests": {
+          "type": "boolean",
+          "description": "Generate client_test.go next to the classic client: one httptest-based contract test per operation, built from fixtures derived from the spec. Each test checks the request the client sends (method, resolved path, query, headers, JSON body round trip) and that the documented success response, and the first documented error response, decode as expected. Requires client. Defaults to false."
+        },
         "models": {
           "type": "boolean",
           "description": "Models specifies whether to generate model types. Defaults to true. Set to false when models are generated in a separate package."

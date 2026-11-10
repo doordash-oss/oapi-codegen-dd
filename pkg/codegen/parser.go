@@ -177,6 +177,12 @@ type TplOperationsContext struct {
 	ErrorConstructors map[string]bool
 }
 
+// TplClientTestsContext is the data for client-tests.tmpl.
+type TplClientTestsContext struct {
+	Cases  []ClientTestCase
+	Config Configuration
+}
+
 // NewParser creates a new Parser with the provided ParseConfig and ParseContext.
 func NewParser(cfg Configuration, ctx *ParseContext) (*Parser, error) {
 	cfg = cfg.WithDefaults()
@@ -300,6 +306,27 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 				}
 			}
 			typesOut[strcase.ToSnake(tmpl)] = formatted
+		}
+	}
+
+	// Contract tests are their own file in both output modes: test code can't
+	// be part of the combined single-file output.
+	var clientTests string
+	if p.cfg.Generate.ClientTests {
+		cases, err := buildClientTestCases(p.ctx.Operations, typeSchemaMap)
+		if err != nil {
+			return nil, err
+		}
+		out, err := p.ParseTemplates([]string{"client-tests.tmpl"}, &TplClientTestsContext{
+			Cases:  cases,
+			Config: p.cfg,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error generating code for client tests: %w", err)
+		}
+		clientTests, err = p.formatCode(out)
+		if err != nil {
+			return nil, fmt.Errorf("error formatting client tests: %w", err)
 		}
 	}
 
@@ -670,6 +697,10 @@ func (p *Parser) Parse() (GeneratedCode, error) {
 			return nil, err
 		}
 		typesOut = map[string]string{"all": formatted}
+	}
+
+	if clientTests != "" {
+		typesOut[clientTestsFileName] = clientTests
 	}
 
 	// Merge scaffold files into the main map with prefix
