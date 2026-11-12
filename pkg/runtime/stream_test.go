@@ -346,7 +346,8 @@ func TestStream_All(t *testing.T) {
 		stream := NewLineStream[streamEvent](&http.Response{Body: body})
 
 		seen := 0
-		for range stream.All() {
+		for _, err := range stream.All() {
+			require.NoError(t, err)
 			seen++
 			break
 		}
