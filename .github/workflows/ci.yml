@@ -42,11 +42,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.7"
+          go-version: "1.26.0"
           cache: true
 
       - name: Install gosec
-        # v2.30.0 and later require go 1.26
+        # Pinned, not @latest: a gosec release can raise its minimum Go version and break
+        # this step. v2.30.0 builds on Go 1.26 but reports G301/G306 for the 0755/0644
+        # modes of generated files in cmd/oapi-codegen/main.go, so it needs its own change.
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
 
       - name: Download Go modules
@@ -66,7 +68,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.7"
+          go-version: "1.26.0"
           cache: true
 
       - name: Download Go modules
@@ -97,7 +99,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.7"
+          go-version: "1.26.0"
           cache: true
 
       - name: Cache Go build cache
