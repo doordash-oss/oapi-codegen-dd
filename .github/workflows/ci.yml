@@ -47,9 +47,8 @@ jobs:
 
       - name: Install gosec
         # Pinned, not @latest: a gosec release can raise its minimum Go version and break
-        # this step. v2.30.0 builds on Go 1.26 but reports G301/G306 for the 0755/0644
-        # modes of generated files in cmd/oapi-codegen/main.go, so it needs its own change.
-        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+        # this step. Nothing updates this pin automatically, so bump it by hand.
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
 
       - name: Download Go modules
         run: go mod download

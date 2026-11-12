@@ -85,7 +85,7 @@ check-all: generate lint test test-integration
 gosec-examples:
 	cd examples && make gosec
 
-# go install github.com/securego/gosec/v2/cmd/gosec@latest
+# go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0 (keep in step with .github/workflows/ci.yml)
 gosec: gosec-examples
 	gosec -exclude-dir=.data -exclude-dir=examples ./...
 

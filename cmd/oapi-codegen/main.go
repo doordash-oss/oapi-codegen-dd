@@ -101,6 +101,7 @@ func main() {
 	if cfg.Output != nil {
 		destDir = cfg.Output.Directory
 		if destDir != "" {
+			// #nosec G301 -- generated source directories must stay readable by build tools and other users
 			err = os.MkdirAll(destDir, generatedDirPerm)
 			if err != nil {
 				errExit("Error creating directory: %v", err)
@@ -110,6 +111,7 @@ func main() {
 			destFile = filepath.Join(destDir, cfg.Output.Filename)
 		} else {
 			destDir = filepath.Join(destDir, cfg.PackageName)
+			// #nosec G301 -- generated source directories must stay readable by build tools and other users
 			err = os.MkdirAll(destDir, generatedDirPerm)
 			if err != nil {
 				errExit("Error creating directory: %v", err)
@@ -123,6 +125,7 @@ func main() {
 	}
 
 	if destFile != "" {
+		// #nosec G306 -- generated source files must stay readable by build tools and other users
 		if err = os.WriteFile(destFile, []byte(code.GetCombined()), generatedFilePerm); err != nil {
 			errExit("Error writing file: %v", err)
 		}
@@ -177,6 +180,7 @@ func main() {
 		if err := os.MkdirAll(filepath.Dir(filePath), 0750); err != nil {
 			errExit("Error creating directory: %v", err)
 		}
+		// #nosec G306 -- generated source files must stay readable by build tools and other users
 		if err = os.WriteFile(filePath, []byte(contents), generatedFilePerm); err != nil {
 			errExit("Error writing file: %v", err)
 		}
