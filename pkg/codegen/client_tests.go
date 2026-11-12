@@ -20,8 +20,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"go.yaml.in/yaml/v4"
 )
 
 // clientTestsFileName is the GeneratedCode key of the generated contract tests.
